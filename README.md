@@ -185,12 +185,30 @@ Comandos disponiveis:
 | `npm start` | Iniciar o sistema e abrir o navegador automaticamente |
 | `npm run dev` | Iniciar o servidor Vite |
 | `npm run build` | Gerar o build de producao |
+| `npm run build:pages` | Gerar o build para o GitHub Pages |
 | `npm run preview` | Servir o build localmente |
 | `npm test` | Executar os testes unitarios |
 | `npm run test:watch` | Executar testes em modo continuo |
 | `npm run test:e2e` | Executar os fluxos de interface no Chrome mobile e desktop |
 | `npm run emulators` | Iniciar os emuladores Firebase |
 | `npm run deploy` | Gerar o build e publicar no Firebase Hosting |
+
+## Publicacao no GitHub Pages
+
+O ambiente inicial pode ser publicado pelo workflow `Deploy GitHub Pages` em:
+
+```text
+https://gabrielbarbosa0.github.io/FASCINLEAD/
+```
+
+Antes da primeira publicacao:
+
+1. Em `Settings > Secrets and variables > Actions`, crie o segredo `VITE_FIREBASE_API_KEY`.
+2. Em `Settings > Pages`, selecione `GitHub Actions` como origem da publicacao.
+3. No Firebase Authentication, adicione `gabrielbarbosa0.github.io` aos dominios autorizados.
+4. Envie as alteracoes para a branch `main` ou execute manualmente o workflow na aba `Actions`.
+
+O build do GitHub Pages usa o caminho `/FASCINLEAD/`. O desenvolvimento local continua usando a raiz `/`.
 
 Copie `.env.example` para `.env.local` e preencha a configuracao web do projeto Firebase. Para usar os emuladores, defina `VITE_USE_FIREBASE_EMULATORS=true`.
 
