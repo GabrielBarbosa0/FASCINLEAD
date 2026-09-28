@@ -144,4 +144,31 @@ describe('access administration rules', () => {
 
     await assertFails(batch.commit());
   });
+
+  it('lets an authorized collaborator create the profile on first login', async () => {
+    const email = 'novo-captador@example.com';
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'allowedEmails', email), {
+        email,
+        displayName: 'Novo Captador',
+        role: 'captor',
+        storeId: 'loja-06',
+        active: true
+      });
+    });
+
+    const db = authenticatedDb('novo-captador-uid', email, 'captor');
+    await assertSucceeds(getDoc(doc(db, 'allowedEmails', email)));
+    await assertSucceeds(setDoc(doc(db, 'users', 'novo-captador-uid'), {
+      email,
+      displayName: 'Novo Captador',
+      photoUrl: '',
+      role: 'captor',
+      storeId: 'loja-06',
+      active: true,
+      createdAt: serverTimestamp(),
+      lastLoginAt: serverTimestamp()
+    }));
+  });
 });

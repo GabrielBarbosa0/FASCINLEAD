@@ -441,7 +441,7 @@ Ao detectar nova versao, o aplicativo avisara o usuario e aplicara a atualizacao
 4. O perfil em `users/{uid}` e criado com os mesmos `role` e `storeId` autorizados.
 5. A sessao passa a ser persistida no navegador.
 
-Em celular, o fluxo por redirecionamento sera preferido ao popup quando oferecer maior compatibilidade.
+O login Google usara popup em computadores e celulares. No GitHub Pages, o redirecionamento entre dominios pode perder o estado da autenticacao por restricoes modernas de armazenamento do navegador. Em navegadores internos de outros aplicativos, a interface orientara abrir o FascinLead diretamente no Chrome ou Safari quando o popup for bloqueado.
 
 ### 10.2 Principios das regras do Firestore
 

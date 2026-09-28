@@ -23,24 +23,28 @@ export async function signInWithGoogle() {
   }
 
   await authPersistenceReady;
-  const prefersRedirect = matchMedia('(max-width: 700px), (pointer: coarse)').matches;
-  if (prefersRedirect) {
-    await signInWithRedirect(auth, provider);
-    return null;
-  }
-
   try {
     return await signInWithPopup(auth, provider);
   } catch (error) {
-    const shouldRetryWithRedirect = [
-      'auth/popup-blocked',
-      'auth/popup-closed-by-user',
-      'auth/cancelled-popup-request'
-    ].includes(error?.code);
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+    if (isLocalhost && ['auth/popup-blocked', 'auth/cancelled-popup-request'].includes(error?.code)) {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
 
-    if (!shouldRetryWithRedirect) throw error;
-    await signInWithRedirect(auth, provider);
-    return null;
+    if (error?.code === 'auth/popup-blocked') {
+      throw new Error('O navegador bloqueou o login do Google. Abra o FascinLead diretamente no Chrome ou Safari e tente novamente.');
+    }
+
+    if (error?.code === 'auth/popup-closed-by-user') {
+      throw new Error('A janela do Google foi fechada antes de concluir o login. Tente novamente e mantenha a janela aberta.');
+    }
+
+    if (error?.code === 'auth/cancelled-popup-request') {
+      throw new Error('Ja existe uma tentativa de login aberta. Aguarde alguns segundos e tente novamente.');
+    }
+
+    throw error;
   }
 }
 
