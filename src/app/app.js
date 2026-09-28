@@ -151,6 +151,17 @@ function roleLabel(role) {
   return { captor: 'Captador', manager: 'Gestor', admin: 'Administrador' }[role] || 'Colaborador';
 }
 
+function profileInitials(displayName = '') {
+  return String(displayName)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || '?';
+}
+
 function canManage() {
   return ['manager', 'admin'].includes(state.profile?.role);
 }
@@ -242,12 +253,7 @@ function headerView() {
 }
 
 function profileCard() {
-  const initials = state.profile.displayName
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
+  const initials = profileInitials(state.profile.displayName);
 
   return `
     <section class="profile-card">
@@ -467,8 +473,8 @@ function accessView() {
     const isCurrentUser = access.email === state.profile.email?.toLowerCase();
     return `<article class="access-row ${access.active ? '' : 'is-inactive'}">
       <div class="access-identity">
-        <span class="access-avatar">${escapeHtml(access.displayName[0]?.toUpperCase() || '?')}</span>
-        <div><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
+        <span class="avatar access-avatar">${escapeHtml(profileInitials(access.displayName))}</span>
+        <div class="access-identity-copy"><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
       </div>
       <div class="access-detail"><span>Perfil</span><strong>${roleLabel(access.role)}</strong></div>
       <div class="access-detail"><span>Loja</span><strong>${escapeHtml(storeLabel(access.storeId))}</strong></div>

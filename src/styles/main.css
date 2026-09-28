@@ -977,34 +977,27 @@ svg {
 }
 
 .access-avatar {
-  width: 40px;
-  height: 40px;
-  display: grid;
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--brand);
-  background: var(--brand-soft);
-  font-weight: 850;
 }
 
 .access-identity strong,
-.access-identity span,
+.access-identity-copy > span,
 .access-detail span,
 .access-detail strong {
   display: block;
 }
 
-.access-identity div {
+.access-identity-copy {
   min-width: 0;
 }
 
-.access-identity span {
+.access-identity-copy > span {
   overflow: hidden;
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.78rem;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .access-detail span {
