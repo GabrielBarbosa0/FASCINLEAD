@@ -18,7 +18,6 @@ import {
   House,
   Info,
   KeyRound,
-  Lightbulb,
   LogIn,
   LogOut,
   Pencil,
@@ -66,7 +65,6 @@ const appIcons = {
   House,
   Info,
   KeyRound,
-  Lightbulb,
   LogIn,
   LogOut,
   Pencil,
@@ -300,10 +298,6 @@ function homeView() {
         <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
-    </section>
-    <section class="info-band">
-      <i data-lucide="lightbulb"></i>
-      <div><strong>Cadastro enxuto</strong><p>Nome, telefone e autorizacao sao suficientes para registrar a abordagem.</p></div>
     </section>`;
 }
 
