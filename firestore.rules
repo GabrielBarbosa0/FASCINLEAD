@@ -55,9 +55,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if activeUser() && (
-        request.auth.uid == userId || isAdmin()
-      );
+      allow get: if signedIn() && request.auth.uid == userId
+        || isAdmin();
 
       allow create: if signedIn()
         && request.auth.uid == userId
