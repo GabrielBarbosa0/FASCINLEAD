@@ -1,4 +1,4 @@
-const VALID_ROUTES = new Set(['home', 'new', 'leads', 'sync']);
+const VALID_ROUTES = new Set(['home', 'new', 'leads', 'sync', 'management']);
 
 export function currentRoute() {
   const route = location.hash.replace(/^#\/?/, '') || 'home';

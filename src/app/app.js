@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  BarChart3,
+  Building2,
   ChevronRight,
   CircleAlert,
   CircleCheck,
@@ -9,6 +11,8 @@ import {
   Clock3,
   CloudCheck,
   Download,
+  FileDown,
+  Filter,
   FlaskConical,
   HardDrive,
   House,
@@ -21,6 +25,7 @@ import {
   Search,
   ShieldCheck,
   UserPlus,
+  Users,
   Wifi,
   WifiOff,
   Wrench,
@@ -29,6 +34,8 @@ import {
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { saveLead, subscribeToLeads, synchronizeNow } from '../services/lead-service.js';
+import { loadManagementLeads, MANAGEMENT_QUERY_LIMIT } from '../services/management-service.js';
+import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
 import { currentRoute, navigate } from './router.js';
@@ -37,6 +44,8 @@ const DEMO_SESSION_KEY = 'fascinlead:demo-session';
 
 const appIcons = {
   ArrowLeft,
+  BarChart3,
+  Building2,
   ChevronRight,
   CircleAlert,
   CircleCheck,
@@ -46,6 +55,8 @@ const appIcons = {
   Clock3,
   CloudCheck,
   Download,
+  FileDown,
+  Filter,
   FlaskConical,
   HardDrive,
   House,
@@ -58,6 +69,7 @@ const appIcons = {
   Search,
   ShieldCheck,
   UserPlus,
+  Users,
   Wifi,
   WifiOff,
   Wrench
@@ -74,8 +86,35 @@ const state = {
   toast: null,
   search: '',
   unsubscribeLeads: null,
-  updateAction: null
+  updateAction: null,
+  management: {
+    loading: false,
+    loaded: false,
+    error: '',
+    records: [],
+    truncated: false,
+    page: 1,
+    pageSize: 20,
+    filters: createDefaultManagementFilters()
+  }
 };
+
+function toLocalDateInput(date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function createDefaultManagementFilters() {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  return {
+    startDate: toLocalDateInput(monthStart),
+    endDate: toLocalDateInput(today),
+    storeId: '',
+    capturedByUid: '',
+    search: ''
+  };
+}
 
 const demoProfile = {
   uid: 'demo-user',
@@ -97,6 +136,38 @@ function escapeHtml(value = '') {
 
 function roleLabel(role) {
   return { captor: 'Captador', manager: 'Gestor', admin: 'Administrador' }[role] || 'Colaborador';
+}
+
+function canManage() {
+  return ['manager', 'admin'].includes(state.profile?.role);
+}
+
+function storeLabel(storeId = '') {
+  return storeId.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatCapturedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Data indisponivel';
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+function filteredManagementRecords() {
+  const { records, filters } = state.management;
+  const search = filters.search.trim().toLowerCase();
+  const phoneSearch = search.replace(/\D/g, '');
+
+  return records.filter((lead) => {
+    if (filters.storeId && lead.storeId !== filters.storeId) return false;
+    if (filters.capturedByUid && lead.capturedByUid !== filters.capturedByUid) return false;
+    if (!search) return true;
+    return String(lead.fullName || '').toLowerCase().includes(search)
+      || String(lead.capturedByName || '').toLowerCase().includes(search)
+      || (phoneSearch && String(lead.phoneSearch || '').includes(phoneSearch));
+  });
 }
 
 function syncLabel(lead) {
@@ -137,7 +208,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner">
+      <div class="header-inner ${state.route === 'management' ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
@@ -200,6 +271,11 @@ function homeView() {
         <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
       </button>
+      ${canManage() ? `<button class="action-card" type="button" data-route="management">
+        <span class="action-icon"><i data-lucide="bar-chart-3"></i></span>
+        <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>` : ''}
     </section>
     <section class="info-band">
       <i data-lucide="lightbulb"></i>
@@ -279,6 +355,84 @@ function leadsView() {
     <section class="lead-list">${list}</section>`;
 }
 
+function managementView() {
+  if (!canManage()) {
+    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Painel de gestao</h1></section>
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos dados gerenciais.</span></div>`;
+  }
+
+  const { filters, loaded, loading, error, records, truncated, pageSize } = state.management;
+  const filtered = filteredManagementRecords();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(state.management.page, totalPages);
+  const pageRecords = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const stores = [...new Set(records.map((lead) => lead.storeId).filter(Boolean))].sort();
+  const captors = [...new Map(records
+    .filter((lead) => lead.capturedByUid)
+    .map((lead) => [lead.capturedByUid, lead.capturedByName || 'Captador'])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+
+  const storeOptions = stores.map((storeId) => `<option value="${escapeHtml(storeId)}" ${filters.storeId === storeId ? 'selected' : ''}>${escapeHtml(storeLabel(storeId))}</option>`).join('');
+  const captorOptions = captors.map(([uid, name]) => `<option value="${escapeHtml(uid)}" ${filters.capturedByUid === uid ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+
+  const tableRows = pageRecords.map((lead) => `<tr>
+    <td><strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small></td>
+    <td>${escapeHtml(lead.capturedByName || 'Nao informado')}</td>
+    <td>${escapeHtml(storeLabel(lead.storeId))}</td>
+    <td>${escapeHtml(lead.interestLabel || 'Nao informado')}</td>
+    <td>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</td>
+  </tr>`).join('');
+
+  const mobileRows = pageRecords.map((lead) => `<article class="management-card">
+    <div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div>
+    <dl>
+      <div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Nao informado')}</dd></div>
+      <div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>
+      <div><dt>Captado em</dt><dd>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</dd></div>
+    </dl>
+  </article>`).join('');
+
+  const results = pageRecords.length
+    ? `<div class="management-table-wrap"><table class="management-table">
+        <thead><tr><th>Lead</th><th>Captador</th><th>Loja</th><th>Interesse</th><th>Captado em</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table></div>
+      <div class="management-mobile-list">${mobileRows}</div>
+      <div class="pagination">
+        <span>${filtered.length} registro(s)</span>
+        <div><button class="button button-secondary" type="button" data-management-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Anterior</button>
+        <strong>${currentPage} de ${totalPages}</strong>
+        <button class="button button-secondary" type="button" data-management-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>Proxima</button></div>
+      </div>`
+    : `<div class="empty-state management-empty"><i data-lucide="bar-chart-3"></i><strong>${loaded ? 'Nenhum cadastro no periodo' : 'Consulte as captacoes'}</strong><p>${loaded ? 'Ajuste os filtros para ampliar a busca.' : 'Escolha o periodo e carregue os resultados.'}</p></div>`;
+
+  return `
+    <section class="management-heading">
+      <div><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
+      <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
+    </section>
+    <form id="management-filters" class="management-filters">
+      <div class="filter-title"><i data-lucide="filter"></i><div><strong>Filtros</strong><span>Periodo maximo recomendado: 90 dias.</span></div></div>
+      <div class="management-filter-grid">
+        <div class="field"><label for="management-start">Data inicial</label><input id="management-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
+        <div class="field"><label for="management-end">Data final</label><input id="management-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
+        ${state.profile.role === 'admin' ? `<div class="field"><label for="management-store">Loja</label><select id="management-store" name="storeId"><option value="">Todas as lojas</option>${storeOptions}</select></div>` : ''}
+        <div class="field"><label for="management-captor">Captador</label><select id="management-captor" name="capturedByUid"><option value="">Todos os captadores</option>${captorOptions}</select></div>
+        <div class="field management-search-field"><label for="management-search">Nome ou telefone</label><input id="management-search" name="search" type="search" value="${escapeHtml(filters.search)}" placeholder="Buscar nos resultados" /></div>
+        <button class="button button-primary management-filter-button" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Consultando...' : 'Aplicar filtros'}</span></button>
+      </div>
+    </form>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A consulta atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter a lista completa.</span></div>` : ''}
+    <section class="management-metrics" aria-label="Resumo do periodo">
+      <div><i data-lucide="clipboard-list"></i><span>Leads encontrados</span><strong>${filtered.length}</strong></div>
+      <div><i data-lucide="users"></i><span>Captadores</span><strong>${new Set(filtered.map((lead) => lead.capturedByUid)).size}</strong></div>
+      <div><i data-lucide="building-2"></i><span>Lojas</span><strong>${new Set(filtered.map((lead) => lead.storeId)).size}</strong></div>
+    </section>
+    <section class="management-results" aria-busy="${loading}">${results}</section>`;
+}
+
 function syncView() {
   const counts = state.leads.reduce((result, lead) => {
     result[lead.syncState] = (result[lead.syncState] || 0) + 1;
@@ -305,15 +459,17 @@ function bottomNav() {
     ['leads', 'clipboard-list', 'Cadastros'],
     ['sync', 'refresh-cw', 'Sync']
   ];
-  return `<nav class="bottom-nav" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
+  if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
+  return `<nav class="bottom-nav ${canManage() ? 'has-management' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
     <button type="button" data-route="${route}" class="${state.route === route ? 'is-active' : ''}" ${state.route === route ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, sync: syncView };
-  return `${headerView()}<main class="app-main">${pages[state.route]()}</main>${bottomNav()}`;
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, sync: syncView, management: managementView };
+  const page = pages[state.route] || homeView;
+  return `${headerView()}<main class="app-main ${state.route === 'management' ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
 function render() {
@@ -385,6 +541,39 @@ function bindPageEvents() {
       document.querySelector('#lead-search')?.focus();
     });
   }
+
+  const managementForm = document.querySelector('#management-filters');
+  if (managementForm) {
+    managementForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const values = Object.fromEntries(new FormData(managementForm));
+      state.management.filters = {
+        startDate: values.startDate,
+        endDate: values.endDate,
+        storeId: values.storeId || '',
+        capturedByUid: values.capturedByUid || '',
+        search: values.search || ''
+      };
+      state.management.page = 1;
+      loadManagementData();
+    });
+
+    const managementSearch = managementForm.elements.search;
+    managementSearch?.addEventListener('input', () => {
+      state.management.filters.search = managementSearch.value;
+      state.management.page = 1;
+      render();
+      document.querySelector('#management-search')?.focus();
+    });
+
+    ['storeId', 'capturedByUid'].forEach((name) => {
+      managementForm.elements[name]?.addEventListener('change', (event) => {
+        state.management.filters[name] = event.target.value;
+        state.management.page = 1;
+        render();
+      });
+    });
+  }
 }
 
 function subscribeProfileLeads() {
@@ -402,6 +591,51 @@ function subscribeProfileLeads() {
       render();
     }
   );
+}
+
+async function loadManagementData() {
+  if (!canManage() || state.management.loading) return;
+  const { startDate, endDate } = state.management.filters;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const rangeInDays = (end - start) / 86_400_000;
+
+  if (!startDate || !endDate || Number.isNaN(rangeInDays) || rangeInDays < 0) {
+    state.management.error = 'Informe um periodo valido.';
+    render();
+    return;
+  }
+
+  if (rangeInDays > 92) {
+    state.management.error = 'Consulte no maximo 93 dias por vez para preservar a cota do sistema.';
+    render();
+    return;
+  }
+
+  state.management.loading = true;
+  state.management.error = '';
+  render();
+
+  try {
+    const result = await loadManagementLeads(state.profile, startDate, endDate);
+    state.management.records = result.records;
+    state.management.truncated = result.truncated;
+    state.management.loaded = true;
+    state.management.page = 1;
+  } catch (error) {
+    state.management.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao possui permissao para esta consulta.'
+      : 'Nao foi possivel carregar o painel. Verifique a conexao e tente novamente.';
+  } finally {
+    state.management.loading = false;
+    render();
+  }
+}
+
+function ensureManagementData() {
+  if (state.route === 'management' && canManage() && !state.management.loaded) {
+    loadManagementData();
+  }
 }
 
 async function handleAction(action) {
@@ -436,6 +670,16 @@ async function handleAction(action) {
     state.profile = null;
     state.demoMode = false;
     state.leads = [];
+    state.management = {
+      loading: false,
+      loaded: false,
+      error: '',
+      records: [],
+      truncated: false,
+      page: 1,
+      pageSize: 20,
+      filters: createDefaultManagementFilters()
+    };
     render();
   }
 
@@ -447,6 +691,13 @@ async function handleAction(action) {
       showToast('A sincronizacao ainda nao foi concluida.', 'danger', 'circle-alert');
     }
   }
+
+  if (action === 'export-management') {
+    const records = filteredManagementRecords();
+    if (!records.length) return;
+    downloadLeadsCsv(records, state.management.filters.startDate, state.management.filters.endDate);
+    showToast(`${records.length} registro(s) exportado(s).`);
+  }
 }
 
 export async function startApp() {
@@ -455,11 +706,18 @@ export async function startApp() {
     if (routeButton) navigate(routeButton.dataset.route);
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) handleAction(actionButton.dataset.action);
+    const pageButton = event.target.closest('[data-management-page]');
+    if (pageButton && !pageButton.disabled) {
+      state.management.page = Number(pageButton.dataset.managementPage);
+      render();
+      document.querySelector('.management-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
 
   window.addEventListener('hashchange', () => {
     state.route = currentRoute();
     render();
+    ensureManagementData();
   });
 
   window.addEventListener('online', render);
@@ -506,6 +764,7 @@ export async function startApp() {
     } finally {
       state.loading = false;
       render();
+      ensureManagementData();
     }
   });
 }
