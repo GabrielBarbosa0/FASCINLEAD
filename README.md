@@ -2,7 +2,7 @@
 
 Pre-cadastro offline para as equipes de captacao das **Oticas Fascinante**.
 
-> **Status:** planejamento tecnico concluido; implementacao ainda nao iniciada.
+> **Status:** fundacao tecnica e primeiro fluxo de captacao em desenvolvimento.
 
 O FascinLead sera uma Progressive Web App (PWA) para substituir as fichas de papel usadas por colaboradores durante abordagens na rua. O usuario podera registrar um potencial cliente mesmo sem internet, consultar os cadastros no proprio aparelho e sincroniza-los com a nuvem quando a conexao voltar.
 
@@ -163,17 +163,38 @@ Leia o `AGENTS.md` e o TDD antes de iniciar qualquer desenvolvimento.
 
 ## Desenvolvimento local
 
-O codigo da aplicacao ainda nao foi inicializado. Por isso, comandos de instalacao, execucao, testes e build ainda nao estao disponiveis.
+Requisitos:
 
-Quando a fundacao tecnica for criada, esta secao devera documentar exclusivamente os scripts reais definidos no `package.json`, incluindo no minimo:
+- Node.js 20.19 ou superior;
+- npm 10 ou superior;
+- Java para executar a Firebase Emulator Suite.
 
-- instalacao das dependencias;
-- execucao do servidor local;
-- inicializacao da Firebase Emulator Suite;
-- testes unitarios;
-- testes das Security Rules;
-- testes de interface;
-- geracao do build de producao.
+Instale as dependencias e inicie o servidor:
+
+```bash
+npm install
+npm run dev
+```
+
+No Windows, tambem e possivel iniciar com dois cliques em `INICIAR-FASCINLEAD.bat`. O arquivo instala as dependencias quando necessario, inicia o servidor e abre o navegador automaticamente. Para desligar, pressione `Ctrl+C` na janela do terminal.
+
+Comandos disponiveis:
+
+| Comando | Finalidade |
+| --- | --- |
+| `npm start` | Iniciar o sistema e abrir o navegador automaticamente |
+| `npm run dev` | Iniciar o servidor Vite |
+| `npm run build` | Gerar o build de producao |
+| `npm run preview` | Servir o build localmente |
+| `npm test` | Executar os testes unitarios |
+| `npm run test:watch` | Executar testes em modo continuo |
+| `npm run test:e2e` | Executar os fluxos de interface no Chrome mobile e desktop |
+| `npm run emulators` | Iniciar os emuladores Firebase |
+| `npm run deploy` | Gerar o build e publicar no Firebase Hosting |
+
+Copie `.env.example` para `.env.local` e preencha a configuracao web do projeto Firebase. Para usar os emuladores, defina `VITE_USE_FIREBASE_EMULATORS=true`.
+
+Sem configuracao Firebase, o servidor de desenvolvimento oferece um modo local identificado como `DEMO`. Ele existe apenas para validar a interface e nunca deve receber dados reais.
 
 ## Plano de entrega
 

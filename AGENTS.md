@@ -11,7 +11,7 @@ Este documento fornece contexto e regras permanentes para qualquer pessoa ou age
 - **Tipo:** Progressive Web App (PWA)
 - **Publico principal:** colaboradores que captam potenciais clientes na rua
 - **Objetivo:** substituir fichas de papel por um pre-cadastro digital rapido, confiavel e utilizavel sem internet
-- **Estado atual:** documentacao e definicao da arquitetura; implementacao ainda nao iniciada
+- **Estado atual:** fundacao tecnica e primeiro fluxo de captacao em desenvolvimento
 
 O FascinLead deve fazer uma coisa pequena muito bem: registrar um contato durante uma abordagem, preservar esse registro no aparelho quando nao houver conexao e sincroniza-lo com a nuvem quando a internet voltar.
 
@@ -360,7 +360,7 @@ Antes do piloto ainda precisam ser definidos:
 - prazo de retencao;
 - permissao de edicao para gestores;
 - inclusao da tela gerencial na primeira entrega;
-- identidade visual final.
+- logotipo e conjunto final de icones; a cor principal aprovada e `#003070`.
 
 Nao bloqueie a fundacao tecnica por essas respostas quando for possivel usar configuracoes ou dados ficticios seguros. Nao publique para uso real sem resolve-las.
 

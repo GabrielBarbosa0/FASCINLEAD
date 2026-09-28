@@ -5,7 +5,7 @@
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
 | Versao | 1.0 |
-| Status | Proposta inicial |
+| Status | Em implementacao |
 | Data | 28/09/2026 |
 | Responsavel | Oticas Fascinante |
 
@@ -643,6 +643,7 @@ O MVP estara apto para piloto quando:
 | ADR-006 | Nao coletar CPF no MVP | Nao e necessario para pre-cadastro e aumenta o risco de privacidade |
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
+| ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 
@@ -654,7 +655,7 @@ O MVP estara apto para piloto quando:
 - Qual texto de consentimento sera exibido ao cliente?
 - Qual sera o prazo definitivo de retencao e exclusao?
 - A visao gerencial faz parte do primeiro piloto ou da fase seguinte?
-- Quais cores, logotipo e icones oficiais serao usados?
+- Qual logotipo e conjunto final de icones serao usados? A cor principal ja definida e `#003070`.
 
 Essas decisoes nao impedem a criacao da fundacao tecnica, mas devem ser respondidas antes do uso com dados reais.
 

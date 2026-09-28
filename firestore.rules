@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userProfile().active == true;
+    }
+
+    function isAdmin() {
+      return activeUser() && userProfile().role == 'admin';
+    }
+
+    function isManager() {
+      return activeUser() && userProfile().role == 'manager';
+    }
+
+    function validLead(data) {
+      return data.keys().hasOnly([
+          'fullName', 'preferredName', 'phone', 'phoneSearch',
+          'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'notes', 'consentGiven', 'consentAtClient', 'source',
+          'capturedAtClient', 'createdAtServer', 'updatedAtServer',
+          'capturedByUid', 'capturedByName', 'storeId', 'installationId',
+          'appVersion', 'schemaVersion'
+        ])
+        && data.fullName is string
+        && data.fullName.size() >= 2
+        && data.fullName.size() <= 120
+        && data.phone is string
+        && data.phone.size() >= 12
+        && data.phone.size() <= 14
+        && data.phoneSearch is string
+        && data.phoneSearch.size() >= 10
+        && data.phoneSearch.size() <= 11
+        && data.notes is string
+        && data.notes.size() <= 500
+        && data.consentGiven == true
+        && data.source == 'street'
+        && data.schemaVersion == 1;
+    }
+
+    match /allowedEmails/{email} {
+      allow get: if signedIn() && request.auth.token.email == email;
+      allow read, write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if activeUser() && (
+        request.auth.uid == userId || isAdmin()
+      );
+
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && exists(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.active == true
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role
+        && request.resource.data.storeId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeId;
+
+      allow update, delete: if isAdmin();
+      allow list: if isAdmin();
+    }
+
+    match /stores/{storeId} {
+      allow get: if activeUser() && (
+        userProfile().storeId == storeId || isAdmin()
+      );
+      allow list: if activeUser();
+      allow write: if isAdmin();
+    }
+
+    match /interests/{interestId} {
+      allow read: if activeUser();
+      allow write: if isAdmin();
+    }
+
+    match /leads/{leadId} {
+      allow create: if activeUser()
+        && validLead(request.resource.data)
+        && request.resource.data.capturedByUid == request.auth.uid
+        && request.resource.data.storeId == userProfile().storeId;
+
+      allow get, list: if activeUser() && (
+        resource.data.capturedByUid == request.auth.uid
+        || (isManager() && resource.data.storeId == userProfile().storeId)
+        || isAdmin()
+      );
+
+      allow update: if activeUser()
+        && resource.data.capturedByUid == request.auth.uid
+        && request.resource.data.capturedByUid == resource.data.capturedByUid
+        && request.resource.data.storeId == resource.data.storeId
+        && request.resource.data.createdAtServer == resource.data.createdAtServer
+        && validLead(request.resource.data);
+
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
