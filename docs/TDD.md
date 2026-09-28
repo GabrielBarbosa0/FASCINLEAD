@@ -649,10 +649,10 @@ O MVP estara apto para piloto quando:
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
+| ADR-010 | Disponibilizar as lojas 02, 04, 05 e 06 | Sao as unidades definidas para a operacao inicial do FascinLead |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 
-- Quais sao as lojas, codigos e estados padrao?
 - Quais e-mails terao perfil de administrador, gestor e captador?
 - Nome e telefone sao suficientes como campos obrigatorios?
 - Quais opcoes devem existir em `Interesse principal`?

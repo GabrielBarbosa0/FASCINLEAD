@@ -246,7 +246,7 @@ Um administrador pode abrir `Gestao` e selecionar `Gerenciar acessos`, ou usar o
 
 1. Informe o nome e o e-mail da conta Google do colaborador.
 2. Escolha `Colaborador`, `Gestor` ou `Administrador`.
-3. Informe o codigo da loja, como `loja-06`.
+3. Escolha entre `Loja 02`, `Loja 04`, `Loja 05` e `Loja 06`.
 4. Selecione `Salvar acesso`.
 
 O e-mail fica autorizado imediatamente. No primeiro login com Google, o FascinLead cria o perfil do usuario. Salvar novamente um e-mail existente atualiza seu perfil e sua loja; `Bloquear` impede novos acessos sem excluir o historico de captacoes.

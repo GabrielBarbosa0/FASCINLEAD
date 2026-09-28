@@ -18,8 +18,8 @@ describe('access validation', () => {
     expect(result.data.storeId).toBe('loja-06');
   });
 
-  it('rejects invalid email, role and store code', () => {
-    const result = validateAccess({ displayName: 'A', email: 'invalido', role: 'owner', storeId: 'Loja 06' });
+  it('rejects invalid email, role and unavailable store', () => {
+    const result = validateAccess({ displayName: 'A', email: 'invalido', role: 'owner', storeId: 'loja-03' });
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toEqual(expect.objectContaining({
@@ -29,5 +29,16 @@ describe('access validation', () => {
       storeId: expect.any(String)
     }));
   });
-});
 
+  it.each(['loja-02', 'loja-04', 'loja-05', 'loja-06'])('accepts the available store %s', (storeId) => {
+    const result = validateAccess({
+      displayName: 'Pessoa de Teste',
+      email: 'pessoa@exemplo.com',
+      role: 'captor',
+      storeId
+    });
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.storeId).toBe(storeId);
+  });
+});

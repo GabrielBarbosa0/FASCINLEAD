@@ -41,6 +41,7 @@ import { loadManagementLeads, MANAGEMENT_QUERY_LIMIT } from '../services/managem
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
+import { STORES } from '../utils/stores.js';
 import { currentRoute, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
@@ -391,13 +392,12 @@ function managementView() {
   const currentPage = Math.min(state.management.page, totalPages);
   const pageRecords = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const stores = [...new Set(records.map((lead) => lead.storeId).filter(Boolean))].sort();
   const captors = [...new Map(records
     .filter((lead) => lead.capturedByUid)
     .map((lead) => [lead.capturedByUid, lead.capturedByName || 'Captador'])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
 
-  const storeOptions = stores.map((storeId) => `<option value="${escapeHtml(storeId)}" ${filters.storeId === storeId ? 'selected' : ''}>${escapeHtml(storeLabel(storeId))}</option>`).join('');
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${filters.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const captorOptions = captors.map(([uid, name]) => `<option value="${escapeHtml(uid)}" ${filters.capturedByUid === uid ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 
   const tableRows = pageRecords.map((lead) => `<tr>
@@ -466,9 +466,8 @@ function accessView() {
       <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem gerenciar acessos.</span></div>`;
   }
 
-  const { accesses, storeIds, loading, saving, error } = state.access;
-  const stores = [...new Set([state.profile.storeId, ...storeIds].filter(Boolean))];
-  const storeSuggestions = stores.map((storeId) => `<option value="${escapeHtml(storeId)}"></option>`).join('');
+  const { accesses, loading, saving, error } = state.access;
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${state.profile.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const rows = accesses.map((access) => {
     const isCurrentUser = access.email === state.profile.email?.toLowerCase();
     return `<article class="access-row ${access.active ? '' : 'is-inactive'}">
@@ -502,7 +501,7 @@ function accessView() {
         <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field" data-field="email"><label for="access-email">E-mail Google</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@gmail.com" required /><small class="field-error"></small></div>
         <div class="field" data-field="role"><label for="access-role">Perfil</label><select id="access-role" name="role" required><option value="captor">Colaborador (captador)</option><option value="manager">Gestor da loja</option><option value="admin">Administrador</option></select><small class="field-error"></small></div>
-        <div class="field" data-field="storeId"><label for="access-store">Loja</label><input id="access-store" name="storeId" list="access-stores" value="${escapeHtml(state.profile.storeId)}" maxlength="60" required /><datalist id="access-stores">${storeSuggestions}</datalist><small class="field-error"></small></div>
+        <div class="field" data-field="storeId"><label for="access-store">Loja</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
         <button class="button button-primary button-block" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>${saving ? 'Salvando...' : 'Salvar acesso'}</span></button>
       </form>
       <section class="access-list-panel" aria-busy="${loading}">

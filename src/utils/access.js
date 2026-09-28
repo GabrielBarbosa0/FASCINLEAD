@@ -1,3 +1,5 @@
+import { STORE_IDS } from './stores.js';
+
 const VALID_ROLES = new Set(['captor', 'manager', 'admin']);
 
 export function normalizeAccessEmail(value = '') {
@@ -23,8 +25,8 @@ export function validateAccess(values) {
     errors.role = 'Escolha um perfil valido.';
   }
 
-  if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(storeId)) {
-    errors.storeId = 'Use um codigo como loja-06.';
+  if (!STORE_IDS.has(storeId)) {
+    errors.storeId = 'Escolha uma loja valida.';
   }
 
   return {
@@ -33,4 +35,3 @@ export function validateAccess(values) {
     data: { displayName, email, role, storeId }
   };
 }
-
