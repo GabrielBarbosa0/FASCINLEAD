@@ -51,7 +51,15 @@ service cloud.firestore {
 
     match /allowedEmails/{email} {
       allow get: if signedIn() && request.auth.token.email == email;
-      allow read, write: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && (email != request.auth.token.email || (
+          request.resource.data.active == true
+          && request.resource.data.role == 'admin'
+          && request.resource.data.storeId == userProfile().storeId
+        ));
+      allow delete: if isAdmin() && email != request.auth.token.email;
     }
 
     match /users/{userId} {
@@ -66,7 +74,14 @@ service cloud.firestore {
         && request.resource.data.role == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role
         && request.resource.data.storeId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeId;
 
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.email == resource.data.email
+        && (userId != request.auth.uid || (
+          request.resource.data.active == true
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.storeId == resource.data.storeId
+        ));
+      allow delete: if false;
       allow list: if isAdmin();
     }
 

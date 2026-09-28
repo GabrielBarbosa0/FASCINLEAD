@@ -17,14 +17,17 @@ import {
   HardDrive,
   House,
   Info,
+  KeyRound,
   Lightbulb,
   LogIn,
   LogOut,
+  Pencil,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
   UserPlus,
+  UserRoundCog,
   Users,
   Wifi,
   WifiOff,
@@ -34,6 +37,7 @@ import {
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { saveLead, subscribeToLeads, synchronizeNow } from '../services/lead-service.js';
+import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { loadManagementLeads, MANAGEMENT_QUERY_LIMIT } from '../services/management-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
@@ -61,14 +65,17 @@ const appIcons = {
   HardDrive,
   House,
   Info,
+  KeyRound,
   Lightbulb,
   LogIn,
   LogOut,
+  Pencil,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
   UserPlus,
+  UserRoundCog,
   Users,
   Wifi,
   WifiOff,
@@ -96,6 +103,14 @@ const state = {
     page: 1,
     pageSize: 20,
     filters: createDefaultManagementFilters()
+  },
+  access: {
+    loading: false,
+    loaded: false,
+    saving: false,
+    error: '',
+    accesses: [],
+    storeIds: []
   }
 };
 
@@ -140,6 +155,10 @@ function roleLabel(role) {
 
 function canManage() {
   return ['manager', 'admin'].includes(state.profile?.role);
+}
+
+function isAdmin() {
+  return state.profile?.role === 'admin';
 }
 
 function storeLabel(storeId = '') {
@@ -208,7 +227,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${state.route === 'management' ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'access'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
@@ -274,6 +293,11 @@ function homeView() {
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
         <span class="action-icon"><i data-lucide="bar-chart-3"></i></span>
         <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>` : ''}
+      ${isAdmin() ? `<button class="action-card" type="button" data-route="access">
+        <span class="action-icon"><i data-lucide="user-round-cog"></i></span>
+        <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
     </section>
@@ -410,7 +434,10 @@ function managementView() {
   return `
     <section class="management-heading">
       <div><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
-      <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
+      <div class="management-heading-actions">
+        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
+        <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
+      </div>
     </section>
     <form id="management-filters" class="management-filters">
       <div class="filter-title"><i data-lucide="filter"></i><div><strong>Filtros</strong><span>Periodo maximo recomendado: 90 dias.</span></div></div>
@@ -431,6 +458,60 @@ function managementView() {
       <div><i data-lucide="building-2"></i><span>Lojas</span><strong>${new Set(filtered.map((lead) => lead.storeId)).size}</strong></div>
     </section>
     <section class="management-results" aria-busy="${loading}">${results}</section>`;
+}
+
+function accessView() {
+  if (!isAdmin()) {
+    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Acessos da equipe</h1></section>
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem gerenciar acessos.</span></div>`;
+  }
+
+  const { accesses, storeIds, loading, saving, error } = state.access;
+  const stores = [...new Set([state.profile.storeId, ...storeIds].filter(Boolean))];
+  const storeSuggestions = stores.map((storeId) => `<option value="${escapeHtml(storeId)}"></option>`).join('');
+  const rows = accesses.map((access) => {
+    const isCurrentUser = access.email === state.profile.email?.toLowerCase();
+    return `<article class="access-row ${access.active ? '' : 'is-inactive'}">
+      <div class="access-identity">
+        <span class="access-avatar">${escapeHtml(access.displayName[0]?.toUpperCase() || '?')}</span>
+        <div><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
+      </div>
+      <div class="access-detail"><span>Perfil</span><strong>${roleLabel(access.role)}</strong></div>
+      <div class="access-detail"><span>Loja</span><strong>${escapeHtml(storeLabel(access.storeId))}</strong></div>
+      <div class="access-detail"><span>Primeiro acesso</span><strong>${access.hasLoggedIn ? 'Realizado' : 'Pendente'}</strong></div>
+      <span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span>
+      <div class="access-actions">
+        <button class="icon-button" type="button" data-access-edit="${escapeHtml(access.email)}" title="Editar acesso" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
+        <button class="button button-secondary access-toggle" type="button" data-access-email="${escapeHtml(access.email)}" data-access-active="${access.active}" ${isCurrentUser || saving ? 'disabled' : ''}>
+          <i data-lucide="${access.active ? 'log-out' : 'circle-check'}"></i><span>${access.active ? 'Bloquear' : 'Reativar'}</span>
+        </button>
+      </div>
+    </article>`;
+  }).join('');
+
+  return `
+    <section class="management-heading access-heading">
+      <div>
+        <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+        <p class="eyebrow">ADMINISTRACAO</p><h1>Acessos da equipe</h1><p>Libere o e-mail Google antes do primeiro acesso ao FascinLead.</p>
+      </div>
+    </section>
+    <section class="access-layout">
+      <form id="access-form" class="access-form" novalidate>
+        <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador entrara usando esta conta Google.</span></div></div>
+        <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
+        <div class="field" data-field="email"><label for="access-email">E-mail Google</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@gmail.com" required /><small class="field-error"></small></div>
+        <div class="field" data-field="role"><label for="access-role">Perfil</label><select id="access-role" name="role" required><option value="captor">Colaborador (captador)</option><option value="manager">Gestor da loja</option><option value="admin">Administrador</option></select><small class="field-error"></small></div>
+        <div class="field" data-field="storeId"><label for="access-store">Loja</label><input id="access-store" name="storeId" list="access-stores" value="${escapeHtml(state.profile.storeId)}" maxlength="60" required /><datalist id="access-stores">${storeSuggestions}</datalist><small class="field-error"></small></div>
+        <button class="button button-primary button-block" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>${saving ? 'Salvando...' : 'Salvar acesso'}</span></button>
+      </form>
+      <section class="access-list-panel" aria-busy="${loading}">
+        <div class="access-list-heading"><div><strong>Acessos cadastrados</strong><span>${accesses.length} pessoa(s)</span></div><button class="icon-button" type="button" data-action="reload-accesses" title="Atualizar acessos" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i></button></div>
+        ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+        ${loading && !accesses.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando acessos...</strong></div>' : ''}
+        ${!loading && !accesses.length ? '<div class="empty-state"><i data-lucide="users"></i><strong>Nenhum acesso cadastrado</strong><p>Use o formulario para liberar a primeira pessoa.</p></div>' : `<div class="access-list">${rows}</div>`}
+      </section>
+    </section>`;
 }
 
 function syncView() {
@@ -467,9 +548,10 @@ function bottomNav() {
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, sync: syncView, management: managementView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, sync: syncView, management: managementView, access: accessView };
   const page = pages[state.route] || homeView;
-  return `${headerView()}<main class="app-main ${state.route === 'management' ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
+  const wideLayout = ['management', 'access'].includes(state.route);
+  return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
 function render() {
@@ -574,6 +656,36 @@ function bindPageEvents() {
       });
     });
   }
+
+  const accessForm = document.querySelector('#access-form');
+  if (accessForm) {
+    accessForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (state.access.saving) return;
+      state.access.saving = true;
+      setFieldErrors(accessForm, {});
+      const values = Object.fromEntries(new FormData(accessForm));
+
+      try {
+        const result = await saveAccess(state.profile, values);
+        if (!result.isValid) {
+          state.access.saving = false;
+          setFieldErrors(accessForm, result.errors);
+          return;
+        }
+        accessForm.reset();
+        accessForm.elements.storeId.value = state.profile.storeId;
+        await loadAccessData();
+        showToast('Acesso salvo. A pessoa ja pode entrar com o Google.');
+      } catch (error) {
+        state.access.saving = false;
+        state.access.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao possui permissao para gerenciar acessos.'
+          : 'Nao foi possivel salvar o acesso. Verifique a conexao e tente novamente.';
+        render();
+      }
+    });
+  }
 }
 
 function subscribeProfileLeads() {
@@ -638,6 +750,33 @@ function ensureManagementData() {
   }
 }
 
+async function loadAccessData() {
+  if (!isAdmin() || state.access.loading) return;
+  state.access.loading = true;
+  state.access.error = '';
+  render();
+  try {
+    const result = await loadAccesses(state.profile);
+    state.access.accesses = result.accesses;
+    state.access.storeIds = result.storeIds;
+    state.access.loaded = true;
+  } catch (error) {
+    state.access.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao possui permissao para consultar acessos.'
+      : 'Nao foi possivel carregar os acessos. Verifique a conexao e tente novamente.';
+  } finally {
+    state.access.loading = false;
+    state.access.saving = false;
+    render();
+  }
+}
+
+function ensureAccessData() {
+  if (state.route === 'access' && isAdmin() && !state.access.loaded) {
+    loadAccessData();
+  }
+}
+
 async function handleAction(action) {
   if (action === 'demo-login') {
     sessionStorage.setItem(DEMO_SESSION_KEY, 'true');
@@ -680,6 +819,14 @@ async function handleAction(action) {
       pageSize: 20,
       filters: createDefaultManagementFilters()
     };
+    state.access = {
+      loading: false,
+      loaded: false,
+      saving: false,
+      error: '',
+      accesses: [],
+      storeIds: []
+    };
     render();
   }
 
@@ -698,10 +845,14 @@ async function handleAction(action) {
     downloadLeadsCsv(records, state.management.filters.startDate, state.management.filters.endDate);
     showToast(`${records.length} registro(s) exportado(s).`);
   }
+
+  if (action === 'reload-accesses') {
+    await loadAccessData();
+  }
 }
 
 export async function startApp() {
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const routeButton = event.target.closest('[data-route]');
     if (routeButton) navigate(routeButton.dataset.route);
     const actionButton = event.target.closest('[data-action]');
@@ -712,12 +863,39 @@ export async function startApp() {
       render();
       document.querySelector('.management-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    const accessButton = event.target.closest('[data-access-email]');
+    if (accessButton && !accessButton.disabled) {
+      const access = state.access.accesses.find((item) => item.email === accessButton.dataset.accessEmail);
+      if (!access) return;
+      accessButton.disabled = true;
+      try {
+        await setAccessActive(state.profile, access, accessButton.dataset.accessActive !== 'true');
+        await loadAccessData();
+        showToast(access.active ? 'Acesso bloqueado.' : 'Acesso reativado.');
+      } catch (error) {
+        state.access.error = error.message || 'Nao foi possivel alterar o acesso.';
+        render();
+      }
+    }
+    const editAccessButton = event.target.closest('[data-access-edit]');
+    if (editAccessButton && !editAccessButton.disabled) {
+      const access = state.access.accesses.find((item) => item.email === editAccessButton.dataset.accessEdit);
+      const form = document.querySelector('#access-form');
+      if (!access || !form) return;
+      form.elements.displayName.value = access.displayName;
+      form.elements.email.value = access.email;
+      form.elements.role.value = access.role;
+      form.elements.storeId.value = access.storeId;
+      form.elements.displayName.focus();
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
 
   window.addEventListener('hashchange', () => {
     state.route = currentRoute();
     render();
     ensureManagementData();
+    ensureAccessData();
   });
 
   window.addEventListener('online', render);
@@ -765,6 +943,7 @@ export async function startApp() {
       state.loading = false;
       render();
       ensureManagementData();
+      ensureAccessData();
     }
   });
 }

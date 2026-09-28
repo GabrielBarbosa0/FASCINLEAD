@@ -238,7 +238,18 @@ Sem configuracao Firebase, o servidor de desenvolvimento oferece um modo local i
 - adicionar filtros e totais simples;
 - restringir dados por perfil e loja;
 - implementar exportacao CSV;
-- concluir administracao basica de acessos.
+- administrar acessos de colaboradores, gestores e administradores.
+
+## Cadastro de acessos
+
+Um administrador pode abrir `Gestao` e selecionar `Gerenciar acessos`, ou usar o atalho `Acessos da equipe` na tela inicial.
+
+1. Informe o nome e o e-mail da conta Google do colaborador.
+2. Escolha `Colaborador`, `Gestor` ou `Administrador`.
+3. Informe o codigo da loja, como `loja-06`.
+4. Selecione `Salvar acesso`.
+
+O e-mail fica autorizado imediatamente. No primeiro login com Google, o FascinLead cria o perfil do usuario. Salvar novamente um e-mail existente atualiza seu perfil e sua loja; `Bloquear` impede novos acessos sem excluir o historico de captacoes.
 
 ### 4. Piloto
 

@@ -29,7 +29,19 @@ export async function signInWithGoogle() {
     return null;
   }
 
-  return signInWithPopup(auth, provider);
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error) {
+    const shouldRetryWithRedirect = [
+      'auth/popup-blocked',
+      'auth/popup-closed-by-user',
+      'auth/cancelled-popup-request'
+    ].includes(error?.code);
+
+    if (!shouldRetryWithRedirect) throw error;
+    await signInWithRedirect(auth, provider);
+    return null;
+  }
 }
 
 export function observeAuth(callback) {

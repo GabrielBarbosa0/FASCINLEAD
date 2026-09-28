@@ -124,10 +124,13 @@ Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas 
 
 - Autorizar ou bloquear um e-mail.
 - Vincular usuario a uma loja e perfil.
+- Permitir que apenas administradores criem ou alterem acessos pela interface.
+- Sincronizar perfil, loja e estado entre `allowedEmails` e um usuario que ja realizou o primeiro login.
+- Impedir que o administrador bloqueie ou remova o proprio perfil administrativo.
 - Ativar ou inativar uma loja.
 - Manter a lista de interesses disponiveis no formulario.
 
-Na primeira entrega, essas configuracoes poderao ser feitas pelo administrador diretamente no Firebase Console. Uma interface administrativa propria podera ser acrescentada depois da validacao do MVP.
+O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas e interesses ainda podem ser mantidos diretamente no Firebase Console durante o MVP.
 
 ## 4. Requisitos nao funcionais
 
@@ -245,6 +248,7 @@ FASCINLEAD/
 4. `Cadastros`: lista pesquisavel dos registros do colaborador.
 5. `Sincronizacao`: totais, ultimo envio, erros e acao manual.
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
+7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
 
 ### 6.2 Navegacao mobile
 
