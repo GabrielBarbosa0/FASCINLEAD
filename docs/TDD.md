@@ -127,6 +127,7 @@ Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas 
 - Permitir que apenas administradores criem ou alterem acessos pela interface.
 - Sincronizar perfil, loja e estado entre `allowedEmails` e um usuario que ja realizou o primeiro login.
 - Impedir que o administrador bloqueie ou remova o proprio perfil administrativo.
+- Manter `oticasfascinantes.financeiro@gmail.com` como conta administradora principal de recuperacao, sempre sujeita ao login Google verificado.
 - Ativar ou inativar uma loja.
 - Manter a lista de interesses disponiveis no formulario.
 

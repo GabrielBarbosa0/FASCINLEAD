@@ -16,8 +16,14 @@ service cloud.firestore {
         && userProfile().active == true;
     }
 
+    function isPrimaryAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'oticasfascinantes.financeiro@gmail.com';
+    }
+
     function isAdmin() {
-      return activeUser() && userProfile().role == 'admin';
+      return isPrimaryAdmin()
+        || (activeUser() && userProfile().role == 'admin');
     }
 
     function isManager() {
@@ -86,10 +92,10 @@ service cloud.firestore {
     }
 
     match /stores/{storeId} {
-      allow get: if activeUser() && (
+      allow get: if isPrimaryAdmin() || (activeUser() && (
         userProfile().storeId == storeId || isAdmin()
-      );
-      allow list: if activeUser();
+      ));
+      allow list: if activeUser() || isPrimaryAdmin();
       allow write: if isAdmin();
     }
 
