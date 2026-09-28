@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createLeadDocument, validateLeadInput } from '../../src/utils/lead.js';
+import { createLeadDocument, createLeadUpdate, validateLeadInput } from '../../src/utils/lead.js';
 
 const validInput = {
   fullName: 'Cliente Exemplo',
@@ -53,5 +53,23 @@ describe('lead validation', () => {
       installationId: 'installation-test',
       schemaVersion: 1
     });
+  });
+
+  it('creates an update with editable fields only', () => {
+    const result = createLeadUpdate({
+      ...validInput,
+      fullName: 'Cliente Corrigido',
+      city: 'Recife'
+    });
+
+    expect(result.isValid).toBe(true);
+    expect(result.data).toMatchObject({
+      fullName: 'Cliente Corrigido',
+      city: 'Recife',
+      phone: '+5581999991234'
+    });
+    expect(result.data).not.toHaveProperty('capturedByUid');
+    expect(result.data).not.toHaveProperty('storeId');
+    expect(result.data).not.toHaveProperty('capturedAtClient');
   });
 });

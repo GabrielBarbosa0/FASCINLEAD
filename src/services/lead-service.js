@@ -12,7 +12,7 @@ import {
   where
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
-import { createLeadDocument } from '../utils/lead.js';
+import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { getInstallationId } from '../utils/installation.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
@@ -87,6 +87,28 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
     createdAtServer: serverTimestamp(),
     updatedAtServer: serverTimestamp()
   });
+
+  writePromise.catch(onRemoteError);
+  return { ...result, id, writePromise };
+}
+
+export function updateLead(id, input, demoMode, onRemoteError) {
+  const result = createLeadUpdate(input);
+  if (!result.isValid) return result;
+
+  if (demoMode || !isFirebaseConfigured) {
+    const leads = readDemoLeads();
+    const index = leads.findIndex((lead) => lead.id === id);
+    if (index === -1) return { isValid: false, errors: {}, notFound: true };
+    leads[index] = { ...leads[index], ...result.data, syncState: 'demo', fromCache: true };
+    writeDemoLeads(leads);
+    return { ...result, id };
+  }
+
+  const writePromise = setDoc(doc(db, 'leads', id), {
+    ...result.data,
+    updatedAtServer: serverTimestamp()
+  }, { merge: true });
 
   writePromise.catch(onRemoteError);
   return { ...result, id, writePromise };

@@ -35,14 +35,14 @@ import {
 } from 'lucide';
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
-import { saveLead, subscribeToLeads, synchronizeNow } from '../services/lead-service.js';
+import { saveLead, subscribeToLeads, synchronizeNow, updateLead } from '../services/lead-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { loadManagementLeads, MANAGEMENT_QUERY_LIMIT } from '../services/management-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
 import { STORES } from '../utils/stores.js';
-import { currentRoute, navigate } from './router.js';
+import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
 
@@ -365,11 +365,12 @@ function leadsView() {
   const list = filtered.length
     ? filtered.map((lead) => {
         const [label, tone] = syncLabel(lead);
-        return `<article class="lead-item">
+        return `<button class="lead-item" type="button" data-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
           <div class="lead-avatar">${escapeHtml(lead.fullName[0]?.toUpperCase() || '?')}</div>
           <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.interestLabel || 'Interesse nao informado')}</small></div>
           <span class="status-badge status-${tone}">${label}</span>
-        </article>`;
+          <i class="lead-chevron" data-lucide="chevron-right"></i>
+        </button>`;
       }).join('')
     : `<div class="empty-state"><i data-lucide="clipboard-x"></i><strong>Nenhum cadastro encontrado</strong><p>${state.search ? 'Tente outro nome ou telefone.' : 'Os contatos registrados aparecerao aqui.'}</p><button class="button button-primary" type="button" data-route="new"><i data-lucide="user-plus"></i>Novo cadastro</button></div>`;
 
@@ -378,6 +379,44 @@ function leadsView() {
     <div class="search-box"><i data-lucide="search"></i><input id="lead-search" type="search" value="${escapeHtml(state.search)}" placeholder="Buscar por nome ou telefone" aria-label="Buscar cadastros" /></div>
     ${state.dataError ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.dataError)}</span></div>` : ''}
     <section class="lead-list">${list}</section>`;
+}
+
+function leadDetailView() {
+  const lead = state.leads.find((item) => item.id === currentRouteParam());
+  if (!lead) {
+    return `<section class="page-heading compact">
+      <button class="back-button" type="button" data-route="leads" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
+      <div><p class="eyebrow">CADASTRO</p><h1>Cadastro nao encontrado</h1><p>Volte para a lista e tente novamente.</p></div>
+    </section>`;
+  }
+
+  const [syncStatus, syncTone] = syncLabel(lead);
+  const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
+  return `
+    <section class="page-heading compact">
+      <button class="back-button" type="button" data-route="leads" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
+      <div><p class="eyebrow">DETALHES DO CADASTRO</p><h1>${escapeHtml(lead.fullName)}</h1><p>Confira os dados e corrija o que for necessario.</p></div>
+    </section>
+    <section class="lead-detail-summary" aria-label="Informacoes do cadastro">
+      <div><span>Status</span><strong class="status-badge status-${syncTone}">${syncStatus}</strong></div>
+      <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
+      <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
+    </section>
+    <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" novalidate>
+      <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required /><small class="field-error"></small></div>
+      <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required /><small class="field-error"></small></div>
+      <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" /></div>
+      <div class="field-row">
+        <div class="field"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" /></div>
+        <div class="field"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" /></div>
+        <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" /></div>
+      </div>
+      <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId">${interests}</select></div>
+      <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3">${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
+      <div class="field consent-field" data-field="consentGiven"><label class="checkbox-label"><input type="checkbox" name="consentGiven" ${lead.consentGiven ? 'checked' : ''} /><span>O cliente autorizou o contato da Oticas Fascinante.</span></label><small class="field-error"></small></div>
+      <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar alteracoes</span></button>
+      <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
+    </form>`;
 }
 
 function managementView() {
@@ -541,13 +580,13 @@ function bottomNav() {
   ];
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   return `<nav class="bottom-nav ${canManage() ? 'has-management' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route ? 'is-active' : ''}" ${state.route === route ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, sync: syncView, management: managementView, access: accessView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, access: accessView };
   const page = pages[state.route] || homeView;
   const wideLayout = ['management', 'access'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
@@ -611,6 +650,30 @@ function bindPageEvents() {
       form.reset();
       navigate('leads');
       showToast(state.demoMode ? 'Cadastro salvo somente neste navegador.' : 'Cadastro salvo. A sincronizacao seguira automaticamente.');
+    });
+  }
+
+  const editLeadForm = document.querySelector('#edit-lead-form');
+  if (editLeadForm) {
+    const phoneInput = editLeadForm.elements.phone;
+    const notesInput = editLeadForm.elements.notes;
+    phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
+    notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
+    editLeadForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const values = Object.fromEntries(new FormData(editLeadForm));
+      values.consentGiven = editLeadForm.elements.consentGiven.checked;
+      const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
+        state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
+        render();
+      });
+      setFieldErrors(editLeadForm, result.errors || {});
+      if (!result.isValid) {
+        if (result.notFound) navigate('leads');
+        return;
+      }
+      navigate('leads');
+      showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : 'Alteracoes salvas. A sincronizacao seguira automaticamente.');
     });
   }
 
@@ -852,6 +915,8 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const leadButton = event.target.closest('[data-lead-id]');
+    if (leadButton) navigate('lead', leadButton.dataset.leadId);
     const routeButton = event.target.closest('[data-route]');
     if (routeButton) navigate(routeButton.dataset.route);
     const actionButton = event.target.closest('[data-action]');

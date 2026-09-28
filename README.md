@@ -37,6 +37,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - sincronizacao automatica e manual;
 - estados `Pendente`, `Sincronizando`, `Sincronizado` e `Erro`;
 - listagem e pesquisa dos cadastros do colaborador;
+- detalhamento e correcao dos proprios cadastros, inclusive offline;
 - alerta local de possivel telefone duplicado;
 - consulta gerencial por loja, colaborador e periodo;
 - exportacao para CSV;

@@ -56,3 +56,27 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
     }
   };
 }
+
+export function createLeadUpdate(input) {
+  const validation = validateLeadInput(input);
+  if (!validation.isValid) return { ...validation, data: null };
+
+  const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
+  return {
+    errors: {},
+    isValid: true,
+    data: {
+      fullName: input.fullName.trim(),
+      preferredName: input.preferredName?.trim() || '',
+      phone: validation.phone.e164,
+      phoneSearch: validation.phone.search,
+      neighborhood: input.neighborhood?.trim() || '',
+      city: input.city?.trim() || '',
+      state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
+      interestId: interest.id,
+      interestLabel: interest.id ? interest.label : '',
+      notes: input.notes?.trim() || '',
+      consentGiven: true
+    }
+  };
+}

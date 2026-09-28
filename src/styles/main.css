@@ -713,15 +713,33 @@ svg {
 }
 
 .lead-item {
+  width: 100%;
   min-height: 82px;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto 20px;
   align-items: center;
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  color: inherit;
   background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.lead-item:hover,
+.lead-item:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgb(0 48 112 / 10%);
+}
+
+.lead-chevron {
+  width: 20px;
+  height: 20px;
+  color: var(--brand);
 }
 
 .lead-avatar {
@@ -772,6 +790,43 @@ svg {
 .status-neutral {
   color: #465d72;
   background: #eaf0f5;
+}
+
+.lead-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+}
+
+.lead-detail-summary > div {
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.lead-detail-summary span:not(.status-badge),
+.lead-detail-summary strong {
+  display: block;
+}
+
+.lead-detail-summary span:not(.status-badge) {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lead-detail-summary strong:not(.status-badge) {
+  overflow: hidden;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -1397,12 +1452,21 @@ svg {
   }
 
   .lead-item {
-    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr) 20px;
   }
 
   .lead-item .status-badge {
     grid-column: 2;
     width: max-content;
+  }
+
+  .lead-chevron {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .lead-detail-summary {
+    grid-template-columns: 1fr;
   }
 }
 

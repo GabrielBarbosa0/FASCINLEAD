@@ -35,4 +35,17 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   await expect(page.getByText('Cliente Exemplo')).toBeVisible();
   await expect(page.getByText('Somente neste navegador', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ver cadastro de Cliente Exemplo' }).click();
+  await expect(page.getByRole('heading', { name: 'Cliente Exemplo' })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('lead-details.png'),
+    fullPage: true
+  });
+  await page.getByLabel('Nome *').fill('Cliente Corrigido');
+  await page.getByLabel('Observacao rapida').fill('Prefere contato pela tarde');
+  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
