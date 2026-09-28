@@ -56,7 +56,8 @@ service cloud.firestore {
     }
 
     match /allowedEmails/{email} {
-      allow get: if signedIn() && request.auth.token.email == email;
+      allow get: if (signedIn() && request.auth.token.email == email)
+        || isAdmin();
       allow list: if isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin()

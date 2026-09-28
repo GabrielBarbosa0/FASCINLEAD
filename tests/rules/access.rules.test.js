@@ -8,6 +8,7 @@ import {
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -82,6 +83,8 @@ describe('access administration rules', () => {
   it('lets an administrator create another authorized email', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
     const email = 'colaborador@example.com';
+    const existingPermission = await assertSucceeds(getDoc(doc(db, 'allowedEmails', email)));
+    expect(existingPermission.exists()).toBe(false);
     const existingUsers = await assertSucceeds(getDocs(query(collection(db, 'users'), where('email', '==', email))));
     expect(existingUsers.empty).toBe(true);
 
