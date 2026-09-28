@@ -1,2 +1,226 @@
-# FASCINLEAD
+# FascinLead
 
+Pre-cadastro offline para as equipes de captacao das **Oticas Fascinante**.
+
+> **Status:** planejamento tecnico concluido; implementacao ainda nao iniciada.
+
+O FascinLead sera uma Progressive Web App (PWA) para substituir as fichas de papel usadas por colaboradores durante abordagens na rua. O usuario podera registrar um potencial cliente mesmo sem internet, consultar os cadastros no proprio aparelho e sincroniza-los com a nuvem quando a conexao voltar.
+
+O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pretende ser um CRM completo.
+
+## Objetivos
+
+- tornar o pre-cadastro rapido e simples no celular;
+- funcionar em locais com conexao instavel ou inexistente;
+- evitar perda, rasura e redigitacao de fichas em papel;
+- identificar o colaborador, a loja e a data de cada captacao;
+- centralizar os registros na nuvem depois da sincronizacao;
+- operar inicialmente apenas com recursos gratuitos do Firebase.
+
+## Fluxo principal
+
+1. O colaborador entra com uma conta Google autorizada.
+2. Inicia uma nova abordagem pelo celular.
+3. Informa nome, telefone e os dados opcionais relevantes.
+4. O cadastro e salvo localmente, mesmo sem internet.
+5. O sistema mostra o registro como pendente.
+6. Quando a conexao retorna, o registro e sincronizado com o Firestore.
+7. O gestor consulta ou exporta os registros autorizados da sua loja.
+
+## Funcionalidades do MVP
+
+- login com Google;
+- autorizacao por e-mail, perfil e loja;
+- formulario curto de pre-cadastro;
+- funcionamento offline depois do primeiro acesso;
+- armazenamento persistente de registros pendentes;
+- sincronizacao automatica e manual;
+- estados `Pendente`, `Sincronizando`, `Sincronizado` e `Erro`;
+- listagem e pesquisa dos cadastros do colaborador;
+- alerta local de possivel telefone duplicado;
+- consulta gerencial por loja, colaborador e periodo;
+- exportacao para CSV;
+- instalacao como PWA em celular e desktop.
+
+## Fora do escopo
+
+O FascinLead nao tera, no MVP:
+
+- funil de vendas ou CRM completo;
+- atendimento e campanhas pelo WhatsApp;
+- agenda de consultas ou exames;
+- anamnese ou recomendacao de lentes;
+- provador virtual;
+- metas, comissoes ou conciliacao de vendas;
+- integracao com Savwin;
+- integracao com AppOk;
+- aplicativo nativo para Android ou iOS.
+
+## Telas previstas
+
+| Tela | Finalidade |
+| --- | --- |
+| Login | Autenticar a conta Google e validar o acesso |
+| Inicio | Exibir atalhos, loja, conectividade e pendencias |
+| Novo | Registrar rapidamente um potencial cliente |
+| Cadastros | Consultar e pesquisar os registros do colaborador |
+| Sincronizacao | Exibir contagens, erros e acao de envio manual |
+| Gestao | Filtrar, acompanhar e exportar registros autorizados |
+
+## Arquitetura
+
+```text
+Celular / navegador
+  |
+  |-- HTML + CSS + JavaScript
+  |-- PWA + Service Worker
+  |-- Firestore SDK + IndexedDB
+  |
+  `---- HTTPS, quando online ----> Firebase
+                                      |-- Authentication
+                                      |-- Cloud Firestore
+                                      |-- Security Rules
+                                      `-- Hosting
+```
+
+### Tecnologias planejadas
+
+- HTML5, CSS3 e JavaScript com ES Modules;
+- Vite;
+- Web App Manifest e Service Worker;
+- Firebase Authentication com Google;
+- Cloud Firestore com persistencia offline;
+- Firebase Hosting;
+- Firebase Emulator Suite;
+- Vitest;
+- Playwright;
+- Lucide Icons.
+
+Nao serao usados Cloud Functions, Cloud Run, Storage ou outros recursos que exijam o plano Blaze durante o MVP.
+
+## Offline primeiro
+
+O modo offline e o requisito central do FascinLead, nao uma funcionalidade secundaria.
+
+Depois do primeiro acesso online, o aplicativo devera abrir e permitir novos cadastros sem conexao. Os dados serao mantidos no IndexedDB por meio do SDK do Firestore. A sincronizacao sera tentada ao salvar online, abrir o aplicativo, recuperar a conexao, voltar ao primeiro plano e tocar em `Sincronizar agora`.
+
+Cada cadastro tera um UUID criado no dispositivo. Novas tentativas usarao o mesmo identificador para evitar duplicacao.
+
+O sistema nao dependera de sincronizacao em segundo plano com o aplicativo fechado, pois navegadores moveis nao garantem essa execucao.
+
+## Seguranca e privacidade
+
+- login Google nao substitui a autorizacao interna;
+- somente e-mails previamente autorizados poderao acessar o sistema;
+- captadores acessarao apenas os proprios registros;
+- gestores acessarao apenas a loja vinculada;
+- regras do Firestore validarao acesso, tipos e campos permitidos;
+- dados pessoais nao deverao aparecer em URLs, logs ou fixtures de teste;
+- o MVP coletara apenas os dados necessarios ao contato;
+- CPF, dados de saude, fotos e geolocalizacao exata nao serao coletados inicialmente;
+- o formulario exigira confirmacao do consentimento para contato.
+
+## Estrutura planejada
+
+```text
+FASCINLEAD/
+|-- docs/
+|   `-- TDD.md
+|-- public/
+|   |-- icons/
+|   `-- manifest.webmanifest
+|-- src/
+|   |-- app/
+|   |-- components/
+|   |-- firebase/
+|   |-- pages/
+|   |-- services/
+|   |-- styles/
+|   `-- utils/
+|-- tests/
+|   |-- e2e/
+|   |-- rules/
+|   `-- unit/
+|-- AGENTS.md
+|-- firestore.indexes.json
+|-- firestore.rules
+|-- firebase.json
+|-- index.html
+|-- package.json
+`-- vite.config.js
+```
+
+A estrutura sera criada durante a fundacao do projeto e podera receber pequenos ajustes conforme a implementacao real.
+
+## Documentacao
+
+| Documento | Conteudo |
+| --- | --- |
+| [Technical Design Document](docs/TDD.md) | Escopo, arquitetura, requisitos, modelo de dados, seguranca, testes e implantacao |
+| [Guia para agentes](AGENTS.md) | Contexto e regras obrigatorias para pessoas e agentes de IA que alterarem o repositorio |
+
+Leia o `AGENTS.md` e o TDD antes de iniciar qualquer desenvolvimento.
+
+## Desenvolvimento local
+
+O codigo da aplicacao ainda nao foi inicializado. Por isso, comandos de instalacao, execucao, testes e build ainda nao estao disponiveis.
+
+Quando a fundacao tecnica for criada, esta secao devera documentar exclusivamente os scripts reais definidos no `package.json`, incluindo no minimo:
+
+- instalacao das dependencias;
+- execucao do servidor local;
+- inicializacao da Firebase Emulator Suite;
+- testes unitarios;
+- testes das Security Rules;
+- testes de interface;
+- geracao do build de producao.
+
+## Plano de entrega
+
+### 1. Fundacao
+
+- inicializar Vite e estrutura modular;
+- definir identidade visual e componentes basicos;
+- configurar PWA e app shell offline;
+- configurar Firebase e Emulator Suite;
+- implementar login e autorizacao;
+- criar e testar as primeiras Security Rules.
+
+### 2. Captacao offline
+
+- implementar o formulario;
+- salvar e consultar registros offline;
+- exibir estados de sincronizacao;
+- sincronizar sem duplicacao;
+- cobrir o fluxo critico com testes.
+
+### 3. Gestao
+
+- adicionar filtros e totais simples;
+- restringir dados por perfil e loja;
+- implementar exportacao CSV;
+- concluir administracao basica de acessos.
+
+### 4. Piloto
+
+- testar com um grupo pequeno de colaboradores;
+- validar Android e iPhone reais;
+- simular perda e retorno de conexao;
+- acompanhar cotas gratuitas do Firebase;
+- corrigir problemas antes da liberacao para todas as lojas.
+
+## Contribuicao
+
+Antes de alterar o repositorio:
+
+1. Leia o [AGENTS.md](AGENTS.md).
+2. Leia o [TDD](docs/TDD.md).
+3. Verifique o estado atual do Git.
+4. Preserve alteracoes existentes que nao pertencem a sua tarefa.
+5. Avalie impactos em operacao offline, seguranca, privacidade e cotas do Firebase.
+6. Implemente testes proporcionais ao risco da mudanca.
+7. Atualize a documentacao quando uma decisao permanente mudar.
+
+## Licenca
+
+Consulte o arquivo [LICENSE](LICENSE) deste repositorio.
