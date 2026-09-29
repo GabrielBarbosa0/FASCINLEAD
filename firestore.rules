@@ -30,6 +30,42 @@ service cloud.firestore {
       return activeUser() && userProfile().role == 'manager';
     }
 
+    function canManageGoals() {
+      return isAdmin() || isManager();
+    }
+
+    function validGoal(data) {
+      return data.keys().hasOnly([
+          'title', 'metric', 'targetCount', 'startDate', 'endDate',
+          'storeId', 'assigneeUid', 'assigneeName', 'createdByUid',
+          'createdByName', 'createdAt', 'groupId', 'schemaVersion'
+        ])
+        && data.title is string
+        && data.title.size() >= 3
+        && data.title.size() <= 80
+        && data.metric == 'leads_captured'
+        && data.targetCount is int
+        && data.targetCount >= 1
+        && data.targetCount <= 10000
+        && data.startDate is string
+        && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.endDate is string
+        && data.endDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.endDate >= data.startDate
+        && data.storeId is string
+        && data.assigneeUid is string
+        && data.assigneeName is string
+        && data.assigneeName.size() >= 2
+        && data.assigneeName.size() <= 120
+        && data.createdByUid == request.auth.uid
+        && data.createdByName is string
+        && data.groupId is string
+        && data.groupId.size() >= 8
+        && data.groupId.size() <= 64
+        && data.createdAt is timestamp
+        && data.schemaVersion == 1;
+    }
+
     function validLead(data) {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
@@ -99,7 +135,8 @@ service cloud.firestore {
           && request.resource.data.storeId == resource.data.storeId
         ));
       allow delete: if false;
-      allow list: if isAdmin();
+      allow list: if isAdmin()
+        || (isManager() && resource.data.storeId == userProfile().storeId);
     }
 
     match /stores/{storeId} {
@@ -135,6 +172,26 @@ service cloud.firestore {
           || (activeUser() && resource.data.capturedByUid == request.auth.uid));
 
       allow delete: if isAdmin();
+    }
+
+    match /goals/{goalId} {
+      allow get, list: if activeUser() && (
+        resource.data.assigneeUid == request.auth.uid
+        || (isManager() && resource.data.storeId == userProfile().storeId)
+        || isAdmin()
+      );
+
+      allow create: if canManageGoals()
+        && validGoal(request.resource.data)
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid))
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.active == true
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.role == 'captor'
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.storeId == request.resource.data.storeId
+        && (isAdmin() || request.resource.data.storeId == userProfile().storeId);
+
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (isManager() && resource.data.storeId == userProfile().storeId);
     }
 
     match /{document=**} {

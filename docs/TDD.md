@@ -4,9 +4,9 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 1.0 |
+| Versao | 1.1 |
 | Status | Em implementacao |
-| Data | 28/09/2026 |
+| Data | 29/09/2026 |
 | Responsavel | Oticas Fascinante |
 
 ## 1. Visao geral
@@ -31,7 +31,7 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 - Atendimento ou campanhas pelo WhatsApp.
 - Agenda centralizada, confirmacoes ou lembretes de consultas e exames. O MVP registra somente um pre-agendamento opcional no lead.
 - Anamnese, recomendacao de lentes ou provador virtual.
-- Metas, comissoes, faturamento ou conciliacao de vendas.
+- Metas de vendas, comissoes, faturamento ou conciliacao de vendas. Metas de quantidade de leads captados estao no escopo.
 - Integracao com Savwin, AppOk ou outros sistemas externos.
 - Envio de notificacoes push na primeira versao.
 - Funcionamento como aplicativo nativo publicado nas lojas Android e iOS.
@@ -40,9 +40,9 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 
 | Perfil | Responsabilidade | Permissoes iniciais |
 | --- | --- | --- |
-| Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios pre-cadastros |
-| Gestor | Acompanhar a captacao de uma loja | Consultar e exportar os registros da propria loja |
-| Administrador | Administrar o FascinLead | Gerenciar usuarios, lojas e consultar todos os registros |
+| Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios pre-cadastros; acompanhar as proprias metas |
+| Gestor | Acompanhar a captacao de uma loja | Consultar e exportar os registros, criar metas e acompanhar apenas a propria equipe |
+| Administrador | Administrar o FascinLead | Gerenciar usuarios, lojas, metas e consultar todos os registros |
 
 As permissoes devem ser aplicadas pelas regras do Firestore. Ocultar botoes na interface nao substitui a autorizacao no banco.
 
@@ -137,6 +137,17 @@ Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas 
 - Manter a lista de interesses disponiveis no formulario.
 
 O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas e interesses ainda podem ser mantidos diretamente no Firebase Console durante o MVP.
+
+### RF-08 - Metas de captacao
+
+- Administradores podem criar metas de quantidade de leads para captadores de qualquer loja.
+- Gestores podem criar metas somente para captadores ativos da propria loja.
+- Uma mesma configuracao pode ser atribuida a um ou mais captadores, gerando uma meta individual para cada pessoa.
+- Captadores visualizam somente as proprias metas e o proprio progresso.
+- Gestores visualizam somente metas e desempenho da propria equipe; administradores visualizam todas as lojas.
+- O progresso considera somente leads sincronizados, atribuidos ao captador e cuja data de captacao esteja dentro do periodo da meta.
+- Metas podem ser excluidas por administradores ou pelo gestor da loja correspondente sem alterar os leads contabilizados.
+- Ranking, premiacoes e gamificacao ficam reservados para uma etapa posterior.
 
 ## 4. Requisitos nao funcionais
 
@@ -358,7 +369,31 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
 
 `phoneSearch` facilita a busca autorizada, mas nao deve ser exibido como campo separado. Nao sera criada uma chave unica baseada no telefone, pois uma mesma pessoa pode ser abordada legitimamente em momentos diferentes.
 
-### 7.6 Indices previstos
+### 7.6 Colecao `goals`
+
+Cada documento representa a meta individual de um captador. Uma atribuicao em massa compartilha o mesmo `groupId`, mas cria documentos independentes para preservar autorizacao e leitura simples.
+
+```json
+{
+  "title": "Meta de captacoes",
+  "metric": "leads_captured",
+  "targetCount": 20,
+  "startDate": "2026-10-01",
+  "endDate": "2026-10-31",
+  "storeId": "loja-06",
+  "assigneeUid": "firebase-uid-captador",
+  "assigneeName": "Nome do captador",
+  "createdByUid": "firebase-uid-gestor",
+  "createdByName": "Nome do gestor",
+  "createdAt": "Timestamp",
+  "groupId": "uuid-da-atribuicao",
+  "schemaVersion": 1
+}
+```
+
+O progresso nao e gravado no documento. Ele e calculado a partir dos leads sincronizados para evitar contadores divergentes e operacoes privilegiadas no plano Spark.
+
+### 7.7 Indices previstos
 
 - `leads`: `capturedByUid ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedAtClient DESC`.
@@ -458,7 +493,8 @@ O login Google usara popup em computadores e celulares. No GitHub Pages, o redir
 - Administrador acessa todas as lojas e configuracoes.
 - Nenhum cliente pode elevar seu proprio perfil, trocar `storeId` ou alterar `role`.
 - Validar chaves permitidas, tipos, limites de texto e valores enumerados.
-- Nao permitir exclusao definitiva de `leads` pelo aplicativo no MVP.
+- Permitir exclusao definitiva de `leads` somente para administradores.
+- Captadores leem apenas suas metas; gestores leem e administram metas da propria loja; administradores administram todas.
 
 Testes automatizados de regras serao obrigatorios antes do deploy.
 
@@ -616,6 +652,7 @@ O primeiro deploy podera ser manual pelo Firebase CLI. Automatizacao por GitHub 
 - indicadores simples de quantidade;
 - exportacao CSV;
 - administracao minima de acessos.
+- metas individuais de quantidade de leads com visibilidade por equipe.
 
 ### Fase 4 - Piloto
 
@@ -657,6 +694,7 @@ O MVP estara apto para piloto quando:
 | ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em agenda ou CRM |
 | ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
 | ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
+| ADR-014 | Modelar atribuicoes em massa como uma meta individual por captador | Simplifica as regras por usuario, preserva a visibilidade por loja e prepara o progresso para futura gamificacao |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 

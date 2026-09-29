@@ -43,6 +43,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - consulta gerencial por loja, colaborador e periodo;
 - exportacao detalhada para CSV;
 - visualizacao, correcao e exclusao de leads por administradores;
+- metas individuais de quantidade de leads, com acompanhamento restrito por usuario e equipe;
 - instalacao como PWA em celular e desktop.
 
 ## Fora do escopo
@@ -54,7 +55,8 @@ O FascinLead nao tera, no MVP:
 - agenda centralizada, confirmacoes ou lembretes de consultas e exames;
 - anamnese ou recomendacao de lentes;
 - provador virtual;
-- metas, comissoes ou conciliacao de vendas;
+- metas de vendas, comissoes ou conciliacao de vendas;
+- ranking, premiacoes ou gamificacao na primeira versao das metas de captacao;
 - integracao com Savwin;
 - integracao com AppOk;
 - aplicativo nativo para Android ou iOS.
@@ -69,6 +71,7 @@ O FascinLead nao tera, no MVP:
 | Cadastros | Consultar e pesquisar os registros do colaborador |
 | Sincronizacao | Exibir contagens, erros e acao de envio manual |
 | Gestao | Filtrar, acompanhar e exportar registros autorizados |
+| Metas | Criar metas de captacao e acompanhar o progresso permitido ao perfil |
 
 ## Arquitetura
 
@@ -242,6 +245,7 @@ Sem configuracao Firebase, o servidor de desenvolvimento oferece um modo local i
 - restringir dados por perfil e loja;
 - implementar exportacao CSV;
 - administrar acessos de colaboradores, gestores e administradores.
+- criar metas individuais em massa e acompanhar o desempenho por loja e captador.
 
 ## Cadastro de acessos
 

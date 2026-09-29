@@ -25,6 +25,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Target,
   Trash2,
   UserPlus,
   UserRoundCog,
@@ -39,6 +40,7 @@ import { isFirebaseConfigured } from '../firebase/client.js';
 import { saveLead, subscribeToLeads, synchronizeNow, updateLead } from '../services/lead-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
+import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
@@ -74,6 +76,7 @@ const appIcons = {
   Save,
   Search,
   ShieldCheck,
+  Target,
   Trash2,
   UserPlus,
   UserRoundCog,
@@ -112,6 +115,17 @@ const state = {
     error: '',
     accesses: [],
     storeIds: []
+  },
+  goals: {
+    loading: false,
+    loaded: false,
+    saving: false,
+    error: '',
+    records: [],
+    members: [],
+    truncated: false,
+    pendingDeleteId: '',
+    draft: createDefaultGoalDraft()
   }
 };
 
@@ -129,6 +143,19 @@ function createDefaultManagementFilters() {
     storeId: '',
     capturedByUid: '',
     search: ''
+  };
+}
+
+function createDefaultGoalDraft(storeId = '') {
+  const today = new Date();
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return {
+    title: 'Meta de captacoes',
+    targetCount: 20,
+    startDate: toLocalDateInput(today),
+    endDate: toLocalDateInput(monthEnd),
+    storeId,
+    assigneeUids: []
   };
 }
 
@@ -186,6 +213,11 @@ function formatCapturedAt(value) {
   }).format(date);
 }
 
+function formatGoalDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponivel';
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(`${value}T12:00:00`));
+}
+
 function filteredManagementRecords() {
   const { records, filters } = state.management;
   const search = filters.search.trim().toLowerCase();
@@ -239,7 +271,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'access'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'access', 'goals'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
@@ -302,6 +334,11 @@ function homeView() {
         <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
+      <button class="action-card" type="button" data-route="goals">
+        <span class="action-icon"><i data-lucide="target"></i></span>
+        <span><strong>Metas</strong><small>${canManage() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'}</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>
       ${isAdmin() ? `<button class="action-card" type="button" data-route="access">
         <span class="action-icon"><i data-lucide="user-round-cog"></i></span>
         <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
@@ -577,6 +614,87 @@ function accessView() {
     </section>`;
 }
 
+function goalStatus(goal) {
+  const today = toLocalDateInput(new Date());
+  if (goal.completed >= goal.targetCount) return ['Concluida', 'success'];
+  if (today < goal.startDate) return ['Agendada', 'neutral'];
+  if (today > goal.endDate) return ['Encerrada', 'danger'];
+  return ['Em andamento', 'warning'];
+}
+
+function goalsView() {
+  const { records, members, loading, saving, error, truncated, draft, pendingDeleteId } = state.goals;
+  const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
+  const selectedCount = draft.assigneeUids.filter((uid) => visibleMembers.some((member) => member.uid === uid)).length;
+  const completedGoals = records.filter((goal) => goal.completed >= goal.targetCount).length;
+  const totalCaptured = records.reduce((total, goal) => total + goal.completed, 0);
+  const selectedGoal = records.find((goal) => goal.id === pendingDeleteId);
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const memberOptions = visibleMembers.length
+    ? visibleMembers.map((member) => `<label class="goal-member-option">
+        <input type="checkbox" name="assigneeUids" value="${escapeHtml(member.uid)}" ${draft.assigneeUids.includes(member.uid) ? 'checked' : ''} />
+        <span class="avatar">${escapeHtml(profileInitials(member.displayName))}</span>
+        <span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(storeLabel(member.storeId))}</small></span>
+      </label>`).join('')
+    : '<p class="goal-members-empty">Nenhum captador ativo nesta loja.</p>';
+
+  const goalCards = records.length
+    ? records.map((goal) => {
+        const [status, tone] = goalStatus(goal);
+        return `<article class="goal-card">
+          <div class="goal-card-heading">
+            <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(goal.title)}</h2></div>
+            ${canManage() ? `<button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(goal.id)}" title="Excluir meta"><i data-lucide="trash-2"></i></button>` : ''}
+          </div>
+          <div class="goal-person"><span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span><div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${escapeHtml(storeLabel(goal.storeId))}</span></div></div>
+          <div class="goal-progress-copy"><strong>${goal.completed} de ${goal.targetCount} leads</strong><span>${goal.percentage}%</span></div>
+          <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${goal.percentage}"><span style="width: ${goal.percentage}%"></span></div>
+          <div class="goal-card-footer"><span>${formatGoalDate(goal.startDate)} a ${formatGoalDate(goal.endDate)}</span><strong>${goal.remaining ? `${goal.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
+        </article>`;
+      }).join('')
+    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${canManage() ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
+
+  const creator = canManage() ? `<form id="goal-form" class="goal-form" novalidate>
+      <div class="filter-title"><i data-lucide="target"></i><div><strong>Nova meta</strong><span>Quantidade de leads sincronizados no periodo.</span></div></div>
+      <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
+      <div class="goal-form-grid">
+        <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
+        <div class="field" data-field="startDate"><label for="goal-start">Inicio</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
+        <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
+      </div>
+      <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin()
+        ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
+        : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
+      <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
+      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="target"></i><span>${saving ? 'Criando...' : 'Criar metas'}</span></button>
+    </form>` : '';
+
+  return `
+    <section class="management-heading goals-heading">
+      <div><p class="eyebrow">DESEMPENHO DE CAPTACAO</p><h1>Metas</h1><p>${canManage() ? 'Defina objetivos e acompanhe os resultados permitidos ao seu perfil.' : 'Acompanhe suas metas individuais de captacao.'}</p></div>
+      <button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>
+    </section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
+    <section class="goal-metrics" aria-label="Resumo das metas">
+      <div><span>Metas</span><strong>${records.length}</strong></div>
+      <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
+      <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
+    </section>
+    <section class="goals-layout ${canManage() ? '' : 'goals-layout-personal'}">
+      ${creator}
+      <section class="goals-results" aria-busy="${loading}">
+        <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${records.length} meta(s)</span></div></div>
+        ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
+      </section>
+    </section>
+    ${selectedGoal ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
+      <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
+      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta de ${escapeHtml(selectedGoal.assigneeName)} sera excluida. As captacoes permanecem intactas.</p></div>
+      <div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-close-goal-dialog>Cancelar</button><button class="button button-danger-solid" type="button" data-confirm-delete-goal="${escapeHtml(selectedGoal.id)}"><i data-lucide="trash-2"></i><span>Excluir meta</span></button></div>
+    </dialog>` : ''}`;
+}
+
 function syncView() {
   const counts = state.leads.reduce((result, lead) => {
     result[lead.syncState] = (result[lead.syncState] || 0) + 1;
@@ -610,9 +728,9 @@ function bottomNav() {
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, access: accessView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, access: accessView, goals: goalsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'access'].includes(state.route);
+  const wideLayout = ['management', 'access', 'goals'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -807,6 +925,59 @@ function bindPageEvents() {
       }
     });
   }
+
+  const goalForm = document.querySelector('#goal-form');
+  if (goalForm) {
+    const readDraft = () => ({
+      title: goalForm.elements.title.value,
+      targetCount: Number(goalForm.elements.targetCount.value),
+      startDate: goalForm.elements.startDate.value,
+      endDate: goalForm.elements.endDate.value,
+      storeId: goalForm.elements.storeId.value,
+      assigneeUids: new FormData(goalForm).getAll('assigneeUids')
+    });
+
+    goalForm.elements.storeId.addEventListener('change', () => {
+      state.goals.draft = { ...readDraft(), assigneeUids: [] };
+      render();
+    });
+
+    goalForm.querySelectorAll('[name="assigneeUids"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        state.goals.draft = readDraft();
+        render();
+      });
+    });
+
+    goalForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (state.goals.saving) return;
+      state.goals.draft = readDraft();
+      state.goals.saving = true;
+      state.goals.error = '';
+      setFieldErrors(goalForm, {});
+
+      try {
+        const result = await createGoals(state.profile, state.goals.draft, state.goals.members);
+        if (!result.isValid) {
+          state.goals.saving = false;
+          setFieldErrors(goalForm, result.errors);
+          return;
+        }
+        const createdCount = state.goals.draft.assigneeUids.length;
+        state.goals.draft = createDefaultGoalDraft(state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId);
+        state.goals.loaded = false;
+        await loadGoalsData();
+        showToast(`${createdCount} meta(s) criada(s).`);
+      } catch (error) {
+        state.goals.saving = false;
+        state.goals.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao possui permissao para criar estas metas.'
+          : 'Nao foi possivel criar as metas. Verifique a conexao e tente novamente.';
+        render();
+      }
+    });
+  }
 }
 
 function subscribeProfileLeads() {
@@ -898,6 +1069,39 @@ function ensureAccessData() {
   }
 }
 
+async function loadGoalsData() {
+  if (!state.profile || state.demoMode || state.goals.loading) return;
+  state.goals.loading = true;
+  state.goals.error = '';
+  render();
+  try {
+    const result = await loadGoalsDashboard(state.profile);
+    state.goals.records = result.goals;
+    state.goals.members = result.members;
+    state.goals.truncated = result.truncated;
+    state.goals.loaded = true;
+    if (!state.goals.draft.storeId) {
+      state.goals.draft.storeId = state.profile.role === 'manager'
+        ? state.profile.storeId
+        : STORES[0]?.id || '';
+    }
+  } catch (error) {
+    state.goals.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao possui permissao para consultar estas metas.'
+      : 'Nao foi possivel carregar as metas. Verifique a conexao e tente novamente.';
+  } finally {
+    state.goals.loading = false;
+    state.goals.saving = false;
+    render();
+  }
+}
+
+function ensureGoalsData() {
+  if (state.route === 'goals' && state.profile && !state.demoMode && !state.goals.loaded) {
+    loadGoalsData();
+  }
+}
+
 async function handleAction(action) {
   if (action === 'update-app' && state.updateAction) {
     const updateAction = state.updateAction;
@@ -956,6 +1160,17 @@ async function handleAction(action) {
       accesses: [],
       storeIds: []
     };
+    state.goals = {
+      loading: false,
+      loaded: false,
+      saving: false,
+      error: '',
+      records: [],
+      members: [],
+      truncated: false,
+      pendingDeleteId: '',
+      draft: createDefaultGoalDraft()
+    };
     render();
   }
 
@@ -977,6 +1192,11 @@ async function handleAction(action) {
 
   if (action === 'reload-accesses') {
     await loadAccessData();
+  }
+
+  if (action === 'reload-goals') {
+    state.goals.loaded = false;
+    await loadGoalsData();
   }
 }
 
@@ -1047,6 +1267,36 @@ export async function startApp() {
       form.elements.displayName.focus();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    const deleteGoalButton = event.target.closest('[data-delete-goal]');
+    if (deleteGoalButton && !deleteGoalButton.disabled) {
+      state.goals.pendingDeleteId = deleteGoalButton.dataset.deleteGoal;
+      render();
+      document.querySelector('#delete-goal-dialog')?.showModal();
+    }
+    const closeGoalDialogButton = event.target.closest('[data-close-goal-dialog]');
+    if (closeGoalDialogButton) {
+      closeGoalDialogButton.closest('dialog')?.close();
+      state.goals.pendingDeleteId = '';
+    }
+    const confirmDeleteGoalButton = event.target.closest('[data-confirm-delete-goal]');
+    if (confirmDeleteGoalButton && !confirmDeleteGoalButton.disabled) {
+      const goal = state.goals.records.find((item) => item.id === confirmDeleteGoalButton.dataset.confirmDeleteGoal);
+      if (!goal) return;
+      confirmDeleteGoalButton.disabled = true;
+      try {
+        await deleteGoal(state.profile, goal);
+        state.goals.pendingDeleteId = '';
+        state.goals.loaded = false;
+        await loadGoalsData();
+        showToast('Meta excluida.');
+      } catch (error) {
+        state.goals.pendingDeleteId = '';
+        state.goals.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode excluir esta meta.'
+          : 'Nao foi possivel excluir a meta.';
+        render();
+      }
+    }
   });
 
   window.addEventListener('hashchange', () => {
@@ -1054,6 +1304,7 @@ export async function startApp() {
     render();
     ensureManagementData();
     ensureAccessData();
+    ensureGoalsData();
   });
 
   window.addEventListener('online', render);
@@ -1102,6 +1353,7 @@ export async function startApp() {
       render();
       ensureManagementData();
       ensureAccessData();
+      ensureGoalsData();
     }
   });
 }

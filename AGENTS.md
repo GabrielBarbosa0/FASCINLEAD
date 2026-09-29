@@ -39,7 +39,7 @@ O FascinLead **nao e um CRM completo**. Nao ampliar o projeto silenciosamente pa
 - anamnese;
 - recomendacao de lentes;
 - provador virtual;
-- metas, comissoes ou faturamento;
+- metas de vendas, comissoes ou faturamento; metas individuais de quantidade de leads captados fazem parte do escopo aprovado;
 - conciliacao de vendas;
 - integracao com Savwin;
 - integracao com AppOk;
@@ -190,6 +190,7 @@ As colecoes iniciais previstas sao:
 - `users`: usuarios autenticados por UID;
 - `interests`: opcoes ativas de interesse;
 - `leads`: pre-cadastros captados.
+- `goals`: metas individuais de quantidade de leads atribuidas a captadores.
 
 O modelo detalhado, os campos e os indices estao em [`docs/TDD.md`](docs/TDD.md). Nao renomeie colecoes, mude tipos ou introduza campos obrigatorios sem avaliar:
 
@@ -365,6 +366,7 @@ Nao bloqueie a fundacao tecnica por essas respostas quando for possivel usar con
 Se voce acabou de chegar ao repositorio, retenha isto:
 
 - FascinLead e um pre-cadastro PWA, nao um CRM.
+- Metas de captacao por quantidade de leads sao permitidas; ranking, vendas, comissoes e faturamento exigem nova decisao de escopo.
 - O usuario trabalha na rua e precisa salvar sem internet.
 - HTML, CSS, JavaScript, Vite e Firebase compoem a arquitetura aprovada.
 - Somente recursos gratuitos do Firebase devem ser usados no MVP.

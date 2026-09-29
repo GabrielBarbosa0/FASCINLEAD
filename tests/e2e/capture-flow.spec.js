@@ -52,3 +52,13 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
+
+test('opens the personal goals screen on mobile and desktop', async ({ page }, testInfo) => {
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Metas/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Metas' })).toBeVisible();
+  await expect(page.getByText('Minhas metas')).toBeVisible();
+  await expect(page.getByText('Nenhuma meta cadastrada')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('goals.png'), fullPage: true });
+});
