@@ -430,7 +430,18 @@ function leadDetailView() {
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar alteracoes</span></button>
       ${managementMode ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
-    </form>`;
+    </form>
+    ${managementMode ? `<dialog id="delete-lead-dialog" class="confirmation-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
+      <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
+      <div class="confirmation-dialog-copy">
+        <h2 id="delete-dialog-title">Excluir este lead?</h2>
+        <p id="delete-dialog-description">O cadastro de <strong>${escapeHtml(lead.fullName)}</strong> sera excluido definitivamente. Essa acao nao pode ser desfeita.</p>
+      </div>
+      <div class="confirmation-dialog-actions">
+        <button class="button button-secondary" type="button" data-close-delete-dialog>Cancelar</button>
+        <button class="button button-danger-solid" type="button" data-confirm-delete="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir definitivamente</span></button>
+      </div>
+    </dialog>` : ''}`;
 }
 
 function managementView() {
@@ -581,8 +592,7 @@ function syncView() {
       <div class="metric"><span>Locais de teste</span><strong>${counts.demo || 0}</strong><i data-lucide="hard-drive"></i></div>
       <div class="metric metric-danger"><span>Com erro</span><strong>${counts.error || 0}</strong><i data-lucide="circle-alert"></i></div>
     </section>
-    <button class="button button-primary button-block" type="button" data-action="sync"><i data-lucide="refresh-cw"></i><span>Sincronizar agora</span></button>
-    <section class="info-band"><i data-lucide="wifi"></i><div><strong>Envio automatico</strong><p>O FascinLead tenta enviar ao abrir, recuperar a internet e voltar ao primeiro plano.</p></div></section>`;
+    <button class="button button-primary button-block" type="button" data-action="sync"><i data-lucide="refresh-cw"></i><span>Sincronizar agora</span></button>`;
 }
 
 function bottomNav() {
@@ -720,6 +730,11 @@ function bindPageEvents() {
       showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : 'Alteracoes salvas. A sincronizacao seguira automaticamente.');
     });
   }
+
+  const deleteLeadDialog = document.querySelector('#delete-lead-dialog');
+  deleteLeadDialog?.addEventListener('click', (event) => {
+    if (event.target === deleteLeadDialog) deleteLeadDialog.close();
+  });
 
   const search = document.querySelector('#lead-search');
   if (search) {
@@ -974,15 +989,25 @@ export async function startApp() {
     const deleteLeadButton = event.target.closest('[data-delete-lead]');
     if (deleteLeadButton && !deleteLeadButton.disabled) {
       const lead = state.management.records.find((item) => item.id === deleteLeadButton.dataset.deleteLead);
-      if (!lead || !window.confirm(`Excluir definitivamente o lead ${lead.fullName}?`)) return;
-      deleteLeadButton.disabled = true;
+      const dialog = document.querySelector('#delete-lead-dialog');
+      if (lead && dialog) dialog.showModal();
+    }
+    const closeDeleteDialogButton = event.target.closest('[data-close-delete-dialog]');
+    if (closeDeleteDialogButton) {
+      closeDeleteDialogButton.closest('dialog')?.close();
+    }
+    const confirmDeleteButton = event.target.closest('[data-confirm-delete]');
+    if (confirmDeleteButton && !confirmDeleteButton.disabled) {
+      const lead = state.management.records.find((item) => item.id === confirmDeleteButton.dataset.confirmDelete);
+      if (!lead) return;
+      confirmDeleteButton.disabled = true;
       try {
         await deleteManagementLead(state.profile, lead.id);
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
         navigate('management');
         showToast('Lead excluido definitivamente.');
       } catch (error) {
-        deleteLeadButton.disabled = false;
+        confirmDeleteButton.disabled = false;
         showToast(error?.code === 'permission-denied' ? 'Seu perfil nao pode excluir este lead.' : 'Nao foi possivel excluir o lead.', 'danger', 'circle-alert');
       }
     }
