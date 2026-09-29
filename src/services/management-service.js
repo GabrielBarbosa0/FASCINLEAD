@@ -1,12 +1,17 @@
 import {
   collection,
+  deleteDoc,
+  doc,
   getDocs,
   limit,
   orderBy,
   query,
+  serverTimestamp,
+  setDoc,
   where
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
+import { createLeadUpdate } from '../utils/lead.js';
 
 export const MANAGEMENT_QUERY_LIMIT = 300;
 
@@ -46,4 +51,29 @@ export async function loadManagementLeads(profile, startDate, endDate) {
     records,
     truncated: snapshot.size > MANAGEMENT_QUERY_LIMIT
   };
+}
+
+function assertAdmin(profile) {
+  if (!isFirebaseConfigured || profile?.role !== 'admin') {
+    const error = new Error('Apenas administradores podem alterar leads da equipe.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+}
+
+export async function updateManagementLead(profile, id, input) {
+  assertAdmin(profile);
+  const validation = createLeadUpdate(input);
+  if (!validation.isValid) return validation;
+
+  await setDoc(doc(db, 'leads', id), {
+    ...validation.data,
+    updatedAtServer: serverTimestamp()
+  }, { merge: true });
+  return validation;
+}
+
+export async function deleteManagementLead(profile, id) {
+  assertAdmin(profile);
+  await deleteDoc(doc(db, 'leads', id));
 }

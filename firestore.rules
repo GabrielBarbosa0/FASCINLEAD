@@ -127,14 +127,14 @@ service cloud.firestore {
         || isAdmin()
       );
 
-      allow update: if activeUser()
-        && resource.data.capturedByUid == request.auth.uid
+      allow update: if validLead(request.resource.data)
         && request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && validLead(request.resource.data);
+        && (isAdmin()
+          || (activeUser() && resource.data.capturedByUid == request.auth.uid));
 
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {

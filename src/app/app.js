@@ -25,6 +25,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Trash2,
   UserPlus,
   UserRoundCog,
   Users,
@@ -37,7 +38,7 @@ import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithG
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { saveLead, subscribeToLeads, synchronizeNow, updateLead } from '../services/lead-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
-import { loadManagementLeads, MANAGEMENT_QUERY_LIMIT } from '../services/management-service.js';
+import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
@@ -73,6 +74,7 @@ const appIcons = {
   Save,
   Search,
   ShieldCheck,
+  Trash2,
   UserPlus,
   UserRoundCog,
   Users,
@@ -365,7 +367,7 @@ function leadsView() {
   const list = filtered.length
     ? filtered.map((lead) => {
         const [label, tone] = syncLabel(lead);
-        return `<button class="lead-item" type="button" data-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
+        return `<button class="lead-item" type="button" data-open-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
           <div class="lead-avatar">${escapeHtml(lead.fullName[0]?.toUpperCase() || '?')}</div>
           <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.interestLabel || 'Interesse nao informado')}</small></div>
           <span class="status-badge status-${tone}">${label}</span>
@@ -382,19 +384,27 @@ function leadsView() {
 }
 
 function leadDetailView() {
-  const lead = state.leads.find((item) => item.id === currentRouteParam());
+  const managementMode = state.route === 'management-lead';
+  if (managementMode && !isAdmin()) {
+    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Detalhes do lead</h1></section>
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar leads da equipe.</span></div>`;
+  }
+
+  const source = managementMode ? state.management.records : state.leads;
+  const lead = source.find((item) => item.id === currentRouteParam());
+  const backRoute = managementMode ? 'management' : 'leads';
   if (!lead) {
     return `<section class="page-heading compact">
-      <button class="back-button" type="button" data-route="leads" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
+      <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
       <div><p class="eyebrow">CADASTRO</p><h1>Cadastro nao encontrado</h1><p>Volte para a lista e tente novamente.</p></div>
     </section>`;
   }
 
-  const [syncStatus, syncTone] = syncLabel(lead);
+  const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
   return `
     <section class="page-heading compact">
-      <button class="back-button" type="button" data-route="leads" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
+      <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
       <div><p class="eyebrow">DETALHES DO CADASTRO</p><h1>${escapeHtml(lead.fullName)}</h1><p>Confira os dados e corrija o que for necessario.</p></div>
     </section>
     <section class="lead-detail-summary" aria-label="Informacoes do cadastro">
@@ -402,7 +412,7 @@ function leadDetailView() {
       <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
-    <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" novalidate>
+    <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required /><small class="field-error"></small></div>
       <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required /><small class="field-error"></small></div>
       <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" /></div>
@@ -418,6 +428,7 @@ function leadDetailView() {
       </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3">${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar alteracoes</span></button>
+      ${managementMode ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>`;
 }
@@ -443,7 +454,7 @@ function managementView() {
   const captorOptions = captors.map(([uid, name]) => `<option value="${escapeHtml(uid)}" ${filters.capturedByUid === uid ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 
   const tableRows = pageRecords.map((lead) => `<tr>
-    <td><strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small></td>
+    <td>${isAdmin() ? `<button class="management-lead-link" type="button" data-management-lead-id="${escapeHtml(lead.id)}"><strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small></button>` : `<strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small>`}</td>
     <td>${escapeHtml(lead.capturedByName || 'Nao informado')}</td>
     <td>${escapeHtml(storeLabel(lead.storeId))}</td>
     <td>${escapeHtml(lead.interestLabel || 'Nao informado')}</td>
@@ -451,7 +462,7 @@ function managementView() {
   </tr>`).join('');
 
   const mobileRows = pageRecords.map((lead) => `<article class="management-card">
-    <div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div>
+    <div>${isAdmin() ? `<button class="management-lead-link" type="button" data-management-lead-id="${escapeHtml(lead.id)}"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></button>` : `<strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span>`}</div>
     <dl>
       <div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Nao informado')}</dd></div>
       <div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>
@@ -583,13 +594,13 @@ function bottomNav() {
   ];
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   return `<nav class="bottom-nav ${canManage() ? 'has-management' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && state.route === 'management-lead') ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && state.route === 'management-lead') ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, access: accessView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, access: accessView };
   const page = pages[state.route] || homeView;
   const wideLayout = ['management', 'access'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
@@ -669,15 +680,39 @@ function bindPageEvents() {
     const notesInput = editLeadForm.elements.notes;
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
-    editLeadForm.addEventListener('submit', (event) => {
+    editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = Object.fromEntries(new FormData(editLeadForm));
+      const submitButton = editLeadForm.querySelector('[type="submit"]');
+      submitButton.disabled = true;
+
+      if (editLeadForm.dataset.management === 'true') {
+        try {
+          const result = await updateManagementLead(state.profile, editLeadForm.dataset.leadId, values);
+          setFieldErrors(editLeadForm, result.errors || {});
+          if (!result.isValid) {
+            submitButton.disabled = false;
+            return;
+          }
+          state.management.records = state.management.records.map((lead) => lead.id === editLeadForm.dataset.leadId
+            ? { ...lead, ...result.data }
+            : lead);
+          navigate('management');
+          showToast('Lead atualizado com sucesso.');
+        } catch (error) {
+          submitButton.disabled = false;
+          showToast(error?.code === 'permission-denied' ? 'Seu perfil nao pode alterar este lead.' : 'Nao foi possivel atualizar o lead.', 'danger', 'circle-alert');
+        }
+        return;
+      }
+
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
         state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
         render();
       });
       setFieldErrors(editLeadForm, result.errors || {});
       if (!result.isValid) {
+        submitButton.disabled = false;
         if (result.notFound) navigate('leads');
         return;
       }
@@ -816,7 +851,7 @@ async function loadManagementData() {
 }
 
 function ensureManagementData() {
-  if (state.route === 'management' && canManage() && !state.management.loaded) {
+  if (['management', 'management-lead'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
   }
 }
@@ -932,8 +967,25 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
-    const leadButton = event.target.closest('[data-lead-id]');
-    if (leadButton) navigate('lead', leadButton.dataset.leadId);
+    const leadButton = event.target.closest('[data-open-lead-id]');
+    if (leadButton) navigate('lead', leadButton.dataset.openLeadId);
+    const managementLeadButton = event.target.closest('[data-management-lead-id]');
+    if (managementLeadButton) navigate('management-lead', managementLeadButton.dataset.managementLeadId);
+    const deleteLeadButton = event.target.closest('[data-delete-lead]');
+    if (deleteLeadButton && !deleteLeadButton.disabled) {
+      const lead = state.management.records.find((item) => item.id === deleteLeadButton.dataset.deleteLead);
+      if (!lead || !window.confirm(`Excluir definitivamente o lead ${lead.fullName}?`)) return;
+      deleteLeadButton.disabled = true;
+      try {
+        await deleteManagementLead(state.profile, lead.id);
+        state.management.records = state.management.records.filter((item) => item.id !== lead.id);
+        navigate('management');
+        showToast('Lead excluido definitivamente.');
+      } catch (error) {
+        deleteLeadButton.disabled = false;
+        showToast(error?.code === 'permission-denied' ? 'Seu perfil nao pode excluir este lead.' : 'Nao foi possivel excluir o lead.', 'danger', 'circle-alert');
+      }
+    }
     const routeButton = event.target.closest('[data-route]');
     if (routeButton) navigate(routeButton.dataset.route);
     const actionButton = event.target.closest('[data-action]');

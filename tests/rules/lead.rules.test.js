@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
 
 const projectId = 'demo-fascinlead-leads';
 let testEnvironment;
@@ -37,6 +37,20 @@ beforeEach(async () => {
         email: 'outro@example.com',
         displayName: 'Outro Captador',
         role: 'captor',
+        storeId: 'loja-06',
+        active: true
+      }),
+      setDoc(doc(db, 'users', 'admin-uid'), {
+        email: 'admin@example.com',
+        displayName: 'Administrador Teste',
+        role: 'admin',
+        storeId: 'loja-02',
+        active: true
+      }),
+      setDoc(doc(db, 'users', 'manager-uid'), {
+        email: 'manager@example.com',
+        displayName: 'Gestor Teste',
+        role: 'manager',
         storeId: 'loja-06',
         active: true
       }),
@@ -112,5 +126,23 @@ describe('lead correction rules', () => {
       storeId: 'loja-02',
       updatedAtServer: Timestamp.now()
     }));
+  });
+
+  it('lets an administrator correct a lead from another store', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      fullName: 'Cliente Corrigido pelo Admin',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('lets an administrator delete any lead', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(deleteDoc(doc(db, 'leads', 'lead-test')));
+  });
+
+  it('rejects lead deletion by a manager', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(deleteDoc(doc(db, 'leads', 'lead-test')));
   });
 });

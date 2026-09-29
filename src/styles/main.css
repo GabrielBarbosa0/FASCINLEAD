@@ -210,6 +210,18 @@ svg {
   background: var(--surface-subtle);
 }
 
+.button-danger {
+  color: var(--danger);
+  border-color: #e7aaa5;
+  background: var(--surface);
+}
+
+.button-danger:hover:not(:disabled) {
+  color: #fff;
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
 .button-block {
   width: 100%;
   margin-top: 12px;
@@ -1193,6 +1205,34 @@ svg {
 .management-table td:first-child strong,
 .management-table td:first-child small {
   display: block;
+}
+
+.management-lead-link {
+  max-width: 100%;
+  display: block;
+  padding: 0;
+  border: 0;
+  color: var(--brand);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.management-lead-link:hover strong,
+.management-lead-link:focus-visible strong {
+  text-decoration: underline;
+}
+
+.management-lead-link strong,
+.management-lead-link span,
+.management-lead-link small {
+  display: block;
+}
+
+.management-lead-link span,
+.management-lead-link small {
+  color: var(--muted);
 }
 
 .management-table td:first-child small {

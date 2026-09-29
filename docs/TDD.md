@@ -117,6 +117,8 @@ O navegador nao garante execucao quando o PWA estiver completamente fechado. Por
 - Buscar por nome ou telefone.
 - Exibir totais por dia e colaborador.
 - Exportar CSV detalhado, com uma linha por captacao e somente dados pertencentes ao escopo do FascinLead.
+- Permitir que administradores visualizem, corrijam e excluam qualquer lead.
+- Manter gestores somente com consulta e exportacao dos leads da propria loja.
 - Paginar resultados para evitar leituras desnecessarias no Firestore.
 
 O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban, comparecimento, venda ou valor, pois esses dados nao sao controlados pelo FascinLead.
@@ -654,6 +656,7 @@ O MVP estara apto para piloto quando:
 | ADR-010 | Disponibilizar as lojas 02, 04, 05 e 06 | Sao as unidades definidas para a operacao inicial do FascinLead |
 | ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em agenda ou CRM |
 | ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
+| ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 

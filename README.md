@@ -42,6 +42,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - alerta local de possivel telefone duplicado;
 - consulta gerencial por loja, colaborador e periodo;
 - exportacao detalhada para CSV;
+- visualizacao, correcao e exclusao de leads por administradores;
 - instalacao como PWA em celular e desktop.
 
 ## Fora do escopo
