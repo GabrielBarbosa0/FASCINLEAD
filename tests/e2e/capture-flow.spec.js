@@ -61,4 +61,18 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await expect(page.getByText('Minhas metas')).toBeVisible();
   await expect(page.getByText('Nenhuma meta cadastrada')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('goals.png'), fullPage: true });
+
+  await page.locator('.goals-results').evaluate((element) => {
+    element.insertAdjacentHTML('beforebegin', `<fieldset class="goal-members field">
+      <legend>Colaboradores <span>1 selecionado</span></legend>
+      <div class="goal-member-list"><label class="goal-member-option">
+        <input type="checkbox" checked />
+        <span class="avatar">GB</span>
+        <span><strong>Gabriel Barbosa</strong><small>Loja 06</small></span>
+      </label></div>
+    </fieldset>`);
+  });
+  await expect(page.locator('.goal-member-option')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.goal-member-option > span').last()).toHaveCSS('color', 'rgb(20, 32, 51)');
+  await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
