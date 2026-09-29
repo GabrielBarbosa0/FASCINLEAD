@@ -9,8 +9,9 @@ const validInput = {
   city: '',
   state: 'PE',
   interestId: 'complete-glasses',
-  notes: '',
-  consentGiven: true
+  appointmentDate: '2026-10-02',
+  appointmentTime: '14:30',
+  notes: ''
 };
 
 const profile = {
@@ -20,20 +21,30 @@ const profile = {
 };
 
 describe('lead validation', () => {
-  it('requires name, phone and consent', () => {
-    const result = validateLeadInput({ fullName: '', phone: '', consentGiven: false });
+  it('requires name and phone', () => {
+    const result = validateLeadInput({ fullName: '', phone: '' });
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toMatchObject({
       fullName: expect.any(String),
-      phone: expect.any(String),
-      consentGiven: expect.any(String)
+      phone: expect.any(String)
     });
   });
 
   it('rejects notes longer than 500 characters', () => {
     const result = validateLeadInput({ ...validInput, notes: 'a'.repeat(501) });
     expect(result.errors.notes).toBeDefined();
+  });
+
+  it('requires date and time together for a pre-appointment', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      appointmentTime: ''
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.appointmentDate).toBeDefined();
+    expect(result.errors.appointmentTime).toBeDefined();
   });
 
   it('creates the expected versioned document', () => {
@@ -45,7 +56,8 @@ describe('lead validation', () => {
       fullName: 'Cliente Exemplo',
       phone: '+5581999991234',
       phoneSearch: '81999991234',
-      consentGiven: true,
+      appointmentDate: '2026-10-02',
+      appointmentTime: '14:30',
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -53,6 +65,8 @@ describe('lead validation', () => {
       installationId: 'installation-test',
       schemaVersion: 1
     });
+    expect(result.data).not.toHaveProperty('consentGiven');
+    expect(result.data).not.toHaveProperty('consentAtClient');
   });
 
   it('creates an update with editable fields only', () => {

@@ -18,7 +18,19 @@ export function validateLeadInput(input) {
   if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no maximo 500 caracteres.';
-  if (!input.consentGiven) errors.consentGiven = 'Confirme a autorizacao para contato.';
+
+  const appointmentDate = input.appointmentDate?.trim() || '';
+  const appointmentTime = input.appointmentTime?.trim() || '';
+  if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
+    errors.appointmentDate = 'Informe a data e o horario do pre-agendamento.';
+    errors.appointmentTime = 'Informe a data e o horario do pre-agendamento.';
+  }
+  if (appointmentDate && !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+    errors.appointmentDate = 'Informe uma data valida.';
+  }
+  if (appointmentTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(appointmentTime)) {
+    errors.appointmentTime = 'Informe um horario valido.';
+  }
 
   return { errors, isValid: Object.keys(errors).length === 0, phone };
 }
@@ -42,9 +54,9 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
+      appointmentDate: input.appointmentDate?.trim() || '',
+      appointmentTime: input.appointmentTime?.trim() || '',
       notes: input.notes?.trim() || '',
-      consentGiven: true,
-      consentAtClient: now.toISOString(),
       source: 'street',
       capturedAtClient: now.toISOString(),
       capturedByUid: profile.uid,
@@ -75,8 +87,9 @@ export function createLeadUpdate(input) {
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
-      notes: input.notes?.trim() || '',
-      consentGiven: true
+      appointmentDate: input.appointmentDate?.trim() || '',
+      appointmentTime: input.appointmentTime?.trim() || '',
+      notes: input.notes?.trim() || ''
     }
   };
 }

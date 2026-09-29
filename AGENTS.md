@@ -35,7 +35,7 @@ O FascinLead **nao e um CRM completo**. Nao ampliar o projeto silenciosamente pa
 
 - funil de vendas;
 - atendimento ou disparos pelo WhatsApp;
-- agenda de consultas ou exames;
+- agenda centralizada, confirmacoes ou lembretes de consultas e exames; o lead pode registrar apenas um pre-agendamento opcional;
 - anamnese;
 - recomendacao de lentes;
 - provador virtual;
@@ -151,8 +151,7 @@ O produto trata nome, telefone e outros dados pessoais. Colete o minimo necessar
 Campos obrigatorios previstos para o MVP:
 
 - nome;
-- telefone ou WhatsApp;
-- consentimento para contato.
+- telefone ou WhatsApp.
 
 Campos opcionais previstos:
 
@@ -178,7 +177,6 @@ Regras permanentes:
 - nunca incluir dados reais em fixtures, exemplos ou testes;
 - nunca versionar credenciais, chaves privadas ou contas de servico;
 - validar tamanho, tipo e campos permitidos tambem no Firestore;
-- manter texto de consentimento visivel no formulario;
 - considerar exclusao e retencao de dados no desenho de qualquer funcionalidade.
 
 A configuracao web publica do Firebase nao e uma credencial administrativa. Mesmo assim, o acesso aos dados deve estar protegido por Authentication, lista de autorizacao e Security Rules.
@@ -288,7 +286,6 @@ Quando o `package.json` existir, use os scripts declarados nele como fonte de ve
 - validacao dos campos obrigatorios;
 - normalizacao do telefone;
 - limites de texto;
-- consentimento;
 - serializacao do documento;
 - protecao contra duplo envio.
 
@@ -356,7 +353,6 @@ Antes do piloto ainda precisam ser definidos:
 - lojas, codigos e estado padrao;
 - e-mails e perfis iniciais;
 - lista de interesses;
-- texto de consentimento;
 - prazo de retencao;
 - permissao de edicao para gestores;
 - inclusao da tela gerencial na primeira entrega;

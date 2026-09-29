@@ -71,6 +71,24 @@ function authenticatedDb(uid, email) {
 }
 
 describe('lead correction rules', () => {
+  it('lets the captor create a lead without consent fields', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(setDoc(doc(db, 'leads', 'lead-without-consent'), {
+      fullName: 'Novo Cliente',
+      phone: '+5581999995678',
+      phoneSearch: '81999995678',
+      notes: '',
+      source: 'street',
+      schemaVersion: 1,
+      capturedByUid: 'captor-uid',
+      capturedByName: 'Captador Teste',
+      storeId: 'loja-06',
+      capturedAtClient: '2026-09-28T13:00:00.000Z',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets the captor correct editable fields in their own lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {

@@ -339,14 +339,14 @@ function newLeadView() {
         <label for="interestId">Interesse principal</label>
         <select id="interestId" name="interestId">${interests}</select>
       </div>
+      <div class="field-row appointment-fields">
+        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" /><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>
+      </div>
       <div class="field" data-field="notes">
         <label for="notes">Observacao rapida</label>
         <textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha"></textarea>
         <small class="field-hint"><span id="notes-count">0</span>/500</small>
-        <small class="field-error"></small>
-      </div>
-      <div class="field consent-field" data-field="consentGiven">
-        <label class="checkbox-label"><input type="checkbox" name="consentGiven" /><span>O cliente autorizou o contato da Oticas Fascinante.</span></label>
         <small class="field-error"></small>
       </div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar cadastro</span></button>
@@ -412,8 +412,11 @@ function leadDetailView() {
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" /></div>
       </div>
       <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId">${interests}</select></div>
+      <div class="field-row appointment-fields">
+        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
+      </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3">${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
-      <div class="field consent-field" data-field="consentGiven"><label class="checkbox-label"><input type="checkbox" name="consentGiven" ${lead.consentGiven ? 'checked' : ''} /><span>O cliente autorizou o contato da Oticas Fascinante.</span></label><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar alteracoes</span></button>
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>`;
@@ -640,7 +643,6 @@ function bindPageEvents() {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const values = Object.fromEntries(new FormData(form));
-      values.consentGiven = form.elements.consentGiven.checked;
       const result = saveLead(values, state.profile, state.demoMode, () => {
         state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
         render();
@@ -662,7 +664,6 @@ function bindPageEvents() {
     editLeadForm.addEventListener('submit', (event) => {
       event.preventDefault();
       const values = Object.fromEntries(new FormData(editLeadForm));
-      values.consentGiven = editLeadForm.elements.consentGiven.checked;
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
         state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
         render();

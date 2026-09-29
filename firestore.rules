@@ -34,7 +34,8 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
-          'notes', 'consentGiven', 'consentAtClient', 'source',
+          'appointmentDate', 'appointmentTime', 'notes',
+          'consentGiven', 'consentAtClient', 'source',
           'capturedAtClient', 'createdAtServer', 'updatedAtServer',
           'capturedByUid', 'capturedByName', 'storeId', 'installationId',
           'appVersion', 'schemaVersion'
@@ -50,7 +51,16 @@ service cloud.firestore {
         && data.phoneSearch.size() <= 11
         && data.notes is string
         && data.notes.size() <= 500
-        && data.consentGiven == true
+        && (!('appointmentDate' in data) || (
+          data.appointmentDate is string
+          && (data.appointmentDate == '' || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
+        ))
+        && (!('appointmentTime' in data) || (
+          data.appointmentTime is string
+          && (data.appointmentTime == '' || data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$'))
+        ))
+        && (!('appointmentDate' in data) || !('appointmentTime' in data)
+          || ((data.appointmentDate == '') == (data.appointmentTime == '')))
         && data.source == 'street'
         && data.schemaVersion == 1;
     }

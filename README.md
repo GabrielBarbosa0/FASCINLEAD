@@ -38,9 +38,10 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - estados `Pendente`, `Sincronizando`, `Sincronizado` e `Erro`;
 - listagem e pesquisa dos cadastros do colaborador;
 - detalhamento e correcao dos proprios cadastros, inclusive offline;
+- pre-agendamento opcional com data e horario;
 - alerta local de possivel telefone duplicado;
 - consulta gerencial por loja, colaborador e periodo;
-- exportacao para CSV;
+- exportacao detalhada para CSV;
 - instalacao como PWA em celular e desktop.
 
 ## Fora do escopo
@@ -49,7 +50,7 @@ O FascinLead nao tera, no MVP:
 
 - funil de vendas ou CRM completo;
 - atendimento e campanhas pelo WhatsApp;
-- agenda de consultas ou exames;
+- agenda centralizada, confirmacoes ou lembretes de consultas e exames;
 - anamnese ou recomendacao de lentes;
 - provador virtual;
 - metas, comissoes ou conciliacao de vendas;
@@ -119,7 +120,7 @@ O sistema nao dependera de sincronizacao em segundo plano com o aplicativo fecha
 - dados pessoais nao deverao aparecer em URLs, logs ou fixtures de teste;
 - o MVP coletara apenas os dados necessarios ao contato;
 - CPF, dados de saude, fotos e geolocalizacao exata nao serao coletados inicialmente;
-- o formulario exigira confirmacao do consentimento para contato.
+- o formulario coletara somente os dados necessarios para a captacao e o pre-agendamento.
 
 ## Estrutura planejada
 

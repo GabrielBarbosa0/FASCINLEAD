@@ -24,7 +24,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
-  await page.getByLabel(/O cliente autorizou/).check();
+  await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
+  await page.getByLabel('Horario').fill('14:30');
   await page.screenshot({
     path: testInfo.outputPath('new-lead.png'),
     fullPage: true
@@ -38,6 +39,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: 'Ver cadastro de Cliente Exemplo' }).click();
   await expect(page.getByRole('heading', { name: 'Cliente Exemplo' })).toBeVisible();
+  await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
+  await expect(page.getByLabel('Horario')).toHaveValue('14:30');
   await page.screenshot({
     path: testInfo.outputPath('lead-details.png'),
     fullPage: true

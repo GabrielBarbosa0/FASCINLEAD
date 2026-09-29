@@ -29,7 +29,7 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 
 - CRM completo, funil comercial ou automacao de vendas.
 - Atendimento ou campanhas pelo WhatsApp.
-- Agendamento de consultas e exames.
+- Agenda centralizada, confirmacoes ou lembretes de consultas e exames. O MVP registra somente um pre-agendamento opcional no lead.
 - Anamnese, recomendacao de lentes ou provador virtual.
 - Metas, comissoes, faturamento ou conciliacao de vendas.
 - Integracao com Savwin, AppOk ou outros sistemas externos.
@@ -69,8 +69,9 @@ Campos minimos propostos:
 | Cidade | Nao | Ate 80 caracteres |
 | UF | Nao | Duas letras; padrao configuravel por loja |
 | Interesse principal | Nao | Opcao de uma lista administrada pelo sistema |
+| Data do pre-agendamento | Nao | Data prevista; exige horario quando informada |
+| Horario do pre-agendamento | Nao | Horario previsto; exige data quando informado |
 | Observacao rapida | Nao | Ate 500 caracteres |
-| Consentimento | Sim | Confirmacao de que o cliente autorizou o contato |
 
 O sistema preenchera automaticamente:
 
@@ -115,8 +116,10 @@ O navegador nao garante execucao quando o PWA estiver completamente fechado. Por
 - Consultar registros da loja por periodo e captador.
 - Buscar por nome ou telefone.
 - Exibir totais por dia e colaborador.
-- Exportar CSV com os registros autorizados.
+- Exportar CSV detalhado, com uma linha por captacao e somente dados pertencentes ao escopo do FascinLead.
 - Paginar resultados para evitar leituras desnecessarias no Firestore.
+
+O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban, comparecimento, venda ou valor, pois esses dados nao sao controlados pelo FascinLead.
 
 Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas de funil, tarefas comerciais ou historico de atendimento.
 
@@ -144,7 +147,7 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 | Confiabilidade | Um cadastro confirmado nao pode desaparecer por falha temporaria de rede |
 | Acessibilidade | Controles com rotulos, foco visivel, contraste adequado e alvos de toque de pelo menos 44 px |
 | Seguranca | Negacao por padrao, menor privilegio e validacao de campos nas regras do Firestore |
-| Privacidade | Coleta minima, consentimento e ausencia de dados pessoais em logs tecnicos |
+| Privacidade | Coleta minima e ausencia de dados pessoais em logs tecnicos |
 | Manutencao | JavaScript modular, formatacao automatica e testes dos fluxos criticos |
 
 ## 5. Arquitetura proposta
@@ -335,9 +338,9 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "state": "PE",
   "interestId": "oculos-completo",
   "interestLabel": "Oculos completo",
+  "appointmentDate": "2026-10-02",
+  "appointmentTime": "14:30",
   "notes": "Prefere contato pela manha",
-  "consentGiven": true,
-  "consentAtClient": "2026-09-28T13:45:00.000Z",
   "source": "street",
   "capturedAtClient": "2026-09-28T13:45:00.000Z",
   "createdAtServer": "Timestamp ou null enquanto offline",
@@ -473,14 +476,13 @@ A chave web publica do Firebase identifica o projeto, mas nao concede acesso adm
 
 ### 11.2 LGPD e operacao
 
-- Exibir texto curto de consentimento antes de salvar.
 - Coletar apenas dados necessarios ao contato comercial.
 - Definir responsavel interno por solicitacoes de acesso, correcao e exclusao.
 - Definir prazo de retencao antes da producao; proposta inicial: revisar ou excluir cadastros sem evolucao apos 180 dias.
 - Orientar usuarios a protegerem o aparelho com senha ou biometria.
 - Disponibilizar comando de sair e procedimento para revogar aparelhos perdidos.
 
-O texto final de consentimento e o prazo de retencao precisam de aprovacao da empresa antes do uso real.
+O FascinLead nao registra um campo especifico de consentimento. A empresa deve validar a base legal aplicavel ao tratamento dos contatos e definir o prazo de retencao antes do uso real.
 
 ## 12. Uso do plano gratuito Firebase
 
@@ -650,6 +652,8 @@ O MVP estara apto para piloto quando:
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
 | ADR-010 | Disponibilizar as lojas 02, 04, 05 e 06 | Sao as unidades definidas para a operacao inicial do FascinLead |
+| ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em agenda ou CRM |
+| ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 
@@ -657,7 +661,6 @@ O MVP estara apto para piloto quando:
 - Nome e telefone sao suficientes como campos obrigatorios?
 - Quais opcoes devem existir em `Interesse principal`?
 - O gestor podera corrigir registros ou apenas consultar e exportar?
-- Qual texto de consentimento sera exibido ao cliente?
 - Qual sera o prazo definitivo de retencao e exclusao?
 - A visao gerencial faz parte do primeiro piloto ou da fase seguinte?
 - Qual logotipo e conjunto final de icones serao usados? A cor principal ja definida e `#003070`.
