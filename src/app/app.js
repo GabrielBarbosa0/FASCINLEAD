@@ -604,6 +604,14 @@ function render() {
     root.innerHTML = state.profile ? appView() : loginView();
   }
 
+  if (state.updateAction) {
+    root.insertAdjacentHTML('beforeend', `<aside class="update-banner" role="status">
+      <i data-lucide="download"></i>
+      <span>Nova versao disponivel.</span>
+      <button class="button button-primary" type="button" data-action="update-app">Atualizar agora</button>
+    </aside>`);
+  }
+
   if (state.toast) {
     root.insertAdjacentHTML('beforeend', `<div class="toast toast-${state.toast.tone}" role="status"><i data-lucide="${state.toast.icon}"></i><span>${escapeHtml(state.toast.message)}</span></div>`);
   }
@@ -841,6 +849,14 @@ function ensureAccessData() {
 }
 
 async function handleAction(action) {
+  if (action === 'update-app' && state.updateAction) {
+    const updateAction = state.updateAction;
+    state.updateAction = null;
+    render();
+    await updateAction();
+    return;
+  }
+
   if (action === 'demo-login') {
     sessionStorage.setItem(DEMO_SESSION_KEY, 'true');
     state.demoMode = true;
@@ -1019,5 +1035,5 @@ export function showOfflineReady() {
 
 export function showUpdateReady(updateAction) {
   state.updateAction = updateAction;
-  showToast('Nova versao disponivel. Reabra o aplicativo para atualizar.', 'neutral', 'download');
+  render();
 }

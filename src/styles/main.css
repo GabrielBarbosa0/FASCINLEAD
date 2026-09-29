@@ -1350,6 +1350,43 @@ svg {
   font-weight: 750;
 }
 
+.update-banner {
+  position: fixed;
+  z-index: 40;
+  right: 20px;
+  bottom: 88px;
+  left: 20px;
+  max-width: 520px;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid #9bb9d8;
+  border-radius: 8px;
+  color: var(--brand);
+  background: #edf5fc;
+  box-shadow: var(--shadow-strong);
+}
+
+.update-banner > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.update-banner > span {
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.update-banner .button {
+  min-height: 40px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
 .toast-danger {
   color: var(--danger);
   border-color: #efb8b3;
