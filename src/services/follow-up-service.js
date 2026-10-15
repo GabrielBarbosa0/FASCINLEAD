@@ -1,6 +1,7 @@
 import { collection, doc, limit, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
+import { profileStoreIds } from '../utils/permissions.js';
 
 export const FOLLOW_UP_QUERY_LIMIT = 500;
 
@@ -11,17 +12,17 @@ function permissionError(message) {
 }
 
 export function subscribeToTeamFollowUps(profile, onData, onError) {
-  if (!isFirebaseConfigured || profile?.role !== 'manager' || !profile.storeId) {
+  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role) || (profile.role === 'manager' && !profile.storeId)) {
     throw permissionError('Retornos da equipe indisponiveis.');
   }
   const today = new Date();
   const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60_000)).toISOString().slice(0, 10);
-  const followUpsQuery = query(
-    collection(db, 'leads'),
-    where('storeId', '==', profile.storeId),
-    where('appointmentDate', '<=', localToday),
-    limit(FOLLOW_UP_QUERY_LIMIT + 1)
-  );
+  const constraints = [where('appointmentDate', '<=', localToday), limit(FOLLOW_UP_QUERY_LIMIT + 1)];
+  if (profile.role === 'manager') {
+    const storeIds = profileStoreIds(profile);
+    constraints.unshift(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
+  }
+  const followUpsQuery = query(collection(db, 'leads'), ...constraints);
   return onSnapshot(followUpsQuery, (snapshot) => {
     onData({
       records: snapshot.docs.slice(0, FOLLOW_UP_QUERY_LIMIT).map((item) => ({ id: item.id, ...item.data() })),

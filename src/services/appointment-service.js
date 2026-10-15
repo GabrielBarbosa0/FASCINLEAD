@@ -1,6 +1,7 @@
 import { collection, doc, limit, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { monthRange } from '../utils/calendar.js';
+import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
 
 export const APPOINTMENTS_QUERY_LIMIT = 500;
 export const APPOINTMENT_ATTENDANCE = new Set(['pending', 'attended', 'missed']);
@@ -13,13 +14,19 @@ function appointmentsQuery(profile, monthKey, selectedStoreId = '') {
   }
 
   const { startDate, endDate } = monthRange(monthKey);
-  const storeId = profile.role === 'manager' ? profile.storeId : selectedStoreId;
+  if (selectedStoreId && !canAccessStore(profile, selectedStoreId)) {
+    const error = new Error('Unidade nao autorizada.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+  const storeIds = profileStoreIds(profile);
   const constraints = [
     where('appointmentDate', '>=', startDate),
     where('appointmentDate', '<=', endDate),
     limit(APPOINTMENTS_QUERY_LIMIT + 1)
   ];
-  if (storeId) constraints.unshift(where('storeId', '==', storeId));
+  if (selectedStoreId) constraints.unshift(where('storeId', '==', selectedStoreId));
+  else if (profile.role === 'manager') constraints.unshift(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
   return query(collection(db, 'leads'), ...constraints);
 }
 
@@ -37,7 +44,7 @@ export function subscribeToAppointments(profile, monthKey, selectedStoreId, onDa
 export async function setAppointmentAttendance(profile, lead, attendance) {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)
     || !APPOINTMENT_ATTENDANCE.has(attendance)
-    || (profile.role === 'manager' && lead.storeId !== profile.storeId)) {
+    || (profile.role === 'manager' && !canAccessStore(profile, lead.storeId))) {
     const error = new Error('Status de comparecimento nao autorizado.');
     error.code = 'permission-denied';
     throw error;

@@ -41,6 +41,7 @@ export async function loadAccesses(profile) {
       displayName: permission.displayName || user?.displayName || 'Colaborador',
       role: permission.role || user?.role || 'captor',
       storeId: permission.storeId || user?.storeId || '',
+      storeIds: permission.storeIds || user?.storeIds || [permission.storeId || user?.storeId].filter(Boolean),
       active: permission.active === true && user?.active !== false,
       hasLoggedIn: Boolean(user)
     };
@@ -60,7 +61,7 @@ export async function saveAccess(profile, values) {
   const validation = validateAccess(values);
   if (!validation.isValid) return validation;
 
-  const { email, displayName, role, storeId } = validation.data;
+  const { email, displayName, role, storeId, storeIds } = validation.data;
   if (email === normalizeAccessEmail(profile.email) && role !== 'admin') {
     return { ...validation, isValid: false, errors: { role: 'Voce nao pode remover seu proprio perfil de administrador.' } };
   }
@@ -76,6 +77,7 @@ export async function saveAccess(profile, values) {
     displayName,
     role,
     storeId,
+    storeIds,
     active: true,
     updatedAt: serverTimestamp(),
     updatedBy: profile.uid
@@ -88,7 +90,7 @@ export async function saveAccess(profile, values) {
 
   batch.set(permissionRef, permissionData, { merge: true });
   usersSnapshot.docs.forEach((item) => {
-    batch.update(item.ref, { displayName, role, storeId, active: true });
+    batch.update(item.ref, { displayName, role, storeId, storeIds, active: true });
   });
   await batch.commit();
   return validation;
@@ -111,4 +113,3 @@ export async function setAccessActive(profile, access, active) {
   usersSnapshot.docs.forEach((item) => batch.update(item.ref, { active }));
   await batch.commit();
 }
-

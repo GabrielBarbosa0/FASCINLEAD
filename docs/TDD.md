@@ -164,7 +164,8 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Agendamentos sem confirmacao nao geram retorno automatico quando a chave da loja estiver desativada.
 - O retorno oferece uma mensagem pronta no WhatsApp e desaparece quando o cliente e reagendado.
 - Ao abrir o WhatsApp, o sistema registra o inicio do contato para o agendamento atual.
-- O gestor acompanha, em modo somente leitura, os retornos da propria loja agrupados por captador e o estado de cada contato.
+- O gestor acompanha, em modo somente leitura, os retornos da propria loja agrupados por captador e o estado de cada contato; o administrador possui a mesma visao para todas as lojas.
+- O administrador configura, em `Acessos da equipe`, uma ou mais unidades permitidas para cada gestor. O administrador nao possui restricao de unidade e o captador permanece vinculado somente a loja principal.
 - A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
 - Administradores configuram por loja o modo controlado ou livre, a duracao da consulta e o inicio e fim do expediente.
 - O modo controlado e o padrao e oferece ao captador somente intervalos livres que caibam integralmente no expediente.

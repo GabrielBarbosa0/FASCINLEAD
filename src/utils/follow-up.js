@@ -1,4 +1,5 @@
 import { DEFAULT_STORE_SCHEDULE } from './schedule.js';
+import { canAccessStore } from './permissions.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -12,16 +13,20 @@ export function followUpAvailableAt(lead, noShowGraceMinutes = DEFAULT_STORE_SCH
 }
 
 export function appointmentFollowUps(leads, profile, settings = DEFAULT_STORE_SCHEDULE, now = new Date()) {
-  if (!['captor', 'manager'].includes(profile?.role)) return [];
-  const grace = Number(settings?.noShowGraceMinutes ?? DEFAULT_STORE_SCHEDULE.noShowGraceMinutes);
-  const automaticPending = settings?.automaticPendingFollowUp === true;
+  if (!['captor', 'manager', 'admin'].includes(profile?.role)) return [];
   return leads
     .filter((lead) => profile.role === 'captor'
       ? lead.capturedByUid === profile.uid
-      : lead.storeId === profile.storeId)
-    .filter((lead) => lead.appointmentAttendance === 'missed'
-      || (automaticPending && (!lead.appointmentAttendance || lead.appointmentAttendance === 'pending')))
+      : profile.role === 'manager' ? canAccessStore(profile, lead.storeId) : true)
     .filter((lead) => {
+      const leadSettings = settings?.byStore?.[lead.storeId] || settings;
+      return lead.appointmentAttendance === 'missed'
+        || (leadSettings?.automaticPendingFollowUp === true
+          && (!lead.appointmentAttendance || lead.appointmentAttendance === 'pending'));
+    })
+    .filter((lead) => {
+      const leadSettings = settings?.byStore?.[lead.storeId] || settings;
+      const grace = Number(leadSettings?.noShowGraceMinutes ?? DEFAULT_STORE_SCHEDULE.noShowGraceMinutes);
       const availableAt = followUpAvailableAt(lead, grace);
       return availableAt && availableAt.getTime() <= now.getTime();
     })

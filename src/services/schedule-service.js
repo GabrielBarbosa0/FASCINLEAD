@@ -2,6 +2,7 @@ import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, w
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { DEFAULT_STORE_SCHEDULE, normalizeStoreSchedule, validateStoreSchedule } from '../utils/schedule.js';
 import { STORES } from '../utils/stores.js';
+import { profileStoreIds } from '../utils/permissions.js';
 
 function permissionError(message) {
   const error = new Error(message);
@@ -31,10 +32,11 @@ export function subscribeToDayAppointments(profile, appointmentDate, onData, onE
 }
 
 export async function loadStoreSchedules(profile) {
-  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem configurar agendas.');
+  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)) throw permissionError('Agendas indisponiveis.');
   const snapshot = await getDocs(collection(db, 'stores'));
   const byId = new Map(snapshot.docs.map((item) => [item.id, item.data()]));
-  return STORES.map((store) => ({
+  const allowedStoreIds = profileStoreIds(profile);
+  return STORES.filter((store) => allowedStoreIds.includes(store.id)).map((store) => ({
     ...store,
     ...normalizeStoreSchedule(byId.get(store.id) || DEFAULT_STORE_SCHEDULE)
   }));

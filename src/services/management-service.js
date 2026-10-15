@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadUpdate } from '../utils/lead.js';
+import { profileStoreIds } from '../utils/permissions.js';
 
 export const MANAGEMENT_QUERY_LIMIT = 300;
 
@@ -38,7 +39,8 @@ export async function loadManagementLeads(profile, startDate, endDate) {
   ];
 
   if (profile.role === 'manager') {
-    constraints.unshift(where('storeId', '==', profile.storeId));
+    const storeIds = profileStoreIds(profile);
+    constraints.unshift(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
   }
 
   const snapshot = await getDocs(query(collection(db, 'leads'), ...constraints));

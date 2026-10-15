@@ -56,6 +56,8 @@ import { INTERESTS } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
+import { profileStoreIds } from '../utils/permissions.js';
+import { formatAccessStoreSummary } from '../utils/access.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
@@ -156,6 +158,7 @@ const state = {
     error: '',
     records: [],
     truncated: false,
+    settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
   settings: {
@@ -228,8 +231,8 @@ const demoProfile = {
 
 function createDemoProfile() {
   const role = sessionStorage.getItem(DEMO_ROLE_KEY);
-  if (role === 'admin') return { ...demoProfile, uid: 'demo-admin', displayName: 'Administrador de Teste', role: 'admin', storeId: 'loja-06' };
-  if (role === 'manager') return { ...demoProfile, uid: 'demo-manager', displayName: 'Gestor de Teste', role: 'manager', storeId: 'loja-06' };
+  if (role === 'admin') return { ...demoProfile, uid: 'demo-admin', displayName: 'Administrador de Teste', role: 'admin', storeId: 'loja-06', storeIds: STORES.map((store) => store.id) };
+  if (role === 'manager') return { ...demoProfile, uid: 'demo-manager', displayName: 'Gestor de Teste', role: 'manager', storeId: 'loja-06', storeIds: ['loja-06', 'loja-02'] };
   return demoProfile;
 }
 
@@ -269,7 +272,10 @@ function pendingFollowUps() {
   const source = state.demoMode || state.profile?.role === 'captor'
     ? state.leads
     : state.followUps.records;
-  return appointmentFollowUps(source, state.profile, state.followUps.settings);
+  return appointmentFollowUps(source, state.profile, {
+    ...state.followUps.settings,
+    byStore: state.followUps.settingsByStore
+  });
 }
 
 function storeLabel(storeId = '') {
@@ -297,7 +303,8 @@ function formatAppointmentDate(value) {
 }
 
 function formatFollowUpAvailableAt(lead) {
-  const availableAt = followUpAvailableAt(lead, state.followUps.settings.noShowGraceMinutes);
+  const settings = state.followUps.settingsByStore[lead.storeId] || state.followUps.settings;
+  const availableAt = followUpAvailableAt(lead, settings.noShowGraceMinutes);
   return availableAt ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(availableAt) : '';
 }
 
@@ -358,12 +365,14 @@ function loginView() {
 
 function headerView() {
   const online = navigator.onLine;
+  const stores = profileStoreIds(state.profile);
+  const storeText = state.profile.role === 'admin' ? 'Todas as lojas' : stores.length > 1 ? `${stores.length} unidades` : storeLabel(state.profile.storeId);
   return `
     <header class="app-header">
       <div class="header-inner ${['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
-          <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
+          <p class="header-store">${escapeHtml(storeText)}</p>
         </div>
         <div class="header-actions">
           ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
@@ -419,9 +428,9 @@ function homeView() {
         <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
       </button>
-      ${['captor', 'manager'].includes(state.profile.role) ? `<button class="action-card" type="button" data-route="follow-ups">
+      ${['captor', 'manager', 'admin'].includes(state.profile.role) ? `<button class="action-card" type="button" data-route="follow-ups">
         <span class="action-icon"><i data-lucide="bell-ring"></i></span>
-        <span><strong>${state.profile.role === 'manager' ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
+        <span><strong>${canManage() ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
         ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendencia(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
       </button>` : ''}
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
@@ -555,13 +564,14 @@ function leadsView() {
 }
 
 function followUpsView() {
-  if (!['captor', 'manager'].includes(state.profile?.role)) {
+  if (!['captor', 'manager', 'admin'].includes(state.profile?.role)) {
     return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Retornos pendentes</h1></section>
       <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
   }
 
   const records = pendingFollowUps();
-  const managerView = state.profile.role === 'manager';
+  const managerView = canManage();
+  const adminView = isAdmin();
   const renderItem = (lead) => {
       const whatsAppUrl = buildWhatsAppFollowUpUrl(lead);
       const manuallyMissed = lead.appointmentAttendance === 'missed';
@@ -576,7 +586,8 @@ function followUpsView() {
           <div><dt>Agendamento</dt><dd>${escapeHtml(formatAppointmentDate(lead.appointmentDate))}, ${escapeHtml(lead.appointmentTime)}</dd></div>
           <div><dt>Retorno liberado</dt><dd>${escapeHtml(formatFollowUpAvailableAt(lead))}</dd></div>
           ${managerView ? `<div><dt>Situacao</dt><dd>${manuallyMissed ? 'Nao compareceu' : 'Sem confirmacao'}</dd></div>
-          <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>` : ''}
+          <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>
+          ${adminView ? `<div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>` : ''}` : ''}
         </dl>
         ${managerView ? '' : `<div class="follow-up-actions">
           <a class="button button-whatsapp" data-follow-up-whatsapp="${escapeHtml(lead.id)}" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a>
@@ -694,7 +705,8 @@ function managementView() {
     .map((lead) => [lead.capturedByUid, lead.capturedByName || 'Captador'])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
 
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${filters.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${filters.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const captorOptions = captors.map(([uid, name]) => `<option value="${escapeHtml(uid)}" ${filters.capturedByUid === uid ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 
   const tableRows = pageRecords.map((lead) => `<tr>
@@ -733,7 +745,7 @@ function managementView() {
       <div class="management-heading-copy"><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
       <div class="management-heading-actions">
         <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
-        ${state.profile.role === 'manager' ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
+        ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
@@ -744,7 +756,7 @@ function managementView() {
       <div class="management-filter-grid">
         <div class="field"><label for="management-start">Data inicial</label><input id="management-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
         <div class="field"><label for="management-end">Data final</label><input id="management-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
-        ${state.profile.role === 'admin' ? `<div class="field"><label for="management-store">Loja</label><select id="management-store" name="storeId"><option value="">Todas as lojas</option>${storeOptions}</select></div>` : ''}
+        ${canManage() && allowedStores.length > 1 ? `<div class="field"><label for="management-store">Loja</label><select id="management-store" name="storeId"><option value="">Todas as lojas permitidas</option>${storeOptions}</select></div>` : ''}
         <div class="field"><label for="management-captor">Captador</label><select id="management-captor" name="capturedByUid"><option value="">Todos os captadores</option>${captorOptions}</select></div>
         <div class="field management-search-field"><label for="management-search">Nome ou telefone</label><input id="management-search" name="search" type="search" value="${escapeHtml(filters.search)}" placeholder="Buscar nos resultados" /></div>
         <button class="button button-primary management-filter-button" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Consultando...' : 'Aplicar filtros'}</span></button>
@@ -773,7 +785,8 @@ function appointmentsView() {
   const groups = appointmentsByDate(records);
   const days = calendarDays(month);
   const selected = groups[selectedDate] || [];
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const cells = days.map((day) => {
     const items = groups[day.date] || [];
     const first = items[0];
@@ -807,7 +820,7 @@ function appointmentsView() {
     }).join('')
     : `<div class="agenda-empty"><i data-lucide="calendar-days"></i><strong>Nenhum exame neste dia</strong><p>Selecione uma data destacada no calendario.</p></div>`;
 
-  const storeTotals = STORES
+  const storeTotals = allowedStores
     .map((store) => ({ ...store, count: records.filter((lead) => lead.storeId === store.id).length }))
     .filter((store) => !storeId || store.id === storeId)
     .map((store) => `<div class="agenda-store-row"><span><i data-lucide="building-2"></i>${store.label}</span><strong>${store.count} exame(s)</strong></div>`)
@@ -828,7 +841,7 @@ function appointmentsView() {
             <button class="icon-button" type="button" data-appointment-month="1" aria-label="Proximo mes"><i data-lucide="chevron-right"></i></button>
           </div>
           <div class="calendar-toolbar-actions">
-            ${isAdmin() ? `<label class="calendar-store-filter"><span>Unidade</span><select id="appointments-store"><option value="">Todas as lojas</option>${storeOptions}</select></label>` : ''}
+            ${allowedStores.length > 1 ? `<label class="calendar-store-filter"><span>Unidade</span><select id="appointments-store"><option value="">Todas as lojas permitidas</option>${storeOptions}</select></label>` : ''}
             <button class="button button-secondary calendar-today" type="button" data-action="appointments-today">Hoje</button>
           </div>
         </div>
@@ -897,15 +910,16 @@ function accessView() {
 
   const { accesses, loading, saving, error } = state.access;
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${state.profile.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeChecks = STORES.map((store) => `<label class="access-store-option checkbox-label"><input type="checkbox" name="storeIds" value="${store.id}" /><span>${store.label}</span></label>`).join('');
   const rows = accesses.map((access) => {
     const isCurrentUser = access.email === state.profile.email?.toLowerCase();
+    const storeSummary = formatAccessStoreSummary(access);
     return `<article class="access-row ${access.active ? '' : 'is-inactive'}">
       <div class="access-identity">
         <span class="avatar access-avatar">${escapeHtml(profileInitials(access.displayName))}</span>
         <div class="access-identity-copy"><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
       </div>
-      <div class="access-detail"><span>Perfil</span><strong>${roleLabel(access.role)}</strong></div>
-      <div class="access-detail"><span>Loja</span><strong>${escapeHtml(storeLabel(access.storeId))}</strong></div>
+      <div class="access-detail access-permissions"><span>Perfil e unidades</span><strong>${roleLabel(access.role)}</strong><small title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</small></div>
       <div class="access-detail"><span>Primeiro acesso</span><strong>${access.hasLoggedIn ? 'Realizado' : 'Pendente'}</strong></div>
       <span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span>
       <div class="access-actions">
@@ -929,8 +943,9 @@ function accessView() {
         <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador entrara usando esta conta Google.</span></div></div>
         <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field" data-field="email"><label for="access-email">E-mail Google</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@gmail.com" required /><small class="field-error"></small></div>
-        <div class="field" data-field="role"><label for="access-role">Perfil</label><select id="access-role" name="role" required><option value="captor">Colaborador (captador)</option><option value="manager">Gestor da loja</option><option value="admin">Administrador</option></select><small class="field-error"></small></div>
+        <div class="field" data-field="role"><label for="access-role">Perfil</label><select id="access-role" name="role" required><option value="captor">Colaborador (captador)</option><option value="manager">Gestor de unidades</option><option value="admin">Administrador</option></select><small class="field-error"></small></div>
         <div class="field" data-field="storeId"><label for="access-store">Loja</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
+        <fieldset id="access-stores-field" class="field access-store-picker" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
         <button class="button button-primary button-block" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>${saving ? 'Salvando...' : 'Salvar acesso'}</span></button>
       </form>
       <section class="access-list-panel" aria-busy="${loading}">
@@ -957,7 +972,8 @@ function goalsView() {
   const completedGoals = records.filter((goal) => goal.completed >= goal.targetCount).length;
   const totalCaptured = records.reduce((total, goal) => total + goal.completed, 0);
   const selectedGoal = records.find((goal) => goal.id === pendingDeleteId);
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const goalStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
+  const storeOptions = goalStores.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const memberOptions = visibleMembers.length
     ? visibleMembers.map((member) => `<label class="goal-member-option">
         <input type="checkbox" name="assigneeUids" value="${escapeHtml(member.uid)}" ${draft.assigneeUids.includes(member.uid) ? 'checked' : ''} />
@@ -990,7 +1006,7 @@ function goalsView() {
         <div class="field" data-field="startDate"><label for="goal-start">Inicio</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
         <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
       </div>
-      <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin()
+      <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin() || goalStores.length > 1
         ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
         : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
       <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
@@ -1238,9 +1254,13 @@ function bindPageEvents() {
   const search = document.querySelector('#lead-search');
   if (search) {
     search.addEventListener('input', () => {
+      const selectionStart = search.selectionStart;
+      const selectionEnd = search.selectionEnd;
       state.search = search.value;
       render();
-      document.querySelector('#lead-search')?.focus();
+      const nextSearch = document.querySelector('#lead-search');
+      nextSearch?.focus();
+      nextSearch?.setSelectionRange(selectionStart, selectionEnd);
     });
   }
 
@@ -1262,10 +1282,14 @@ function bindPageEvents() {
 
     const managementSearch = managementForm.elements.search;
     managementSearch?.addEventListener('input', () => {
+      const selectionStart = managementSearch.selectionStart;
+      const selectionEnd = managementSearch.selectionEnd;
       state.management.filters.search = managementSearch.value;
       state.management.page = 1;
       render();
-      document.querySelector('#management-search')?.focus();
+      const nextSearch = document.querySelector('#management-search');
+      nextSearch?.focus();
+      nextSearch?.setSelectionRange(selectionStart, selectionEnd);
     });
 
     ['storeId', 'capturedByUid'].forEach((name) => {
@@ -1286,12 +1310,25 @@ function bindPageEvents() {
 
   const accessForm = document.querySelector('#access-form');
   if (accessForm) {
+    const syncStorePicker = () => {
+      const manager = accessForm.elements.role.value === 'manager';
+      const picker = document.querySelector('#access-stores-field');
+      picker.hidden = !manager;
+      if (manager && !new FormData(accessForm).getAll('storeIds').length) {
+        const primary = accessForm.querySelector(`[name="storeIds"][value="${accessForm.elements.storeId.value}"]`);
+        if (primary) primary.checked = true;
+      }
+    };
+    accessForm.elements.role.addEventListener('change', syncStorePicker);
+    accessForm.elements.storeId.addEventListener('change', syncStorePicker);
+    syncStorePicker();
     accessForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.access.saving) return;
       state.access.saving = true;
       setFieldErrors(accessForm, {});
-      const values = Object.fromEntries(new FormData(accessForm));
+      const formData = new FormData(accessForm);
+      const values = { ...Object.fromEntries(formData), storeIds: formData.getAll('storeIds') };
 
       try {
         const result = await saveAccess(state.profile, values);
@@ -1302,6 +1339,7 @@ function bindPageEvents() {
         }
         accessForm.reset();
         accessForm.elements.storeId.value = state.profile.storeId;
+        syncStorePicker();
         await loadAccessData();
         showToast('Acesso salvo. A pessoa ja pode entrar com o Google.');
       } catch (error) {
@@ -1472,15 +1510,28 @@ function stopFollowUpScheduleSubscription() {
 function startFollowUpScheduleSubscription() {
   stopFollowUpScheduleSubscription();
   state.followUps = {
-    loaded: state.demoMode || !['captor', 'manager'].includes(state.profile?.role),
+    loaded: state.demoMode || !['captor', 'manager', 'admin'].includes(state.profile?.role),
     error: '',
     records: [],
     truncated: false,
+    settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   };
-  if (!['captor', 'manager'].includes(state.profile?.role) || state.demoMode) return;
+  if (!['captor', 'manager', 'admin'].includes(state.profile?.role) || state.demoMode) return;
 
-  try {
+  if (state.profile.role === 'admin' || profileStoreIds(state.profile).length > 1) {
+    loadStoreSchedules(state.profile)
+      .then((records) => {
+        state.followUps.settingsByStore = Object.fromEntries(records.map((record) => [record.id, record]));
+        state.followUps.loaded = true;
+        render();
+      })
+      .catch(() => {
+        state.followUps.loaded = true;
+        state.followUps.error = 'Nao foi possivel carregar as configuracoes das lojas. Usando 30 minutos.';
+        render();
+      });
+  } else try {
     state.unsubscribeFollowUpSchedule = subscribeToStoreSchedule(
       state.profile,
       (settings) => {
@@ -1500,7 +1551,7 @@ function startFollowUpScheduleSubscription() {
     state.followUps.error = 'Nao foi possivel carregar a tolerancia da loja. Usando 30 minutos.';
   }
 
-  if (state.profile.role === 'manager') {
+  if (['manager', 'admin'].includes(state.profile.role)) {
     try {
       state.unsubscribeFollowUpLeads = subscribeToTeamFollowUps(
         state.profile,
@@ -1883,6 +1934,7 @@ async function handleAction(action) {
       error: '',
       records: [],
       truncated: false,
+      settingsByStore: {},
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
     state.settings = {
@@ -2079,6 +2131,10 @@ export async function startApp() {
       form.elements.email.value = access.email;
       form.elements.role.value = access.role;
       form.elements.storeId.value = access.storeId;
+      form.querySelectorAll('[name="storeIds"]').forEach((input) => {
+        input.checked = access.storeIds.includes(input.value);
+      });
+      form.elements.role.dispatchEvent(new Event('change'));
       form.elements.displayName.focus();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -2140,7 +2196,7 @@ export async function startApp() {
   window.addEventListener('offline', render);
   window.addEventListener('resize', syncAgendaSidebarHeight);
   window.setInterval(() => {
-    if (['captor', 'manager'].includes(state.profile?.role) && ['home', 'follow-ups'].includes(state.route)) render();
+    if (['captor', 'manager', 'admin'].includes(state.profile?.role) && ['home', 'follow-ups'].includes(state.route)) render();
   }, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {

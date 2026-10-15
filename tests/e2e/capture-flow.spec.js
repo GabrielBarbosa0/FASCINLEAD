@@ -77,6 +77,22 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
 
+test('configures multiple permitted stores for a manager access', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Acessos da equipe/ }).click();
+
+  await page.getByLabel('Perfil').selectOption('manager');
+  await expect(page.getByText('Unidades permitidas', { exact: true })).toBeVisible();
+  await page.getByLabel('Loja 02').check();
+  await page.getByLabel('Loja 06').check();
+  await expect(page.getByLabel('Loja 02')).toBeChecked();
+  await expect(page.getByLabel('Loja 06')).toBeChecked();
+  await expect(page.getByLabel('Loja 02').locator('..')).toHaveCSS('color', 'rgb(0, 48, 112)');
+  await expect(page.getByLabel('Loja 04').locator('..')).toHaveCSS('color', 'rgb(20, 32, 51)');
+  await page.screenshot({ path: testInfo.outputPath('access-store-picker.png'), fullPage: true });
+});
+
 test('keeps management actions and filters organized at intermediate widths', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chrome', 'Uses a controlled intermediate desktop viewport.');
   await page.setViewportSize({ width: 1120, height: 820 });
@@ -84,6 +100,8 @@ test('keeps management actions and filters organized at intermediate widths', as
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Painel de gestao/ }).click();
   await expect(page.getByRole('heading', { name: 'Painel de leads' })).toBeVisible();
+  await page.getByLabel('Nome ou telefone').pressSequentially('pedro');
+  await expect(page.getByLabel('Nome ou telefone')).toHaveValue('pedro');
 
   const layout = await page.evaluate(() => {
     const heading = document.querySelector('.management-dashboard-heading').getBoundingClientRect();
@@ -338,7 +356,7 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
         appointmentAttendance: 'missed',
         capturedByUid: 'captor-outra',
         capturedByName: 'Outra Captadora',
-        storeId: 'loja-02',
+        storeId: 'loja-04',
         notes: '',
         syncState: 'demo'
       }
@@ -351,11 +369,63 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
   await expect(page.getByText('Ana Captadora', { exact: true })).toBeVisible();
   await expect(page.getByText('Bruno Captador', { exact: true })).toBeVisible();
+  await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('display', 'grid');
+  await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('place-items', 'center');
   await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Aguardando contato' })).toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Contato iniciado' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Chamar no WhatsApp' })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('manager-team-follow-ups.png'), fullPage: true });
+});
+
+test('lets an administrator monitor follow-ups from every store', async ({ page }, testInfo) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const appointmentDate = yesterday.toISOString().slice(0, 10);
+
+  await page.evaluate(({ appointmentDate }) => {
+    sessionStorage.setItem('fascinlead:demo-role', 'admin');
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
+      {
+        id: 'admin-store-02',
+        fullName: 'Cliente Loja 02',
+        phone: '+5581999991111',
+        phoneSearch: '81999991111',
+        appointmentDate,
+        appointmentTime: '08:00',
+        appointmentAttendance: 'missed',
+        capturedByUid: 'captor-02',
+        capturedByName: 'Captador Loja 02',
+        storeId: 'loja-02',
+        notes: '',
+        syncState: 'demo'
+      },
+      {
+        id: 'admin-store-06',
+        fullName: 'Cliente Loja 06',
+        phone: '+5581999992222',
+        phoneSearch: '81999992222',
+        appointmentDate,
+        appointmentTime: '09:00',
+        appointmentAttendance: 'missed',
+        capturedByUid: 'captor-06',
+        capturedByName: 'Captador Loja 06',
+        storeId: 'loja-06',
+        notes: '',
+        syncState: 'demo'
+      }
+    ]));
+  }, { appointmentDate });
+
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Retornos da equipe/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
+  const store02Card = page.locator('.follow-up-item').filter({ hasText: 'Cliente Loja 02' });
+  const store06Card = page.locator('.follow-up-item').filter({ hasText: 'Cliente Loja 06' });
+  await expect(store02Card.getByText('Loja 02', { exact: true })).toBeVisible();
+  await expect(store06Card.getByText('Loja 06', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('admin-all-store-follow-ups.png'), fullPage: true });
 });
 
 test('configures appointment duration and hides occupied slots', async ({ page }, testInfo) => {

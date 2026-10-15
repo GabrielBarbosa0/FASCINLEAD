@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { calculateGoalProgress, GOAL_METRIC, validateGoal } from '../utils/goal.js';
+import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
 
 export const GOALS_LEAD_LIMIT = 1000;
 
@@ -31,7 +32,10 @@ function localDayAfter(date) {
 
 async function loadGoals(profile) {
   const constraints = [];
-  if (profile.role === 'manager') constraints.push(where('storeId', '==', profile.storeId));
+  if (profile.role === 'manager') {
+    const storeIds = profileStoreIds(profile);
+    constraints.push(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
+  }
   if (profile.role === 'captor') constraints.push(where('assigneeUid', '==', profile.uid));
 
   const snapshot = await getDocs(query(collection(db, 'goals'), ...constraints));
@@ -40,8 +44,9 @@ async function loadGoals(profile) {
 
 async function loadMembers(profile) {
   if (!canManageGoals(profile)) return [];
+  const storeIds = profileStoreIds(profile);
   const usersQuery = profile.role === 'manager'
-    ? query(collection(db, 'users'), where('storeId', '==', profile.storeId))
+    ? query(collection(db, 'users'), where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds))
     : collection(db, 'users');
   const snapshot = await getDocs(usersQuery);
 
@@ -62,7 +67,10 @@ async function loadProgressLeads(profile, goals) {
     limit(GOALS_LEAD_LIMIT + 1)
   ];
 
-  if (profile.role === 'manager') constraints.unshift(where('storeId', '==', profile.storeId));
+  if (profile.role === 'manager') {
+    const storeIds = profileStoreIds(profile);
+    constraints.unshift(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
+  }
   if (profile.role === 'captor') constraints.unshift(where('capturedByUid', '==', profile.uid));
 
   const snapshot = await getDocs(query(collection(db, 'leads'), ...constraints));
@@ -99,8 +107,8 @@ export async function createGoals(profile, values, members) {
     return { ...validation, isValid: false, errors: { assigneeUids: 'Um dos colaboradores selecionados nao esta disponivel.' } };
   }
   if (profile.role === 'manager' && (
-    validation.data.storeId !== profile.storeId
-    || selectedMembers.some((member) => member.storeId !== profile.storeId)
+    !canAccessStore(profile, validation.data.storeId)
+    || selectedMembers.some((member) => member.storeId !== validation.data.storeId)
   )) {
     const error = new Error('O gestor so pode criar metas para sua propria equipe.');
     error.code = 'permission-denied';
@@ -133,7 +141,7 @@ export async function createGoals(profile, values, members) {
 
 export async function deleteGoal(profile, goal) {
   if (!isFirebaseConfigured || !canManageGoals(profile)
-    || (profile.role === 'manager' && goal.storeId !== profile.storeId)) {
+    || (profile.role === 'manager' && !canAccessStore(profile, goal.storeId))) {
     const error = new Error('Seu perfil nao pode excluir esta meta.');
     error.code = 'permission-denied';
     throw error;

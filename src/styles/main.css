@@ -592,8 +592,8 @@ svg {
   flex: 0 0 auto;
 }
 
-.follow-up-team-heading strong,
-.follow-up-team-heading span {
+.follow-up-team-heading div strong,
+.follow-up-team-heading div span {
   display: block;
 }
 
@@ -1197,7 +1197,7 @@ svg {
 
 @media (max-width: 1200px) and (min-width: 761px) {
   .management-dashboard-heading .management-heading-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .management-filter-grid {
@@ -1227,6 +1227,61 @@ svg {
   grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
   align-items: start;
   gap: 22px;
+}
+
+.access-store-picker {
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.access-store-picker[hidden] {
+  display: none;
+}
+
+.access-store-picker legend {
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.access-store-picker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.access-store-option {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+  font-size: 0.82rem;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.access-store-option:hover {
+  border-color: #9db7dc;
+  background: #f4f8fd;
+}
+
+.access-store-option:has(input:checked) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.access-store-option input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
 }
 
 .settings-layout {
@@ -1478,7 +1533,7 @@ svg {
 .access-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(190px, 1.6fr) repeat(3, minmax(100px, 0.75fr)) auto auto;
+  grid-template-columns: minmax(190px, 1.6fr) minmax(125px, 0.85fr) minmax(100px, 0.7fr) auto auto;
   align-items: center;
   gap: 14px;
   padding: 14px;
@@ -1507,6 +1562,18 @@ svg {
 .access-detail span,
 .access-detail strong {
   display: block;
+}
+
+.access-permissions small {
+  display: block;
+  max-width: 150px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .access-identity-copy {
@@ -1556,7 +1623,7 @@ svg {
 
 @container (max-width: 900px) {
   .access-row {
-    grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(80px, auto));
+    grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(100px, auto));
     gap: 12px;
   }
 

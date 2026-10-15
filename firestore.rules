@@ -30,6 +30,13 @@ service cloud.firestore {
       return activeUser() && userProfile().role == 'manager';
     }
 
+    function managerHasStore(storeId) {
+      return isManager() && (
+        userProfile().storeId == storeId
+        || ('storeIds' in userProfile() && storeId in userProfile().storeIds)
+      );
+    }
+
     function canManageGoals() {
       return isAdmin() || isManager();
     }
@@ -166,7 +173,7 @@ service cloud.firestore {
 
     function isManagerAttendanceUpdate() {
       return isManager()
-        && resource.data.storeId == userProfile().storeId
+        && managerHasStore(resource.data.storeId)
         && resource.data.appointmentDate is string
         && resource.data.appointmentDate != ''
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -200,6 +207,7 @@ service cloud.firestore {
           request.resource.data.active == true
           && request.resource.data.role == 'admin'
           && request.resource.data.storeId == userProfile().storeId
+          && (!('storeIds' in resource.data) || request.resource.data.storeIds == resource.data.storeIds)
         ));
       allow delete: if isAdmin() && email != request.auth.token.email;
     }
@@ -214,7 +222,9 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.active == true
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role
-        && request.resource.data.storeId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeId;
+        && request.resource.data.storeId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeId
+        && (!('storeIds' in get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data)
+          || request.resource.data.storeIds == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeIds);
 
       allow update: if isAdmin()
         && request.resource.data.email == resource.data.email
@@ -222,15 +232,16 @@ service cloud.firestore {
           request.resource.data.active == true
           && request.resource.data.role == resource.data.role
           && request.resource.data.storeId == resource.data.storeId
+          && (!('storeIds' in resource.data) || request.resource.data.storeIds == resource.data.storeIds)
         ));
       allow delete: if false;
       allow list: if isAdmin()
-        || (isManager() && resource.data.storeId == userProfile().storeId);
+        || managerHasStore(resource.data.storeId);
     }
 
     match /stores/{storeId} {
       allow get: if isPrimaryAdmin() || (activeUser() && (
-        userProfile().storeId == storeId || isAdmin()
+        userProfile().storeId == storeId || managerHasStore(storeId) || isAdmin()
       ));
       allow list: if activeUser() || isPrimaryAdmin();
       allow write: if isAdmin();
@@ -249,7 +260,7 @@ service cloud.firestore {
 
       allow get, list: if activeUser() && (
         resource.data.capturedByUid == request.auth.uid
-        || (isManager() && resource.data.storeId == userProfile().storeId)
+        || managerHasStore(resource.data.storeId)
         || isAdmin()
       );
 
@@ -264,7 +275,7 @@ service cloud.firestore {
 
     match /appointmentSlots/{slotId} {
       allow get, list: if activeUser() && (
-        resource.data.storeId == userProfile().storeId || isAdmin()
+        resource.data.storeId == userProfile().storeId || managerHasStore(resource.data.storeId) || isAdmin()
       );
       allow create: if activeUser()
         && validAppointmentSlot(slotId, request.resource.data)
@@ -291,7 +302,7 @@ service cloud.firestore {
     match /goals/{goalId} {
       allow get, list: if activeUser() && (
         resource.data.assigneeUid == request.auth.uid
-        || (isManager() && resource.data.storeId == userProfile().storeId)
+        || managerHasStore(resource.data.storeId)
         || isAdmin()
       );
 
@@ -301,11 +312,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.active == true
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.role == 'captor'
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.storeId == request.resource.data.storeId
-        && (isAdmin() || request.resource.data.storeId == userProfile().storeId);
+        && (isAdmin() || managerHasStore(request.resource.data.storeId));
 
       allow update: if false;
       allow delete: if isAdmin()
-        || (isManager() && resource.data.storeId == userProfile().storeId);
+        || managerHasStore(resource.data.storeId);
     }
 
     match /{document=**} {

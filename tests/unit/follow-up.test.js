@@ -47,6 +47,26 @@ describe('missed appointment follow-ups', () => {
     expect(appointmentFollowUps([ownStore, anotherStore], manager, {}, new Date('2026-10-16T10:00:00'))).toEqual([ownStore]);
   });
 
+  it('lets an administrator see returns from every store using each store configuration', () => {
+    const admin = { uid: 'admin-1', role: 'admin', storeId: 'loja-06' };
+    const missedAnotherStore = { ...lead, id: 'lead-2', storeId: 'loja-02' };
+    const pendingOwnStore = { ...lead, id: 'lead-3', storeId: 'loja-06', appointmentTime: '09:30', appointmentAttendance: 'pending' };
+    const settings = {
+      noShowGraceMinutes: 30,
+      automaticPendingFollowUp: false,
+      byStore: {
+        'loja-02': { noShowGraceMinutes: 60, automaticPendingFollowUp: false },
+        'loja-06': { noShowGraceMinutes: 30, automaticPendingFollowUp: true }
+      }
+    };
+    expect(appointmentFollowUps(
+      [missedAnotherStore, pendingOwnStore],
+      admin,
+      settings,
+      new Date('2026-10-15T10:00:00')
+    )).toEqual([pendingOwnStore, missedAnotherStore]);
+  });
+
   it('counts a contact only for the current appointment', () => {
     const contacted = {
       ...lead,

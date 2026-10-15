@@ -81,6 +81,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
       photoUrl: firebaseUser.photoURL || '',
       role: permission.role,
       storeId: permission.storeId,
+      storeIds: permission.storeIds || [permission.storeId],
       active: true,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp()
@@ -95,6 +96,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
         photoUrl: firebaseUser.photoURL || '',
         role: permission.role,
         storeId: permission.storeId,
+        storeIds: permission.storeIds || [permission.storeId],
         active: true
       };
 

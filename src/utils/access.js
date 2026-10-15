@@ -6,11 +6,32 @@ export function normalizeAccessEmail(value = '') {
   return String(value).trim().toLowerCase();
 }
 
+function storeLabel(storeId = '') {
+  return String(storeId).replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function formatAccessStoreSummary(access = {}) {
+  const allStoreIds = [...STORE_IDS];
+  const storeIds = access.role === 'admin'
+    ? allStoreIds
+    : [...new Set(access.storeIds || [access.storeId].filter(Boolean))];
+  const allStores = allStoreIds.every((storeId) => storeIds.includes(storeId));
+
+  if (allStores) return { short: 'TODAS', full: 'Todas as unidades' };
+  if (storeIds.length === 1) return { short: storeLabel(storeIds[0]), full: storeLabel(storeIds[0]) };
+
+  return {
+    short: storeIds.map((storeId) => storeLabel(storeId).replace(/^Loja\s+/i, '')).join(', '),
+    full: storeIds.map(storeLabel).join(', ')
+  };
+}
+
 export function validateAccess(values) {
   const displayName = String(values.displayName || '').trim();
   const email = normalizeAccessEmail(values.email);
   const role = String(values.role || '');
   const storeId = String(values.storeId || '').trim().toLowerCase();
+  const requestedStoreIds = Array.isArray(values.storeIds) ? values.storeIds : [values.storeIds].filter(Boolean);
   const errors = {};
 
   if (displayName.length < 2 || displayName.length > 120) {
@@ -29,9 +50,16 @@ export function validateAccess(values) {
     errors.storeId = 'Escolha uma loja valida.';
   }
 
+  const storeIds = role === 'admin'
+    ? [...STORE_IDS]
+    : role === 'manager'
+      ? [...new Set([storeId, ...requestedStoreIds.map((item) => String(item).trim().toLowerCase())])]
+      : [storeId];
+  if (storeIds.some((item) => !STORE_IDS.has(item))) errors.storeIds = 'Escolha apenas unidades validas.';
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
-    data: { displayName, email, role, storeId }
+    data: { displayName, email, role, storeId, storeIds }
   };
 }

@@ -52,6 +52,7 @@ beforeEach(async () => {
         displayName: 'Gestor Teste',
         role: 'manager',
         storeId: 'loja-06',
+        storeIds: ['loja-06', 'loja-02'],
         active: true
       }),
       setDoc(doc(db, 'leads', 'lead-test'), {
@@ -181,6 +182,36 @@ describe('appointment calendar queries', () => {
     await assertFails(getDocs(appointments));
   });
 
+  it('lets a manager query an additional permitted store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'leads'),
+      where('storeId', '==', 'loja-02'),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    )));
+  });
+
+  it('lets a manager query all permitted stores together', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'leads'),
+      where('storeId', 'in', ['loja-06', 'loja-02']),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    )));
+  });
+
+  it('rejects a manager query for a store outside the permitted list', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(getDocs(query(
+      collection(db, 'leads'),
+      where('storeId', '==', 'loja-04'),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    )));
+  });
+
   it('lets an administrator query appointments from all stores', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
     const appointments = query(
@@ -189,6 +220,15 @@ describe('appointment calendar queries', () => {
       where('appointmentDate', '<=', '2026-10-31')
     );
     await assertSucceeds(getDocs(appointments));
+  });
+
+  it('lets an administrator query overdue follow-ups from all stores', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    const followUps = query(
+      collection(db, 'leads'),
+      where('appointmentDate', '<=', '2026-10-15')
+    );
+    await assertSucceeds(getDocs(followUps));
   });
 
   it('lets a manager register attendance for an appointment in their store', async () => {

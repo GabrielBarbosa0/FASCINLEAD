@@ -48,7 +48,8 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - atualizacao dinamica da agenda enquanto novos pre-agendamentos sao sincronizados;
 - registro direto de comparecimento ou falta pela equipe gerencial;
 - retorno de faltas para o captador responsavel, com tolerancia por loja, automacao opcional e mensagem pronta no WhatsApp;
-- acompanhamento gerencial dos retornos por colaborador, diferenciando contatos aguardando acao e ja iniciados;
+- acompanhamento gerencial dos retornos por colaborador, diferenciando contatos aguardando acao e ja iniciados; gestores veem a propria loja e administradores veem todas as unidades;
+- hierarquia de acesso por perfil: administradores acessam todas as unidades, gestores acessam as unidades permitidas e captadores ficam restritos a operacao basica da loja principal;
 - configuracao administrativa da duracao e do expediente de exames por loja;
 - oferta de horarios livres no cadastro, com bloqueio dos intervalos ja ocupados;
 - instalacao como PWA em celular e desktop.
