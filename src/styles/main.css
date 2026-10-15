@@ -2651,6 +2651,40 @@ svg {
   color: var(--danger);
 }
 
+.goal-percentage {
+  flex: 0 0 auto;
+  min-width: 72px;
+  text-align: right;
+}
+
+.goal-percentage strong,
+.goal-percentage span {
+  display: block;
+}
+
+.goal-percentage strong {
+  color: var(--brand);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.goal-percentage span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.goals-layout-personal .goal-card-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.goals-layout-personal .goal-progress-copy {
+  margin-top: 16px;
+}
+
 .goal-person {
   display: flex;
   align-items: center;

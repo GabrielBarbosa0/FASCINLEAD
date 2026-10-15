@@ -988,9 +988,11 @@ function goalsView() {
         return `<article class="goal-card">
           <div class="goal-card-heading">
             <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(goal.title)}</h2></div>
-            ${canManage() ? `<button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(goal.id)}" title="Excluir meta"><i data-lucide="trash-2"></i></button>` : ''}
+            ${canManage()
+              ? `<button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(goal.id)}" title="Excluir meta"><i data-lucide="trash-2"></i></button>`
+              : `<div class="goal-percentage" aria-label="${goal.percentage}% da meta atingida"><strong>${goal.percentage}%</strong><span>da meta</span></div>`}
           </div>
-          <div class="goal-person"><span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span><div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${escapeHtml(storeLabel(goal.storeId))}</span></div></div>
+          ${canManage() ? `<div class="goal-person"><span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span><div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${escapeHtml(storeLabel(goal.storeId))}</span></div></div>` : ''}
           <div class="goal-progress-copy"><strong>${goal.completed} de ${goal.targetCount} leads</strong><span>${goal.percentage}%</span></div>
           <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${goal.percentage}"><span style="width: ${goal.percentage}%"></span></div>
           <div class="goal-card-footer"><span>${formatGoalDate(goal.startDate)} a ${formatGoalDate(goal.endDate)}</span><strong>${goal.remaining ? `${goal.remaining} restante(s)` : 'Meta alcancada'}</strong></div>

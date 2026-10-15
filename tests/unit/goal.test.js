@@ -33,6 +33,22 @@ describe('goal validation', () => {
 });
 
 describe('goal progress', () => {
+  it('calculates the percentage and remaining amount for the captor', () => {
+    const progress = calculateGoalProgress({
+      assigneeUid: 'captor-1',
+      targetCount: 20,
+      startDate: '2026-10-01',
+      endDate: '2026-10-31'
+    }, Array.from({ length: 5 }, (_, index) => ({
+      capturedByUid: 'captor-1',
+      capturedAtClient: `2026-10-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`
+    })));
+
+    expect(progress.completed).toBe(5);
+    expect(progress.remaining).toBe(15);
+    expect(progress.percentage).toBe(25);
+  });
+
   it('counts only leads from the assignee inside the period', () => {
     const progress = calculateGoalProgress({
       assigneeUid: 'captor-1',
