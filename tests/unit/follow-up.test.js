@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildWhatsAppFollowUpUrl, followUpAvailableAt, missedFollowUps } from '../../src/utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../../src/utils/follow-up.js';
 
 const profile = { uid: 'captor-1', role: 'captor' };
 const lead = {
@@ -17,14 +17,44 @@ const lead = {
 describe('missed appointment follow-ups', () => {
   it('releases a missed appointment after the configured grace period', () => {
     expect(followUpAvailableAt(lead, 30)).toEqual(new Date('2026-10-15T09:30:00'));
-    expect(missedFollowUps([lead], profile, { noShowGraceMinutes: 30 }, new Date('2026-10-15T09:29:59'))).toEqual([]);
-    expect(missedFollowUps([lead], profile, { noShowGraceMinutes: 30 }, new Date('2026-10-15T09:30:00'))).toEqual([lead]);
+    expect(appointmentFollowUps([lead], profile, { noShowGraceMinutes: 30 }, new Date('2026-10-15T09:29:59'))).toEqual([]);
+    expect(appointmentFollowUps([lead], profile, { noShowGraceMinutes: 30 }, new Date('2026-10-15T09:30:00'))).toEqual([lead]);
   });
 
   it('only returns missed leads owned by the signed-in captor', () => {
     const attended = { ...lead, id: 'lead-2', appointmentAttendance: 'attended' };
     const anotherCaptor = { ...lead, id: 'lead-3', capturedByUid: 'captor-2' };
-    expect(missedFollowUps([attended, anotherCaptor], profile, {}, new Date('2026-10-16T10:00:00'))).toEqual([]);
+    expect(appointmentFollowUps([attended, anotherCaptor], profile, {}, new Date('2026-10-16T10:00:00'))).toEqual([]);
+  });
+
+  it('includes overdue pending appointments only when automation is enabled', () => {
+    const pending = { ...lead, appointmentAttendance: 'pending' };
+    const now = new Date('2026-10-15T10:00:00');
+    expect(appointmentFollowUps([pending], profile, {
+      noShowGraceMinutes: 60,
+      automaticPendingFollowUp: false
+    }, now)).toEqual([]);
+    expect(appointmentFollowUps([pending], profile, {
+      noShowGraceMinutes: 60,
+      automaticPendingFollowUp: true
+    }, now)).toEqual([pending]);
+  });
+
+  it('lets a manager see overdue returns only from their store', () => {
+    const manager = { uid: 'manager-1', role: 'manager', storeId: 'loja-06' };
+    const ownStore = { ...lead, storeId: 'loja-06' };
+    const anotherStore = { ...lead, id: 'lead-2', storeId: 'loja-02' };
+    expect(appointmentFollowUps([ownStore, anotherStore], manager, {}, new Date('2026-10-16T10:00:00'))).toEqual([ownStore]);
+  });
+
+  it('counts a contact only for the current appointment', () => {
+    const contacted = {
+      ...lead,
+      followUpContactedAt: '2026-10-15T10:00:00.000Z',
+      followUpContactedAppointmentKey: followUpAppointmentKey(lead)
+    };
+    expect(isFollowUpContacted(contacted)).toBe(true);
+    expect(isFollowUpContacted({ ...contacted, appointmentTime: '11:00' })).toBe(false);
   });
 
   it('builds a prepared WhatsApp message using the customer phone and preferred name', () => {

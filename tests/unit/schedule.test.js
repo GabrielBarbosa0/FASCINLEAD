@@ -7,6 +7,7 @@ describe('store schedule helpers', () => {
       schedulingMode: 'controlled',
       appointmentDurationMinutes: 20,
       noShowGraceMinutes: 30,
+      automaticPendingFollowUp: false,
       openingTime: '08:00',
       closingTime: '18:00'
     });
@@ -68,5 +69,10 @@ describe('store schedule helpers', () => {
       openingTime: '08:00',
       closingTime: '18:00'
     })).toMatchObject({ isValid: false, errors: { noShowGraceMinutes: expect.any(String) } });
+  });
+
+  it('normalizes the automatic follow-up switch from form values', () => {
+    expect(normalizeStoreSchedule({ automaticPendingFollowUp: 'true' }).automaticPendingFollowUp).toBe(true);
+    expect(normalizeStoreSchedule({ automaticPendingFollowUp: 'false' }).automaticPendingFollowUp).toBe(false);
   });
 });

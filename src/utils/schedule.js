@@ -2,6 +2,7 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   schedulingMode: 'controlled',
   appointmentDurationMinutes: 20,
   noShowGraceMinutes: 30,
+  automaticPendingFollowUp: false,
   openingTime: '08:00',
   closingTime: '18:00'
 });
@@ -31,6 +32,7 @@ export function normalizeStoreSchedule(value = {}) {
     noShowGraceMinutes: Number.isInteger(noShowGrace) && noShowGrace >= 0 && noShowGrace <= 240
       ? noShowGrace
       : DEFAULT_STORE_SCHEDULE.noShowGraceMinutes,
+    automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     openingTime: opening,
     closingTime: closing
   };

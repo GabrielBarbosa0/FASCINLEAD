@@ -558,6 +558,59 @@ svg {
   gap: 12px;
 }
 
+.follow-up-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.follow-up-team-list {
+  display: grid;
+  gap: 18px;
+}
+
+.follow-up-team-group {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgba(20, 40, 70, 0.06);
+}
+
+.follow-up-team-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-subtle);
+}
+
+.follow-up-team-heading .avatar {
+  flex: 0 0 auto;
+}
+
+.follow-up-team-heading strong,
+.follow-up-team-heading span {
+  display: block;
+}
+
+.follow-up-team-heading div > span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.follow-up-team-group .follow-up-list {
+  padding: 12px;
+}
+
+.follow-up-team-group .follow-up-item {
+  box-shadow: none;
+}
+
 .follow-up-item {
   padding: 18px;
   border: 1px solid var(--line);
@@ -1220,6 +1273,80 @@ svg {
 
 .schedule-grace-field .number-with-unit input:focus {
   background: var(--surface);
+}
+
+.setting-toggle {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+  cursor: pointer;
+}
+
+.setting-toggle > span:first-child strong,
+.setting-toggle > span:first-child small {
+  display: block;
+}
+
+.setting-toggle > span:first-child strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+.setting-toggle > span:first-child small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.setting-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.setting-toggle-control {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #aeb9c5;
+  transition: background-color 160ms ease;
+}
+
+.setting-toggle-control::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 40, 70, 0.2);
+  content: '';
+  transition: transform 160ms ease;
+}
+
+.setting-toggle input:checked + .setting-toggle-control {
+  background: var(--brand);
+}
+
+.setting-toggle input:checked + .setting-toggle-control::after {
+  transform: translateX(20px);
+}
+
+.setting-toggle input:focus-visible + .setting-toggle-control {
+  outline: 3px solid rgba(18, 92, 174, 0.22);
+  outline-offset: 2px;
 }
 
 .schedule-hours {
@@ -2614,6 +2741,10 @@ svg {
 }
 
 @media (max-width: 760px) {
+  .follow-up-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .management-heading {
     align-items: stretch;
     flex-direction: column;

@@ -161,6 +161,16 @@ describe('appointment calendar queries', () => {
     await assertSucceeds(getDocs(appointments));
   });
 
+  it('lets a manager query overdue follow-ups from their own store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const followUps = query(
+      collection(db, 'leads'),
+      where('storeId', '==', 'loja-06'),
+      where('appointmentDate', '<=', '2026-10-15')
+    );
+    await assertSucceeds(getDocs(followUps));
+  });
+
   it('rejects an unscoped appointment query by a manager', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     const appointments = query(
@@ -212,6 +222,39 @@ describe('appointment calendar queries', () => {
     }));
   });
 
+  it('lets the owning captor register that follow-up contact started', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      followUpContactedAt: Timestamp.now(),
+      followUpContactedByUid: 'captor-uid',
+      followUpContactedByName: 'Captador Teste',
+      followUpContactedAppointmentKey: '2026-10-15|09:30',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('does not let another captor register contact for the lead', async () => {
+    const db = authenticatedDb('outro-uid', 'outro@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      followUpContactedAt: Timestamp.now(),
+      followUpContactedByUid: 'outro-uid',
+      followUpContactedByName: 'Outro Captador',
+      followUpContactedAppointmentKey: '2026-10-15|09:30',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('does not let a manager register contact for a captor', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      followUpContactedAt: Timestamp.now(),
+      followUpContactedByUid: 'manager-uid',
+      followUpContactedByName: 'Gestor Teste',
+      followUpContactedAppointmentKey: '2026-10-15|09:30',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets the owning captor clear a missed status only while rescheduling', async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await updateDoc(doc(context.firestore(), 'leads', 'lead-test'), {
@@ -248,6 +291,7 @@ describe('store schedule settings', () => {
       schedulingMode: 'controlled',
       appointmentDurationMinutes: 20,
       noShowGraceMinutes: 30,
+      automaticPendingFollowUp: true,
       openingTime: '08:00',
       closingTime: '18:00'
     }, { merge: true }));

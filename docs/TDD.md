@@ -159,8 +159,12 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Gestores podem marcar cada agendamento como `Compareceu` ou `Nao compareceu`; enquanto nenhuma opcao for escolhida, o estado e `Aguardando`.
 - A alteracao de comparecimento registra data e usuario responsavel e nao concede ao gestor permissao para editar os demais dados do lead.
 - A agenda reutiliza os campos do lead e nao cria uma segunda fonte de dados.
-- Uma falta aparece em `Retornos` somente para o captador responsavel depois da tolerancia configurada para a loja.
+- Uma falta aparece em `Retornos` para o captador responsavel depois da tolerancia configurada para a loja.
+- Quando a automacao da loja estiver ativa, um agendamento ainda sem confirmacao tambem aparece em `Retornos` depois da tolerancia.
+- Agendamentos sem confirmacao nao geram retorno automatico quando a chave da loja estiver desativada.
 - O retorno oferece uma mensagem pronta no WhatsApp e desaparece quando o cliente e reagendado.
+- Ao abrir o WhatsApp, o sistema registra o inicio do contato para o agendamento atual.
+- O gestor acompanha, em modo somente leitura, os retornos da propria loja agrupados por captador e o estado de cada contato.
 - A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
 - Administradores configuram por loja o modo controlado ou livre, a duracao da consulta e o inicio e fim do expediente.
 - O modo controlado e o padrao e oferece ao captador somente intervalos livres que caibam integralmente no expediente.
@@ -284,7 +288,7 @@ FASCINLEAD/
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
 7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
 8. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
-9. `Retornos`: faltas vencidas do proprio captador e acesso ao WhatsApp para reagendamento.
+9. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
 10. `Configuracoes`: modo de agenda, duracao da consulta, expediente e tolerancia para faltas por loja, restritos a administradores.
 
 ### 6.2 Navegacao mobile

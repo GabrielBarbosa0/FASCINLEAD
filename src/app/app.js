@@ -42,7 +42,8 @@ import {
 } from 'lucide';
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
-import { saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
+import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
+import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
@@ -53,7 +54,7 @@ import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, m
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
-import { buildWhatsAppFollowUpUrl, followUpAvailableAt, missedFollowUps } from '../utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
@@ -116,6 +117,7 @@ const state = {
   unsubscribeAppointments: null,
   unsubscribeStoreSchedule: null,
   unsubscribeFollowUpSchedule: null,
+  unsubscribeFollowUpLeads: null,
   unsubscribeDayAppointments: null,
   updateAction: null,
   management: {
@@ -152,6 +154,8 @@ const state = {
   followUps: {
     loaded: false,
     error: '',
+    records: [],
+    truncated: false,
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
   settings: {
@@ -222,6 +226,13 @@ const demoProfile = {
   active: true
 };
 
+function createDemoProfile() {
+  const role = sessionStorage.getItem(DEMO_ROLE_KEY);
+  if (role === 'admin') return { ...demoProfile, uid: 'demo-admin', displayName: 'Administrador de Teste', role: 'admin', storeId: 'loja-06' };
+  if (role === 'manager') return { ...demoProfile, uid: 'demo-manager', displayName: 'Gestor de Teste', role: 'manager', storeId: 'loja-06' };
+  return demoProfile;
+}
+
 function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -255,7 +266,10 @@ function isAdmin() {
 }
 
 function pendingFollowUps() {
-  return missedFollowUps(state.leads, state.profile, state.followUps.settings);
+  const source = state.demoMode || state.profile?.role === 'captor'
+    ? state.leads
+    : state.followUps.records;
+  return appointmentFollowUps(source, state.profile, state.followUps.settings);
 }
 
 function storeLabel(storeId = '') {
@@ -285,6 +299,12 @@ function formatAppointmentDate(value) {
 function formatFollowUpAvailableAt(lead) {
   const availableAt = followUpAvailableAt(lead, state.followUps.settings.noShowGraceMinutes);
   return availableAt ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(availableAt) : '';
+}
+
+function formatDateTimeValue(value) {
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 function filteredManagementRecords() {
@@ -399,9 +419,9 @@ function homeView() {
         <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
       </button>
-      ${state.profile.role === 'captor' ? `<button class="action-card" type="button" data-route="follow-ups">
+      ${['captor', 'manager'].includes(state.profile.role) ? `<button class="action-card" type="button" data-route="follow-ups">
         <span class="action-icon"><i data-lucide="bell-ring"></i></span>
-        <span><strong>Retornos pendentes</strong><small>${followUps.length ? `${followUps.length} cliente(s) aguardando novo contato` : 'Nenhuma falta aguardando contato'}</small></span>
+        <span><strong>${state.profile.role === 'manager' ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
         ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendencia(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
       </button>` : ''}
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
@@ -535,36 +555,61 @@ function leadsView() {
 }
 
 function followUpsView() {
-  if (state.profile?.role !== 'captor') {
+  if (!['captor', 'manager'].includes(state.profile?.role)) {
     return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Retornos pendentes</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores.</span></div>`;
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
   }
 
   const records = pendingFollowUps();
-  const items = records.length
-    ? records.map((lead) => {
+  const managerView = state.profile.role === 'manager';
+  const renderItem = (lead) => {
       const whatsAppUrl = buildWhatsAppFollowUpUrl(lead);
+      const manuallyMissed = lead.appointmentAttendance === 'missed';
+      const contacted = isFollowUpContacted(lead);
       return `<article class="follow-up-item">
         <div class="follow-up-heading">
           <span class="follow-up-icon"><i data-lucide="bell-ring"></i></span>
           <div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div>
-          <span class="status-badge status-danger">Nao compareceu</span>
+          <span class="status-badge ${contacted ? 'status-success' : 'status-warning'}">${contacted ? 'Contato iniciado' : 'Aguardando contato'}</span>
         </div>
         <dl class="follow-up-details">
           <div><dt>Agendamento</dt><dd>${escapeHtml(formatAppointmentDate(lead.appointmentDate))}, ${escapeHtml(lead.appointmentTime)}</dd></div>
           <div><dt>Retorno liberado</dt><dd>${escapeHtml(formatFollowUpAvailableAt(lead))}</dd></div>
+          ${managerView ? `<div><dt>Situacao</dt><dd>${manuallyMissed ? 'Nao compareceu' : 'Sem confirmacao'}</dd></div>
+          <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>` : ''}
         </dl>
-        <div class="follow-up-actions">
-          <a class="button button-whatsapp" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a>
+        ${managerView ? '' : `<div class="follow-up-actions">
+          <a class="button button-whatsapp" data-follow-up-whatsapp="${escapeHtml(lead.id)}" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a>
           <button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}"><i data-lucide="calendar-days"></i><span>Reagendar</span></button>
-        </div>
+        </div>`}
       </article>`;
-    }).join('')
+  };
+  const contactedCount = records.filter(isFollowUpContacted).length;
+  const captorGroups = [...records.reduce((groups, lead) => {
+    const key = lead.capturedByUid || lead.capturedByName || 'captor';
+    if (!groups.has(key)) groups.set(key, { name: lead.capturedByName || 'Captador nao informado', records: [] });
+    groups.get(key).records.push(lead);
+    return groups;
+  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const items = records.length
+    ? (managerView
+      ? captorGroups.map((group) => `<section class="follow-up-team-group">
+          <header class="follow-up-team-heading"><span class="avatar">${escapeHtml(profileInitials(group.name))}</span><div><strong>${escapeHtml(group.name)}</strong><span>${group.records.length} retorno(s)</span></div></header>
+          <div class="follow-up-list">${group.records.map(renderItem).join('')}</div>
+        </section>`).join('')
+      : records.map(renderItem).join(''))
     : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum retorno pendente</strong><p>As faltas registradas pela loja aparecerao aqui depois do tempo de tolerancia.</p></div>`;
 
-  return `<section class="page-heading compact"><div><p class="eyebrow">ACOMPANHAMENTO</p><h1>Retornos pendentes</h1><p>Retome o contato com clientes que nao compareceram.</p></div></section>
+  return `<section class="page-heading compact"><div><p class="eyebrow">ACOMPANHAMENTO</p><h1>${managerView ? 'Retornos da equipe' : 'Retornos pendentes'}</h1><p>${managerView ? 'Acompanhe os contatos realizados por cada colaborador.' : 'Retome o contato com clientes que nao compareceram.'}</p></div></section>
     ${state.followUps.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>${escapeHtml(state.followUps.error)}</span></div>` : ''}
-    <section class="follow-up-list">${items}</section>`;
+    ${state.followUps.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de 500 registros.</span></div>` : ''}
+    ${managerView ? `<section class="follow-up-metrics" aria-label="Resumo dos retornos">
+      <div class="metric"><span>Retornos</span><strong>${records.length}</strong><i data-lucide="bell-ring"></i></div>
+      <div class="metric metric-warning"><span>Aguardando contato</span><strong>${records.length - contactedCount}</strong><i data-lucide="clock-3"></i></div>
+      <div class="metric metric-success"><span>Contato iniciado</span><strong>${contactedCount}</strong><i data-lucide="message-circle"></i></div>
+      <div class="metric"><span>Captadores</span><strong>${captorGroups.length}</strong><i data-lucide="users"></i></div>
+    </section>` : ''}
+    <section class="${managerView ? 'follow-up-team-list' : 'follow-up-list'}">${items}</section>`;
 }
 
 function leadDetailView() {
@@ -688,6 +733,7 @@ function managementView() {
       <div class="management-heading-copy"><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
       <div class="management-heading-actions">
         <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
+        ${state.profile.role === 'manager' ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
@@ -825,13 +871,19 @@ function settingsView() {
           </div>
         </div>
         <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Tolerancia apos o horario</label><small id="settings-no-show-help" class="field-help">Tempo para liberar o retorno ao captador quando houver falta.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
+        <input name="automaticPendingFollowUp" type="hidden" value="false" />
+        <label class="setting-toggle checkbox-label" for="settings-automatic-follow-up">
+          <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois da tolerancia.</small></span>
+          <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
+          <span class="setting-toggle-control" aria-hidden="true"></span>
+        </label>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
       <aside class="schedule-preview">
         <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
         ${selected.schedulingMode === 'free'
           ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
-          : `<div class="schedule-summary-grid"><div><span>Duracao</span><strong>${selected.appointmentDurationMinutes} min</strong></div><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Capacidade diaria</span><strong>${previewSlots.length} consulta(s)</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div></div>
+          : `<div class="schedule-summary-grid"><div><span>Duracao</span><strong>${selected.appointmentDurationMinutes} min</strong></div><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Capacidade diaria</span><strong>${previewSlots.length} consulta(s)</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div></div>
             <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
       </aside>
     </section>`;
@@ -1000,7 +1052,7 @@ function bottomNav() {
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
 }
@@ -1282,10 +1334,16 @@ function bindPageEvents() {
           : scheduleSettingsForm.elements[name].value;
       });
     });
+    document.querySelector('#settings-automatic-follow-up')?.addEventListener('change', (event) => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (record) record.automaticPendingFollowUp = event.target.checked;
+      render();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
       const values = Object.fromEntries(new FormData(scheduleSettingsForm));
+      values.automaticPendingFollowUp = values.automaticPendingFollowUp === 'true';
       if (values.schedulingMode === 'free') {
         const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
         values.appointmentDurationMinutes = current.appointmentDurationMinutes;
@@ -1300,7 +1358,8 @@ function bindPageEvents() {
           const record = state.settings.records.find((item) => item.id === values.storeId);
           Object.assign(record, values, {
             appointmentDurationMinutes: Number(values.appointmentDurationMinutes),
-            noShowGraceMinutes: Number(values.noShowGraceMinutes)
+            noShowGraceMinutes: Number(values.noShowGraceMinutes),
+            automaticPendingFollowUp: values.automaticPendingFollowUp
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
@@ -1406,16 +1465,20 @@ function subscribeProfileLeads() {
 function stopFollowUpScheduleSubscription() {
   state.unsubscribeFollowUpSchedule?.();
   state.unsubscribeFollowUpSchedule = null;
+  state.unsubscribeFollowUpLeads?.();
+  state.unsubscribeFollowUpLeads = null;
 }
 
 function startFollowUpScheduleSubscription() {
   stopFollowUpScheduleSubscription();
   state.followUps = {
-    loaded: state.demoMode || state.profile?.role !== 'captor',
+    loaded: state.demoMode || !['captor', 'manager'].includes(state.profile?.role),
     error: '',
+    records: [],
+    truncated: false,
     settings: { ...DEFAULT_STORE_SCHEDULE }
   };
-  if (state.profile?.role !== 'captor' || state.demoMode) return;
+  if (!['captor', 'manager'].includes(state.profile?.role) || state.demoMode) return;
 
   try {
     state.unsubscribeFollowUpSchedule = subscribeToStoreSchedule(
@@ -1435,6 +1498,27 @@ function startFollowUpScheduleSubscription() {
   } catch {
     state.followUps.loaded = true;
     state.followUps.error = 'Nao foi possivel carregar a tolerancia da loja. Usando 30 minutos.';
+  }
+
+  if (state.profile.role === 'manager') {
+    try {
+      state.unsubscribeFollowUpLeads = subscribeToTeamFollowUps(
+        state.profile,
+        (result) => {
+          state.followUps.records = result.records;
+          state.followUps.truncated = result.truncated;
+          render();
+        },
+        (error) => {
+          state.followUps.error = error?.code === 'permission-denied'
+            ? 'Seu perfil nao pode consultar os retornos desta equipe.'
+            : 'Nao foi possivel acompanhar os retornos da equipe.';
+          render();
+        }
+      );
+    } catch {
+      state.followUps.error = 'Nao foi possivel acompanhar os retornos da equipe.';
+    }
   }
 }
 
@@ -1731,9 +1815,7 @@ async function handleAction(action) {
   if (action === 'demo-login') {
     sessionStorage.setItem(DEMO_SESSION_KEY, 'true');
     state.demoMode = true;
-    state.profile = import.meta.env.DEV && sessionStorage.getItem(DEMO_ROLE_KEY) === 'admin'
-      ? { ...demoProfile, displayName: 'Gestor de Teste', role: 'admin', storeId: 'loja-06' }
-      : demoProfile;
+    state.profile = createDemoProfile();
     state.authError = '';
     subscribeProfileLeads();
     startFollowUpScheduleSubscription();
@@ -1799,6 +1881,8 @@ async function handleAction(action) {
     state.followUps = {
       loaded: false,
       error: '',
+      records: [],
+      truncated: false,
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
     state.settings = {
@@ -1872,6 +1956,18 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const followUpWhatsAppLink = event.target.closest('[data-follow-up-whatsapp]');
+    if (followUpWhatsAppLink) {
+      const lead = state.leads.find((item) => item.id === followUpWhatsAppLink.dataset.followUpWhatsapp);
+      if (lead && state.profile?.role === 'captor') {
+        try {
+          if (state.demoMode) markDemoFollowUpContact(lead.id, state.profile);
+          else await markFollowUpContactStarted(state.profile, lead);
+        } catch {
+          showToast('O WhatsApp foi aberto, mas o contato nao foi registrado.', 'warning', 'circle-alert');
+        }
+      }
+    }
     const leadButton = event.target.closest('[data-open-lead-id]');
     if (leadButton) navigate('lead', leadButton.dataset.openLeadId);
     const managementLeadButton = event.target.closest('[data-management-lead-id]');
@@ -2044,7 +2140,7 @@ export async function startApp() {
   window.addEventListener('offline', render);
   window.addEventListener('resize', syncAgendaSidebarHeight);
   window.setInterval(() => {
-    if (state.profile?.role === 'captor' && ['home', 'follow-ups'].includes(state.route)) render();
+    if (['captor', 'manager'].includes(state.profile?.role) && ['home', 'follow-ups'].includes(state.route)) render();
   }, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {
@@ -2054,9 +2150,7 @@ export async function startApp() {
 
   if (sessionStorage.getItem(DEMO_SESSION_KEY) === 'true' && import.meta.env.DEV) {
     state.demoMode = true;
-    state.profile = sessionStorage.getItem(DEMO_ROLE_KEY) === 'admin'
-      ? { ...demoProfile, displayName: 'Gestor de Teste', role: 'admin', storeId: 'loja-06' }
-      : demoProfile;
+    state.profile = createDemoProfile();
     state.loading = false;
     subscribeProfileLeads();
     startFollowUpScheduleSubscription();

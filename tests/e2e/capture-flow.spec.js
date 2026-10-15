@@ -271,6 +271,11 @@ test('alerts the captor about a missed appointment and prepares WhatsApp follow-
   const whatsAppLink = page.getByRole('link', { name: 'Chamar no WhatsApp' });
   await expect(whatsAppLink).toHaveAttribute('href', /wa\.me\/5581999991234/);
   await expect(whatsAppLink).toHaveAttribute('href', /reagendar/);
+  await whatsAppLink.evaluate((element) => {
+    element.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    element.click();
+  });
+  await expect(page.getByText('Contato iniciado', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('missed-follow-up.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Reagendar' }).click();
@@ -279,6 +284,78 @@ test('alerts the captor about a missed appointment and prepares WhatsApp follow-
   await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
   await page.getByRole('button', { name: 'Retornos', exact: true }).click();
   await expect(page.getByText('Nenhum retorno pendente')).toBeVisible();
+});
+
+test('lets a manager monitor follow-ups grouped by collaborator', async ({ page }, testInfo) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const appointmentDate = yesterday.toISOString().slice(0, 10);
+
+  await page.evaluate(({ appointmentDate }) => {
+    sessionStorage.setItem('fascinlead:demo-role', 'manager');
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
+      {
+        id: 'team-awaiting',
+        fullName: 'Cliente Aguardando',
+        phone: '+5581999991111',
+        phoneSearch: '81999991111',
+        appointmentDate,
+        appointmentTime: '08:00',
+        appointmentAttendance: 'missed',
+        capturedByUid: 'captor-ana',
+        capturedByName: 'Ana Captadora',
+        capturedAtClient: new Date().toISOString(),
+        storeId: 'loja-06',
+        notes: '',
+        syncState: 'demo'
+      },
+      {
+        id: 'team-contacted',
+        fullName: 'Cliente Contatado',
+        phone: '+5581999992222',
+        phoneSearch: '81999992222',
+        appointmentDate,
+        appointmentTime: '09:00',
+        appointmentAttendance: 'missed',
+        followUpContactedAt: new Date().toISOString(),
+        followUpContactedByUid: 'captor-bruno',
+        followUpContactedByName: 'Bruno Captador',
+        followUpContactedAppointmentKey: `${appointmentDate}|09:00`,
+        capturedByUid: 'captor-bruno',
+        capturedByName: 'Bruno Captador',
+        capturedAtClient: new Date().toISOString(),
+        storeId: 'loja-06',
+        notes: '',
+        syncState: 'demo'
+      },
+      {
+        id: 'another-store',
+        fullName: 'Cliente Outra Loja',
+        phone: '+5581999993333',
+        phoneSearch: '81999993333',
+        appointmentDate,
+        appointmentTime: '10:00',
+        appointmentAttendance: 'missed',
+        capturedByUid: 'captor-outra',
+        capturedByName: 'Outra Captadora',
+        storeId: 'loja-02',
+        notes: '',
+        syncState: 'demo'
+      }
+    ]));
+  }, { appointmentDate });
+
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Retornos da equipe/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
+  await expect(page.getByText('Ana Captadora', { exact: true })).toBeVisible();
+  await expect(page.getByText('Bruno Captador', { exact: true })).toBeVisible();
+  await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
+  await expect(page.locator('.status-badge', { hasText: 'Aguardando contato' })).toBeVisible();
+  await expect(page.locator('.status-badge', { hasText: 'Contato iniciado' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Chamar no WhatsApp' })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('manager-team-follow-ups.png'), fullPage: true });
 });
 
 test('configures appointment duration and hides occupied slots', async ({ page }, testInfo) => {
@@ -297,11 +374,14 @@ test('configures appointment duration and hides occupied slots', async ({ page }
     return { helpBottom: help.bottom, inputTop: input.top };
   });
   expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
+  await page.getByLabel('Gerar retorno automaticamente').check();
+  await expect(page.getByLabel('Gerar retorno automaticamente')).toBeChecked();
   await page.getByLabel('Inicio').fill('08:00');
   await page.getByLabel('Fim').fill('18:00');
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   await expect(page.getByText('45 min')).toBeVisible();
+  await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();

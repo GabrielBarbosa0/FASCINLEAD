@@ -73,6 +73,8 @@ service cloud.firestore {
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
+          'followUpContactedAt', 'followUpContactedByUid',
+          'followUpContactedByName', 'followUpContactedAppointmentKey',
           'consentGiven', 'consentAtClient', 'source',
           'capturedAtClient', 'createdAtServer', 'updatedAtServer',
           'capturedByUid', 'capturedByName', 'storeId', 'installationId',
@@ -105,6 +107,14 @@ service cloud.firestore {
           || data.appointmentAttendanceUpdatedAt is timestamp)
         && (!('appointmentAttendanceUpdatedByUid' in data)
           || data.appointmentAttendanceUpdatedByUid is string)
+        && (!('followUpContactedAt' in data)
+          || data.followUpContactedAt is timestamp)
+        && (!('followUpContactedByUid' in data)
+          || (data.followUpContactedByUid is string && data.followUpContactedByUid.size() <= 128))
+        && (!('followUpContactedByName' in data)
+          || (data.followUpContactedByName is string && data.followUpContactedByName.size() <= 120))
+        && (!('followUpContactedAppointmentKey' in data)
+          || (data.followUpContactedAppointmentKey is string && data.followUpContactedAppointmentKey.size() <= 32))
         && (!('appointmentSchedulingMode' in data)
           || data.appointmentSchedulingMode in ['controlled', 'free'])
         && (!('appointmentDurationMinutes' in data)
@@ -163,6 +173,21 @@ service cloud.firestore {
           'appointmentAttendance', 'appointmentAttendanceUpdatedAt',
           'appointmentAttendanceUpdatedByUid', 'updatedAtServer'
         ]);
+    }
+
+    function isCaptorFollowUpContactUpdate() {
+      return activeUser()
+        && userProfile().role == 'captor'
+        && resource.data.capturedByUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'followUpContactedAt', 'followUpContactedByUid',
+          'followUpContactedByName', 'followUpContactedAppointmentKey',
+          'updatedAtServer'
+        ])
+        && request.resource.data.followUpContactedByUid == request.auth.uid
+        && request.resource.data.followUpContactedByName == userProfile().displayName
+        && request.resource.data.followUpContactedAppointmentKey
+          == resource.data.appointmentDate + '|' + resource.data.appointmentTime;
     }
 
     match /allowedEmails/{email} {
@@ -232,7 +257,7 @@ service cloud.firestore {
         && request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate());
+        && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate() || isCaptorFollowUpContactUpdate());
 
       allow delete: if isAdmin();
     }

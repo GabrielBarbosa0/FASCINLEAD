@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
+import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
@@ -187,6 +188,21 @@ export function updateDemoAppointmentAttendance(id, attendance, profile) {
     appointmentAttendance: attendance,
     appointmentAttendanceUpdatedAt: new Date().toISOString(),
     appointmentAttendanceUpdatedByUid: profile.uid
+  };
+  writeDemoLeads(leads);
+  return true;
+}
+
+export function markDemoFollowUpContact(id, profile) {
+  const leads = readDemoLeads();
+  const index = leads.findIndex((lead) => lead.id === id && lead.capturedByUid === profile.uid);
+  if (index === -1) return false;
+  leads[index] = {
+    ...leads[index],
+    followUpContactedAt: new Date().toISOString(),
+    followUpContactedByUid: profile.uid,
+    followUpContactedByName: profile.displayName,
+    followUpContactedAppointmentKey: followUpAppointmentKey(leads[index])
   };
   writeDemoLeads(leads);
   return true;

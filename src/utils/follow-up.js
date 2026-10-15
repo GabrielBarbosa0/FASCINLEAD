@@ -11,17 +11,31 @@ export function followUpAvailableAt(lead, noShowGraceMinutes = DEFAULT_STORE_SCH
   return appointment;
 }
 
-export function missedFollowUps(leads, profile, settings = DEFAULT_STORE_SCHEDULE, now = new Date()) {
-  if (profile?.role !== 'captor') return [];
+export function appointmentFollowUps(leads, profile, settings = DEFAULT_STORE_SCHEDULE, now = new Date()) {
+  if (!['captor', 'manager'].includes(profile?.role)) return [];
   const grace = Number(settings?.noShowGraceMinutes ?? DEFAULT_STORE_SCHEDULE.noShowGraceMinutes);
+  const automaticPending = settings?.automaticPendingFollowUp === true;
   return leads
-    .filter((lead) => lead.capturedByUid === profile.uid && lead.appointmentAttendance === 'missed')
+    .filter((lead) => profile.role === 'captor'
+      ? lead.capturedByUid === profile.uid
+      : lead.storeId === profile.storeId)
+    .filter((lead) => lead.appointmentAttendance === 'missed'
+      || (automaticPending && (!lead.appointmentAttendance || lead.appointmentAttendance === 'pending')))
     .filter((lead) => {
       const availableAt = followUpAvailableAt(lead, grace);
       return availableAt && availableAt.getTime() <= now.getTime();
     })
     .sort((a, b) => String(b.appointmentDate || '').localeCompare(String(a.appointmentDate || ''))
       || String(b.appointmentTime || '').localeCompare(String(a.appointmentTime || '')));
+}
+
+export function followUpAppointmentKey(lead) {
+  return `${lead?.appointmentDate || ''}|${lead?.appointmentTime || ''}`;
+}
+
+export function isFollowUpContacted(lead) {
+  return Boolean(lead?.followUpContactedAt
+    && lead.followUpContactedAppointmentKey === followUpAppointmentKey(lead));
 }
 
 export function buildWhatsAppFollowUpUrl(lead) {
