@@ -9,6 +9,32 @@ export const INTERESTS = [
   { id: 'other', label: 'Outro' }
 ];
 
+export const AMETROPIAS = [
+  { id: 'myopia', label: 'Miopia' },
+  { id: 'hyperopia', label: 'Hipermetropia' },
+  { id: 'astigmatism', label: 'Astigmatismo' },
+  { id: 'presbyopia', label: 'Presbiopia' },
+  { id: 'none', label: 'Nao possui' },
+  { id: 'unknown', label: 'Nao sabe informar' }
+];
+
+function normalizeAmetropias(values) {
+  const requested = Array.isArray(values) ? values : [values].filter(Boolean);
+  const validIds = new Set(AMETROPIAS.map((item) => item.id));
+  const selected = [...new Set(requested.map(String).filter((id) => validIds.has(id)))];
+  if (selected.includes('none')) return ['none'];
+  if (selected.includes('unknown')) return ['unknown'];
+  return selected;
+}
+
+function ametropiaData(input) {
+  const ametropiaIds = normalizeAmetropias(input.ametropiaIds);
+  return {
+    ametropiaIds,
+    ametropiaLabels: ametropiaIds.map((id) => AMETROPIAS.find((item) => item.id === id).label)
+  };
+}
+
 export function validateLeadInput(input) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
@@ -54,6 +80,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
+      ...ametropiaData(input),
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() ? {
@@ -92,6 +119,7 @@ export function createLeadUpdate(input) {
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
+      ...ametropiaData(input),
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() && input.schedulingMode ? {

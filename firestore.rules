@@ -77,6 +77,7 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'ametropiaIds', 'ametropiaLabels',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
@@ -98,6 +99,19 @@ service cloud.firestore {
         && data.phoneSearch.size() <= 11
         && data.notes is string
         && data.notes.size() <= 500
+        && (!('ametropiaIds' in data) || (
+          data.ametropiaIds is list
+          && data.ametropiaIds.size() <= 4
+          && data.ametropiaIds.hasOnly(['myopia', 'hyperopia', 'astigmatism', 'presbyopia', 'none', 'unknown'])
+          && (!data.ametropiaIds.hasAny(['none', 'unknown']) || data.ametropiaIds.size() == 1)
+        ))
+        && (!('ametropiaLabels' in data) || (
+          data.ametropiaLabels is list
+          && data.ametropiaLabels.size() <= 4
+          && data.ametropiaLabels.hasOnly(['Miopia', 'Hipermetropia', 'Astigmatismo', 'Presbiopia', 'Nao possui', 'Nao sabe informar'])
+        ))
+        && (('ametropiaIds' in data) == ('ametropiaLabels' in data))
+        && (!('ametropiaIds' in data) || data.ametropiaIds.size() == data.ametropiaLabels.size())
         && (!('appointmentDate' in data) || (
           data.appointmentDate is string
           && (data.appointmentDate == '' || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
@@ -157,6 +171,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'ametropiaIds', 'ametropiaLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentAttendance', 'notes', 'updatedAtServer'
         ])

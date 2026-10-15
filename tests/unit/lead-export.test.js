@@ -11,6 +11,7 @@ describe('createLeadsCsv', () => {
       phone: '+5581999991234',
       phoneSearch: '81999991234',
       interestLabel: 'Armacao',
+      ametropiaLabels: ['Miopia', 'Astigmatismo'],
       neighborhood: 'Centro',
       city: 'Recife',
       state: 'PE',
@@ -32,6 +33,8 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"Compareceu?"');
     expect(csv).toContain('"14:30";"Sim"');
     expect(csv).toContain('"Captacao em campo"');
+    expect(csv).toContain('"Ametropias"');
+    expect(csv).toContain('"Miopia, Astigmatismo"');
     expect(csv).not.toContain('Consentimento');
   });
 

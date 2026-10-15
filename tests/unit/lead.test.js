@@ -9,6 +9,7 @@ const validInput = {
   city: '',
   state: 'PE',
   interestId: 'complete-glasses',
+  ametropiaIds: ['myopia', 'astigmatism'],
   appointmentDate: '2026-10-02',
   appointmentTime: '14:30',
   notes: ''
@@ -59,6 +60,8 @@ describe('lead validation', () => {
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
       appointmentAttendance: 'pending',
+      ametropiaIds: ['myopia', 'astigmatism'],
+      ametropiaLabels: ['Miopia', 'Astigmatismo'],
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -86,5 +89,15 @@ describe('lead validation', () => {
     expect(result.data).not.toHaveProperty('capturedByUid');
     expect(result.data).not.toHaveProperty('storeId');
     expect(result.data).not.toHaveProperty('capturedAtClient');
+  });
+
+  it('keeps exclusive ametropia answers consistent', () => {
+    const result = createLeadUpdate({
+      ...validInput,
+      ametropiaIds: ['myopia', 'none']
+    });
+
+    expect(result.data.ametropiaIds).toEqual(['none']);
+    expect(result.data.ametropiaLabels).toEqual(['Nao possui']);
   });
 });

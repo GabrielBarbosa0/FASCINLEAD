@@ -24,6 +24,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
+  await page.getByLabel('Miopia').check();
+  await page.getByLabel('Astigmatismo').check();
   await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
   await page.getByLabel('Horario disponivel').selectOption('14:20');
   await page.screenshot({
@@ -41,6 +43,11 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByRole('heading', { name: 'Cliente Exemplo' })).toBeVisible();
   await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
   await expect(page.getByLabel('Horario')).toHaveValue('14:20');
+  await expect(page.getByLabel('Miopia')).toBeChecked();
+  await expect(page.getByLabel('Astigmatismo')).toBeChecked();
+  await page.getByLabel('Nao possui').check();
+  await expect(page.getByLabel('Miopia')).not.toBeChecked();
+  await expect(page.getByLabel('Astigmatismo')).not.toBeChecked();
   await page.screenshot({
     path: testInfo.outputPath('lead-details.png'),
     fullPage: true
@@ -60,6 +67,11 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await expect(page.getByRole('heading', { name: 'Metas' })).toBeVisible();
   await expect(page.getByText('Minhas metas')).toBeVisible();
   await expect(page.getByText('Nenhuma meta cadastrada')).toBeVisible();
+  const personalOrder = await page.evaluate(() => ({
+    goalsTop: document.querySelector('.goals-results').getBoundingClientRect().top,
+    metricsTop: document.querySelector('.goal-metrics').getBoundingClientRect().top
+  }));
+  expect(personalOrder.goalsTop).toBeLessThan(personalOrder.metricsTop);
   await page.screenshot({ path: testInfo.outputPath('goals.png'), fullPage: true });
 
   await page.locator('.goals-results').evaluate((element) => {
@@ -74,6 +86,15 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   });
   await expect(page.locator('.goal-member-option')).toHaveCSS('display', 'grid');
   await expect(page.locator('.goal-member-option > span').last()).toHaveCSS('color', 'rgb(20, 32, 51)');
+  await page.locator('.goals-results').evaluate((element) => {
+    element.insertAdjacentHTML('beforeend', `<div class="goal-person">
+      <span class="avatar">GG</span>
+      <div><strong>Gabriel Gomes Barbosa</strong><span>Loja 02</span></div>
+    </div>`);
+  });
+  await expect(page.locator('.goal-person .avatar')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.goal-person .avatar')).toHaveCSS('align-items', 'center');
+  await expect(page.locator('.goal-person .avatar')).toHaveCSS('justify-items', 'center');
   await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
 

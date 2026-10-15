@@ -95,6 +95,8 @@ describe('lead correction rules', () => {
       phone: '+5581999995678',
       phoneSearch: '81999995678',
       notes: '',
+      ametropiaIds: ['myopia', 'astigmatism'],
+      ametropiaLabels: ['Miopia', 'Astigmatismo'],
       source: 'street',
       schemaVersion: 1,
       capturedByUid: 'captor-uid',
@@ -111,6 +113,17 @@ describe('lead correction rules', () => {
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
       fullName: 'Cliente Corrigido',
       notes: 'Prefere contato pela tarde',
+      ametropiaIds: ['presbyopia'],
+      ametropiaLabels: ['Presbiopia'],
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('rejects contradictory ametropia answers', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      ametropiaIds: ['myopia', 'none'],
+      ametropiaLabels: ['Miopia', 'Nao possui'],
       updatedAtServer: Timestamp.now()
     }));
   });

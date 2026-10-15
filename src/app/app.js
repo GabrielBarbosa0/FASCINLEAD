@@ -52,7 +52,7 @@ import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscr
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { INTERESTS } from '../utils/lead.js';
+import { AMETROPIAS, INTERESTS } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
@@ -488,6 +488,30 @@ function appointmentTimeField() {
   </div>`;
 }
 
+function ametropiaOptions(selectedIds = []) {
+  return AMETROPIAS.map((item) => `<label class="ametropia-option checkbox-label">
+    <input type="checkbox" name="ametropiaIds" value="${item.id}" ${selectedIds.includes(item.id) ? 'checked' : ''} />
+    <span>${item.label}</span>
+  </label>`).join('');
+}
+
+function leadFormValues(form) {
+  const formData = new FormData(form);
+  return { ...Object.fromEntries(formData), ametropiaIds: formData.getAll('ametropiaIds') };
+}
+
+function bindAmetropiaOptions(form) {
+  const inputs = [...form.querySelectorAll('[name="ametropiaIds"]')];
+  inputs.forEach((input) => input.addEventListener('change', () => {
+    if (!input.checked) return;
+    const exclusive = ['none', 'unknown'];
+    inputs.forEach((other) => {
+      if (other === input) return;
+      if (exclusive.includes(input.value) || exclusive.includes(other.value)) other.checked = false;
+    });
+  }));
+}
+
 function newLeadView() {
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   return `
@@ -521,6 +545,11 @@ function newLeadView() {
         <label for="interestId">Interesse principal</label>
         <select id="interestId" name="interestId">${interests}</select>
       </div>
+      <fieldset class="field ametropia-field">
+        <legend>Ametropias</legend>
+        <small>Marque todas que se aplicam.</small>
+        <div class="ametropia-options">${ametropiaOptions()}</div>
+      </fieldset>
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
@@ -666,6 +695,11 @@ function leadDetailView() {
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" /></div>
       </div>
       <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId">${interests}</select></div>
+      <fieldset class="field ametropia-field">
+        <legend>Ametropias</legend>
+        <small>Marque todas que se aplicam.</small>
+        <div class="ametropia-options">${ametropiaOptions(lead.ametropiaIds || [])}</div>
+      </fieldset>
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
         <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
@@ -1014,6 +1048,15 @@ function goalsView() {
       <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
       <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="target"></i><span>${saving ? 'Criando...' : 'Criar metas'}</span></button>
     </form>` : '';
+  const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
+      <div><span>Metas</span><strong>${records.length}</strong></div>
+      <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
+      <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
+    </section>`;
+  const results = `<section class="goals-results" aria-busy="${loading}">
+      <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${records.length} meta(s)</span></div></div>
+      ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
+    </section>`;
 
   return `
     <section class="management-heading goals-heading">
@@ -1022,18 +1065,9 @@ function goalsView() {
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
-    <section class="goal-metrics" aria-label="Resumo das metas">
-      <div><span>Metas</span><strong>${records.length}</strong></div>
-      <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
-      <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
-    </section>
-    <section class="goals-layout ${canManage() ? '' : 'goals-layout-personal'}">
-      ${creator}
-      <section class="goals-results" aria-busy="${loading}">
-        <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${records.length} meta(s)</span></div></div>
-        ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
-      </section>
-    </section>
+    ${canManage()
+      ? `${metrics}<section class="goals-layout">${creator}${results}</section>`
+      : `<section class="personal-goals">${results}<h2 class="personal-goals-summary">Resumo</h2>${metrics}</section>`}
     ${selectedGoal ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
       <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta de ${escapeHtml(selectedGoal.assigneeName)} sera excluida. As captacoes permanecem intactas.</p></div>
@@ -1154,9 +1188,10 @@ function bindPageEvents() {
       state.newLeadSchedule.appointmentDate = appointmentDateInput.value;
       startDayAppointmentsSubscription();
     });
+    bindAmetropiaOptions(form);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = Object.fromEntries(new FormData(form));
+      const values = leadFormValues(form);
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
         const selectedSlot = buildAppointmentSlots(state.newLeadSchedule.settings, state.newLeadSchedule.appointments)
@@ -1202,9 +1237,10 @@ function bindPageEvents() {
     const notesInput = editLeadForm.elements.notes;
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
+    bindAmetropiaOptions(editLeadForm);
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = Object.fromEntries(new FormData(editLeadForm));
+      const values = leadFormValues(editLeadForm);
       const submitButton = editLeadForm.querySelector('[type="submit"]');
       submitButton.disabled = true;
 
