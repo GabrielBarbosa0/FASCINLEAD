@@ -29,7 +29,7 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 
 - CRM completo, funil comercial ou automacao de vendas.
 - Atendimento ou campanhas pelo WhatsApp.
-- Confirmacoes automaticas ou lembretes de consultas e exames. O pre-agendamento opcional do lead pode ser consultado em uma agenda mensal gerencial.
+- Confirmacoes automaticas antes de consultas e exames. O pre-agendamento pode ser consultado na agenda, e faltas confirmadas geram retorno interno para o captador.
 - Anamnese, recomendacao de lentes ou provador virtual.
 - Metas de vendas, comissoes, faturamento ou conciliacao de vendas. Metas de quantidade de leads captados estao no escopo.
 - Integracao com Savwin, AppOk ou outros sistemas externos.
@@ -158,7 +158,9 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Enquanto a agenda estiver aberta, novos pre-agendamentos e alteracoes aparecem em tempo real, sem recarregar a pagina.
 - Gestores podem marcar cada agendamento como `Compareceu` ou `Nao compareceu`; enquanto nenhuma opcao for escolhida, o estado e `Aguardando`.
 - A alteracao de comparecimento registra data e usuario responsavel e nao concede ao gestor permissao para editar os demais dados do lead.
-- A agenda reutiliza os campos do lead e nao cria uma segunda fonte de dados, confirmacoes automaticas ou lembretes.
+- A agenda reutiliza os campos do lead e nao cria uma segunda fonte de dados.
+- Uma falta aparece em `Retornos` somente para o captador responsavel depois da tolerancia configurada para a loja.
+- O retorno oferece uma mensagem pronta no WhatsApp e desaparece quando o cliente e reagendado.
 - A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
 - Administradores configuram por loja o modo controlado ou livre, a duracao da consulta e o inicio e fim do expediente.
 - O modo controlado e o padrao e oferece ao captador somente intervalos livres que caibam integralmente no expediente.
@@ -282,7 +284,8 @@ FASCINLEAD/
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
 7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
 8. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
-9. `Configuracoes`: modo de agenda, duracao da consulta e expediente por loja, restritos a administradores.
+9. `Retornos`: faltas vencidas do proprio captador e acesso ao WhatsApp para reagendamento.
+10. `Configuracoes`: modo de agenda, duracao da consulta, expediente e tolerancia para faltas por loja, restritos a administradores.
 
 ### 6.2 Navegacao mobile
 

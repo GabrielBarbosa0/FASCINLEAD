@@ -119,13 +119,26 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     const leads = readDemoLeads();
     const index = leads.findIndex((lead) => lead.id === id);
     if (index === -1) return { isValid: false, errors: {}, notFound: true };
-    leads[index] = { ...leads[index], ...result.data, syncState: 'demo', fromCache: true };
+    const appointmentChanged = leads[index].appointmentDate !== result.data.appointmentDate
+      || leads[index].appointmentTime !== result.data.appointmentTime;
+    leads[index] = {
+      ...leads[index],
+      ...result.data,
+      ...(appointmentChanged && leads[index].appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
+      syncState: 'demo',
+      fromCache: true
+    };
     writeDemoLeads(leads);
     return { ...result, id };
   }
 
+  const appointmentChanged = existingLead && (
+    existingLead.appointmentDate !== result.data.appointmentDate
+    || existingLead.appointmentTime !== result.data.appointmentTime
+  );
   const leadUpdate = {
     ...result.data,
+    ...(appointmentChanged && existingLead.appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
   const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'

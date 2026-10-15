@@ -211,6 +211,34 @@ describe('appointment calendar queries', () => {
       updatedAtServer: Timestamp.now()
     }));
   });
+
+  it('lets the owning captor clear a missed status only while rescheduling', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'leads', 'lead-test'), {
+        appointmentAttendance: 'missed'
+      });
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentDate: '2026-10-20',
+      appointmentTime: '10:00',
+      appointmentAttendance: 'pending',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('does not let the owning captor clear a missed status without rescheduling', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'leads', 'lead-test'), {
+        appointmentAttendance: 'missed'
+      });
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentAttendance: 'pending',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
 });
 
 describe('store schedule settings', () => {
@@ -219,6 +247,7 @@ describe('store schedule settings', () => {
     await assertSucceeds(setDoc(doc(db, 'stores', 'loja-06'), {
       schedulingMode: 'controlled',
       appointmentDurationMinutes: 20,
+      noShowGraceMinutes: 30,
       openingTime: '08:00',
       closingTime: '18:00'
     }, { merge: true }));

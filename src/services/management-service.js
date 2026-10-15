@@ -73,6 +73,11 @@ export async function updateManagementLead(profile, lead, input) {
   const newSlotId = newControlled ? `slot-${lead.storeId}-${validation.data.appointmentDate}-${validation.data.appointmentTime}` : '';
   const update = {
     ...validation.data,
+    ...((lead.appointmentDate !== validation.data.appointmentDate
+      || lead.appointmentTime !== validation.data.appointmentTime)
+      && lead.appointmentAttendance === 'missed'
+      ? { appointmentAttendance: 'pending' }
+      : {}),
     updatedAtServer: serverTimestamp()
   };
   if (oldSlotId !== newSlotId && (oldSlotId || newSlotId)) {

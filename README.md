@@ -47,6 +47,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - agenda mensal dos pre-agendamentos para gestores e administradores;
 - atualizacao dinamica da agenda enquanto novos pre-agendamentos sao sincronizados;
 - registro direto de comparecimento ou falta pela equipe gerencial;
+- retorno de faltas para o captador responsavel, com tolerancia por loja e mensagem pronta no WhatsApp;
 - configuracao administrativa da duracao e do expediente de exames por loja;
 - oferta de horarios livres no cadastro, com bloqueio dos intervalos ja ocupados;
 - instalacao como PWA em celular e desktop.
@@ -77,7 +78,8 @@ O FascinLead nao tera, no MVP:
 | Sincronizacao | Exibir contagens, erros e acao de envio manual |
 | Gestao | Filtrar, acompanhar e exportar registros autorizados |
 | Agenda | Visualizar por mes os pre-agendamentos autorizados para o perfil |
-| Configuracoes | Definir agenda controlada ou livre, duracao e expediente por loja |
+| Retornos | Acompanhar faltas vencidas e iniciar o reagendamento pelo WhatsApp |
+| Configuracoes | Definir agenda controlada ou livre, duracao, expediente e tolerancia para faltas por loja |
 | Metas | Criar metas de captacao e acompanhar o progresso permitido ao perfil |
 
 ## Arquitetura

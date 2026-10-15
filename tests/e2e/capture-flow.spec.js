@@ -77,6 +77,44 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
 
+test('keeps management actions and filters organized at intermediate widths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chrome', 'Uses a controlled intermediate desktop viewport.');
+  await page.setViewportSize({ width: 1120, height: 820 });
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Painel de gestao/ }).click();
+  await expect(page.getByRole('heading', { name: 'Painel de leads' })).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const heading = document.querySelector('.management-dashboard-heading').getBoundingClientRect();
+    const copy = document.querySelector('.management-heading-copy').getBoundingClientRect();
+    const actions = document.querySelector('.management-heading-actions').getBoundingClientRect();
+    const filter = document.querySelector('.management-filters').getBoundingClientRect();
+    const search = document.querySelector('.management-search-field').getBoundingClientRect();
+    const filterButton = document.querySelector('.management-filter-button').getBoundingClientRect();
+    const actionButtons = [...document.querySelectorAll('.management-heading-actions .button')]
+      .map((button) => button.getBoundingClientRect());
+    return {
+      headingRight: heading.right,
+      copyBottom: copy.bottom,
+      actionsTop: actions.top,
+      filterRight: filter.right,
+      searchWidth: search.width,
+      filterButtonWidth: filterButton.width,
+      actionButtonsRight: Math.max(...actionButtons.map((button) => button.right)),
+      actionRows: new Set(actionButtons.map((button) => Math.round(button.top))).size
+    };
+  });
+
+  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.copyBottom);
+  expect(layout.actionButtonsRight).toBeLessThanOrEqual(layout.headingRight + 1);
+  expect(layout.actionRows).toBe(2);
+  expect(layout.searchWidth).toBeGreaterThan(layout.filterButtonWidth * 2);
+  expect(layout.filterButtonWidth).toBeGreaterThanOrEqual(160);
+  expect(layout.filterRight).toBeLessThanOrEqual(1120);
+  await page.screenshot({ path: testInfo.outputPath('management-responsive.png'), fullPage: true });
+});
+
 test('groups appointments by day and registers attendance', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -178,6 +216,71 @@ test('keeps a long appointment list inside the calendar height', async ({ page }
   await page.screenshot({ path: testInfo.outputPath('appointments-scroll.png'), fullPage: true });
 });
 
+test('alerts the captor about a missed appointment and prepares WhatsApp follow-up', async ({ page }, testInfo) => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const missedDate = yesterday.toISOString().slice(0, 10);
+  const futureDate = tomorrow.toISOString().slice(0, 10);
+
+  await page.evaluate(({ missedDate, futureDate }) => {
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
+      {
+        id: 'missed-owned-lead',
+        fullName: 'Cliente Retorno',
+        preferredName: 'Clara',
+        phone: '+5581999991234',
+        phoneSearch: '81999991234',
+        appointmentDate: missedDate,
+        appointmentTime: '08:00',
+        appointmentAttendance: 'missed',
+        appointmentSchedulingMode: 'controlled',
+        appointmentDurationMinutes: 20,
+        capturedByUid: 'demo-user',
+        capturedByName: 'Equipe Fascinante',
+        capturedAtClient: new Date().toISOString(),
+        storeId: 'loja-teste',
+        notes: '',
+        syncState: 'demo'
+      },
+      {
+        id: 'future-missed-lead',
+        fullName: 'Cliente Futuro',
+        phone: '+5581999999999',
+        phoneSearch: '81999999999',
+        appointmentDate: futureDate,
+        appointmentTime: '08:00',
+        appointmentAttendance: 'missed',
+        capturedByUid: 'demo-user',
+        capturedByName: 'Equipe Fascinante',
+        storeId: 'loja-teste',
+        notes: '',
+        syncState: 'demo'
+      }
+    ]));
+  }, { missedDate, futureDate });
+
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await expect(page.getByRole('button', { name: /Retornos pendentes/ })).toContainText('1 cliente');
+  await page.getByRole('button', { name: /Retornos pendentes/ }).click();
+  await expect(page.getByRole('heading', { name: 'Retornos pendentes' })).toBeVisible();
+  await expect(page.getByText('Cliente Retorno', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Futuro', { exact: true })).not.toBeVisible();
+
+  const whatsAppLink = page.getByRole('link', { name: 'Chamar no WhatsApp' });
+  await expect(whatsAppLink).toHaveAttribute('href', /wa\.me\/5581999991234/);
+  await expect(whatsAppLink).toHaveAttribute('href', /reagendar/);
+  await page.screenshot({ path: testInfo.outputPath('missed-follow-up.png'), fullPage: true });
+
+  await page.getByRole('button', { name: 'Reagendar' }).click();
+  await page.getByLabel('Data do pre-agendamento').fill(futureDate);
+  await page.getByLabel('Horario').fill('10:00');
+  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await page.getByRole('button', { name: 'Retornos', exact: true }).click();
+  await expect(page.getByText('Nenhum retorno pendente')).toBeVisible();
+});
+
 test('configures appointment duration and hides occupied slots', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -186,10 +289,19 @@ test('configures appointment duration and hides occupied slots', async ({ page }
 
   await page.getByLabel('Loja').selectOption('loja-06');
   await page.getByLabel('Duracao da consulta').fill('30');
+  const graceInput = page.getByLabel('Tolerancia apos o horario');
+  await graceInput.fill('45');
+  const graceLayout = await page.evaluate(() => {
+    const help = document.querySelector('#settings-no-show-help').getBoundingClientRect();
+    const input = document.querySelector('#settings-no-show-grace').getBoundingClientRect();
+    return { helpBottom: help.bottom, inputTop: input.top };
+  });
+  expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
   await page.getByLabel('Inicio').fill('08:00');
   await page.getByLabel('Fim').fill('18:00');
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
+  await expect(page.getByText('45 min')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();

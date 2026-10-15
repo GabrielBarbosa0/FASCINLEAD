@@ -6,6 +6,7 @@ describe('store schedule helpers', () => {
     expect(normalizeStoreSchedule({})).toEqual({
       schedulingMode: 'controlled',
       appointmentDurationMinutes: 20,
+      noShowGraceMinutes: 30,
       openingTime: '08:00',
       closingTime: '18:00'
     });
@@ -57,5 +58,15 @@ describe('store schedule helpers', () => {
       openingTime: '18:00',
       closingTime: '08:00'
     })).toMatchObject({ isValid: false, errors: { closingTime: expect.any(String) } });
+  });
+
+  it('validates the no-show follow-up grace period', () => {
+    expect(validateStoreSchedule({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      noShowGraceMinutes: 241,
+      openingTime: '08:00',
+      closingTime: '18:00'
+    })).toMatchObject({ isValid: false, errors: { noShowGraceMinutes: expect.any(String) } });
   });
 });
