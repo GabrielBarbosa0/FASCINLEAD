@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, query, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 const projectId = 'demo-fascinlead-leads';
 let testEnvironment;
@@ -59,6 +59,8 @@ beforeEach(async () => {
         phone: '+5581999991234',
         phoneSearch: '81999991234',
         notes: '',
+        appointmentDate: '2026-10-15',
+        appointmentTime: '09:30',
         consentGiven: true,
         source: 'street',
         schemaVersion: 1,
@@ -144,5 +146,69 @@ describe('lead correction rules', () => {
   it('rejects lead deletion by a manager', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     await assertFails(deleteDoc(doc(db, 'leads', 'lead-test')));
+  });
+});
+
+describe('appointment calendar queries', () => {
+  it('lets a manager query appointments only from their own store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const appointments = query(
+      collection(db, 'leads'),
+      where('storeId', '==', 'loja-06'),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    );
+    await assertSucceeds(getDocs(appointments));
+  });
+
+  it('rejects an unscoped appointment query by a manager', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const appointments = query(
+      collection(db, 'leads'),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    );
+    await assertFails(getDocs(appointments));
+  });
+
+  it('lets an administrator query appointments from all stores', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    const appointments = query(
+      collection(db, 'leads'),
+      where('appointmentDate', '>=', '2026-10-01'),
+      where('appointmentDate', '<=', '2026-10-31')
+    );
+    await assertSucceeds(getDocs(appointments));
+  });
+
+  it('lets a manager register attendance for an appointment in their store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentAttendance: 'attended',
+      appointmentAttendanceUpdatedAt: Timestamp.now(),
+      appointmentAttendanceUpdatedByUid: 'manager-uid',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('does not let a manager edit customer data while registering attendance', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      fullName: 'Alteracao indevida pelo gestor',
+      appointmentAttendance: 'attended',
+      appointmentAttendanceUpdatedAt: Timestamp.now(),
+      appointmentAttendanceUpdatedByUid: 'manager-uid',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('does not let a captor change attendance directly', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentAttendance: 'missed',
+      appointmentAttendanceUpdatedAt: Timestamp.now(),
+      appointmentAttendanceUpdatedByUid: 'captor-uid',
+      updatedAtServer: Timestamp.now()
+    }));
   });
 });

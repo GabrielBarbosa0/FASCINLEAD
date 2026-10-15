@@ -70,7 +70,8 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
-          'appointmentDate', 'appointmentTime', 'notes',
+          'appointmentDate', 'appointmentTime', 'appointmentAttendance',
+          'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
           'consentGiven', 'consentAtClient', 'source',
           'capturedAtClient', 'createdAtServer', 'updatedAtServer',
           'capturedByUid', 'capturedByName', 'storeId', 'installationId',
@@ -97,8 +98,35 @@ service cloud.firestore {
         ))
         && (!('appointmentDate' in data) || !('appointmentTime' in data)
           || ((data.appointmentDate == '') == (data.appointmentTime == '')))
+        && (!('appointmentAttendance' in data)
+          || data.appointmentAttendance in ['pending', 'attended', 'missed'])
+        && (!('appointmentAttendanceUpdatedAt' in data)
+          || data.appointmentAttendanceUpdatedAt is timestamp)
+        && (!('appointmentAttendanceUpdatedByUid' in data)
+          || data.appointmentAttendanceUpdatedByUid is string)
         && data.source == 'street'
         && data.schemaVersion == 1;
+    }
+
+    function isCaptorLeadCorrection() {
+      return activeUser()
+        && resource.data.capturedByUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'fullName', 'preferredName', 'phone', 'phoneSearch',
+          'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'appointmentDate', 'appointmentTime', 'notes', 'updatedAtServer'
+        ]);
+    }
+
+    function isManagerAttendanceUpdate() {
+      return isManager()
+        && resource.data.storeId == userProfile().storeId
+        && resource.data.appointmentDate is string
+        && resource.data.appointmentDate != ''
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'appointmentAttendance', 'appointmentAttendanceUpdatedAt',
+          'appointmentAttendanceUpdatedByUid', 'updatedAtServer'
+        ]);
     }
 
     match /allowedEmails/{email} {
@@ -168,8 +196,7 @@ service cloud.firestore {
         && request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdmin()
-          || (activeUser() && resource.data.capturedByUid == request.auth.uid));
+        && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate());
 
       allow delete: if isAdmin();
     }

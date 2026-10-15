@@ -114,6 +114,22 @@ export function updateLead(id, input, demoMode, onRemoteError) {
   return { ...result, id, writePromise };
 }
 
+export function updateDemoAppointmentAttendance(id, attendance, profile) {
+  const allowed = new Set(['pending', 'attended', 'missed']);
+  if (!allowed.has(attendance)) return false;
+  const leads = readDemoLeads();
+  const index = leads.findIndex((lead) => lead.id === id);
+  if (index === -1) return false;
+  leads[index] = {
+    ...leads[index],
+    appointmentAttendance: attendance,
+    appointmentAttendanceUpdatedAt: new Date().toISOString(),
+    appointmentAttendanceUpdatedByUid: profile.uid
+  };
+  writeDemoLeads(leads);
+  return true;
+}
+
 export async function synchronizeNow(demoMode) {
   if (demoMode || !isFirebaseConfigured) return { demo: true };
   await enableNetwork(db);

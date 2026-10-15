@@ -35,7 +35,7 @@ O FascinLead **nao e um CRM completo**. Nao ampliar o projeto silenciosamente pa
 
 - funil de vendas;
 - atendimento ou disparos pelo WhatsApp;
-- agenda centralizada, confirmacoes ou lembretes de consultas e exames; o lead pode registrar apenas um pre-agendamento opcional;
+- confirmacoes automaticas ou lembretes de consultas e exames; o lead registra um pre-agendamento opcional, exibido aos gestores em uma agenda mensal;
 - anamnese;
 - recomendacao de lentes;
 - provador virtual;
@@ -191,6 +191,9 @@ As colecoes iniciais previstas sao:
 - `interests`: opcoes ativas de interesse;
 - `leads`: pre-cadastros captados.
 - `goals`: metas individuais de quantidade de leads atribuidas a captadores.
+
+A agenda gerencial nao cria uma colecao propria: ela consulta `appointmentDate` e `appointmentTime` nos documentos de `leads` para manter uma unica fonte de verdade.
+Gestores podem atualizar somente o estado de comparecimento dos pre-agendamentos da propria loja; essa permissao nao se estende aos demais campos do lead.
 
 O modelo detalhado, os campos e os indices estao em [`docs/TDD.md`](docs/TDD.md). Nao renomeie colecoes, mude tipos ou introduza campos obrigatorios sem avaliar:
 

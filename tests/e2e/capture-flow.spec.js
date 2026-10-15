@@ -76,3 +76,50 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await expect(page.locator('.goal-member-option > span').last()).toHaveCSS('color', 'rgb(20, 32, 51)');
   await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
+
+test('groups appointments by day and registers attendance', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  await expect(page.getByText('Nenhum exame neste dia')).toBeVisible();
+
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const appointmentDate = `${now.getFullYear()}-${month}-18`;
+  const nextDate = `${now.getFullYear()}-${month}-19`;
+
+  async function createAppointment(name, date, time) {
+    await page.getByRole('button', { name: 'Novo', exact: true }).click();
+    await page.getByLabel('Nome *').fill(name);
+    await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+    await page.getByLabel('Data do pre-agendamento').fill(date);
+    await page.getByLabel('Horario').fill(time);
+    await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+    await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  }
+
+  await createAppointment('Cliente Agenda A', appointmentDate, '08:30');
+  await createAppointment('Cliente Agenda B', appointmentDate, '10:00');
+  await createAppointment('Cliente Outro Dia', nextDate, '09:00');
+
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  const selectedDay = page.locator(`[data-appointment-date="${appointmentDate}"]`);
+  await expect(selectedDay).toContainText('2 exames');
+  await selectedDay.click();
+  await expect(page.getByText('Cliente Agenda A', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Agenda B', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Outro Dia', { exact: true })).not.toBeVisible();
+
+  const attendance = page.getByRole('group', { name: 'Comparecimento de Cliente Agenda A' });
+  await attendance.getByRole('button', { name: 'Compareceu', exact: true }).click();
+  await expect(attendance.getByRole('button', { name: 'Compareceu', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Comparecimento registrado.')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('appointments-attendance.png'), fullPage: true });
+
+  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  await page.locator(`[data-appointment-date="${appointmentDate}"]`).click();
+  const persistedAttendance = page.getByRole('group', { name: 'Comparecimento de Cliente Agenda A' });
+  await expect(persistedAttendance.getByRole('button', { name: 'Compareceu', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});

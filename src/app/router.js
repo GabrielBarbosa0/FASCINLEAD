@@ -1,4 +1,4 @@
-const VALID_ROUTES = new Set(['home', 'new', 'leads', 'lead', 'sync', 'management', 'management-lead', 'access', 'goals']);
+const VALID_ROUTES = new Set(['home', 'new', 'leads', 'lead', 'sync', 'management', 'management-lead', 'appointments', 'access', 'goals']);
 
 function routeParts() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);

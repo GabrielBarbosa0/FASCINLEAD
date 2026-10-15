@@ -2,9 +2,12 @@ import {
   ArrowLeft,
   BarChart3,
   Building2,
+  CalendarDays,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   CircleCheck,
+  CircleX,
   CirclePlus,
   ClipboardList,
   ClipboardX,
@@ -37,25 +40,31 @@ import {
 } from 'lucide';
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
-import { saveLead, subscribeToLeads, synchronizeNow, updateLead } from '../services/lead-service.js';
+import { saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
+import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
+import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
 import { STORES } from '../utils/stores.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
+const DEMO_ROLE_KEY = 'fascinlead:demo-role';
 
 const appIcons = {
   ArrowLeft,
   BarChart3,
   Building2,
+  CalendarDays,
+  ChevronLeft,
   ChevronRight,
   CircleAlert,
   CircleCheck,
+  CircleX,
   CirclePlus,
   ClipboardList,
   ClipboardX,
@@ -97,6 +106,7 @@ const state = {
   toast: null,
   search: '',
   unsubscribeLeads: null,
+  unsubscribeAppointments: null,
   updateAction: null,
   management: {
     loading: false,
@@ -107,6 +117,17 @@ const state = {
     page: 1,
     pageSize: 20,
     filters: createDefaultManagementFilters()
+  },
+  appointments: {
+    loading: false,
+    loaded: false,
+    error: '',
+    records: [],
+    truncated: false,
+    updatingId: '',
+    month: monthKeyFromDate(),
+    storeId: '',
+    selectedDate: toLocalDateInput(new Date())
   },
   access: {
     loading: false,
@@ -218,6 +239,12 @@ function formatGoalDate(value) {
   return new Intl.DateTimeFormat('pt-BR').format(new Date(`${value}T12:00:00`));
 }
 
+function formatAppointmentDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponivel';
+  return new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
+    .format(new Date(`${value}T12:00:00`));
+}
+
 function filteredManagementRecords() {
   const { records, filters } = state.management;
   const search = filters.search.trim().toLowerCase();
@@ -271,7 +298,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'access', 'goals'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'appointments', 'access', 'goals'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
@@ -332,6 +359,11 @@ function homeView() {
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
         <span class="action-icon"><i data-lucide="bar-chart-3"></i></span>
         <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>` : ''}
+      ${canManage() ? `<button class="action-card" type="button" data-route="appointments">
+        <span class="action-icon"><i data-lucide="calendar-days"></i></span>
+        <span><strong>Agenda de exames</strong><small>Visualizar os pre-agendamentos</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       <button class="action-card" type="button" data-route="goals">
@@ -427,7 +459,9 @@ function leadDetailView() {
       <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar leads da equipe.</span></div>`;
   }
 
-  const source = managementMode ? state.management.records : state.leads;
+  const source = managementMode
+    ? [...state.management.records, ...state.appointments.records]
+    : state.leads;
   const lead = source.find((item) => item.id === currentRouteParam());
   const backRoute = managementMode ? 'management' : 'leads';
   if (!lead) {
@@ -536,6 +570,7 @@ function managementView() {
     <section class="management-heading">
       <div><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
       <div class="management-heading-actions">
+        <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
       </div>
@@ -559,6 +594,88 @@ function managementView() {
       <div><i data-lucide="building-2"></i><span>Lojas</span><strong>${new Set(filtered.map((lead) => lead.storeId)).size}</strong></div>
     </section>
     <section class="management-results" aria-busy="${loading}">${results}</section>`;
+}
+
+function appointmentsView() {
+  if (!canManage()) {
+    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Agenda de exames</h1></section>
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso a agenda gerencial.</span></div>`;
+  }
+
+  const { loading, error, truncated, month, storeId, selectedDate, updatingId } = state.appointments;
+  const records = state.demoMode
+    ? state.leads.filter((lead) => String(lead.appointmentDate || '').startsWith(`${month}-`))
+    : state.appointments.records;
+  const groups = appointmentsByDate(records);
+  const days = calendarDays(month);
+  const selected = groups[selectedDate] || [];
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const cells = days.map((day) => {
+    const items = groups[day.date] || [];
+    const first = items[0];
+    const classes = [
+      'calendar-day',
+      day.inCurrentMonth ? '' : 'is-outside',
+      day.isToday ? 'is-today' : '',
+      day.date === selectedDate ? 'is-selected' : '',
+      items.length ? 'has-appointments' : ''
+    ].filter(Boolean).join(' ');
+    return `<button class="${classes}" type="button" data-appointment-date="${day.date}" aria-label="${day.day} de ${escapeHtml(formatMonthLabel(month))}, ${items.length} agendamento(s)">
+      <span class="calendar-day-number">${day.day}</span>
+      ${items.length ? `<span class="calendar-count"><strong>${items.length}</strong><span> ${items.length === 1 ? 'exame' : 'exames'}</span></span>
+        <span class="calendar-preview">${escapeHtml(first.appointmentTime)} · ${escapeHtml(first.preferredName || first.fullName)}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  const selectedItems = selected.length
+    ? selected.map((lead) => {
+      const attendance = lead.appointmentAttendance || 'pending';
+      const updating = updatingId === lead.id;
+      return `<article class="appointment-item">
+        <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
+        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small></div>
+        <div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
+          <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
+          <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Nao compareceu</span></button>
+        </div>
+        ${isAdmin() ? `<button class="icon-button appointment-open" type="button" data-appointment-lead-id="${escapeHtml(lead.id)}" title="Abrir cadastro" aria-label="Abrir cadastro de ${escapeHtml(lead.fullName)}"><i data-lucide="chevron-right"></i></button>` : ''}
+      </article>`;
+    }).join('')
+    : `<div class="agenda-empty"><i data-lucide="calendar-days"></i><strong>Nenhum exame neste dia</strong><p>Selecione uma data destacada no calendario.</p></div>`;
+
+  const storeTotals = STORES
+    .map((store) => ({ ...store, count: records.filter((lead) => lead.storeId === store.id).length }))
+    .filter((store) => !storeId || store.id === storeId)
+    .map((store) => `<div class="agenda-store-row"><span><i data-lucide="building-2"></i>${store.label}</span><strong>${store.count} exame(s)</strong></div>`)
+    .join('');
+
+  return `<section class="management-heading agenda-heading">
+      <div><p class="eyebrow">EXAMES</p><h1>Agenda de exames</h1><p>Visualize os pre-agendamentos registrados pela equipe.</p></div>
+      <button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+    </section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A agenda atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} exames neste mes.</span></div>` : ''}
+    <section class="agenda-layout" aria-busy="${loading}">
+      <div class="calendar-panel">
+        <div class="calendar-toolbar">
+          <div class="calendar-navigation">
+            <button class="icon-button" type="button" data-appointment-month="-1" aria-label="Mes anterior"><i data-lucide="chevron-left"></i></button>
+            <h2>${escapeHtml(formatMonthLabel(month))}</h2>
+            <button class="icon-button" type="button" data-appointment-month="1" aria-label="Proximo mes"><i data-lucide="chevron-right"></i></button>
+          </div>
+          <div class="calendar-toolbar-actions">
+            ${isAdmin() ? `<label class="calendar-store-filter"><span>Unidade</span><select id="appointments-store"><option value="">Todas as lojas</option>${storeOptions}</select></label>` : ''}
+            <button class="button button-secondary calendar-today" type="button" data-action="appointments-today">Hoje</button>
+          </div>
+        </div>
+        <div class="calendar-weekdays" aria-hidden="true"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sab</span></div>
+        ${loading ? '<div class="calendar-loading"><i data-lucide="refresh-cw"></i><span>Carregando agenda...</span></div>' : `<div class="calendar-grid">${cells}</div>`}
+      </div>
+      <aside class="agenda-sidebar">
+        <section class="agenda-summary"><div class="agenda-section-title"><i data-lucide="building-2"></i><h2>Unidades</h2></div>${storeTotals}</section>
+        <section class="agenda-day-details"><div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div><div class="appointment-list">${selectedItems}</div></section>
+      </aside>
+    </section>`;
 }
 
 function accessView() {
@@ -722,15 +839,15 @@ function bottomNav() {
   ];
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   return `<nav class="bottom-nav ${canManage() ? 'has-management' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && state.route === 'management-lead') ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && state.route === 'management-lead') ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, access: accessView, goals: goalsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, appointments: appointmentsView, access: accessView, goals: goalsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'access', 'goals'].includes(state.route);
+  const wideLayout = ['management', 'appointments', 'access', 'goals'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -825,6 +942,9 @@ function bindPageEvents() {
           state.management.records = state.management.records.map((lead) => lead.id === editLeadForm.dataset.leadId
             ? { ...lead, ...result.data }
             : lead);
+          state.appointments.records = state.appointments.records.map((lead) => lead.id === editLeadForm.dataset.leadId
+            ? { ...lead, ...result.data }
+            : lead);
           navigate('management');
           showToast('Lead atualizado com sucesso.');
         } catch (error) {
@@ -895,6 +1015,13 @@ function bindPageEvents() {
       });
     });
   }
+
+  const appointmentsStore = document.querySelector('#appointments-store');
+  appointmentsStore?.addEventListener('change', () => {
+    state.appointments.storeId = appointmentsStore.value;
+    state.appointments.loaded = false;
+    startAppointmentsSubscription();
+  });
 
   const accessForm = document.querySelector('#access-form');
   if (accessForm) {
@@ -1042,6 +1169,47 @@ function ensureManagementData() {
   }
 }
 
+function stopAppointmentsSubscription() {
+  state.unsubscribeAppointments?.();
+  state.unsubscribeAppointments = null;
+}
+
+function startAppointmentsSubscription() {
+  if (!canManage() || state.demoMode || state.route !== 'appointments') return;
+  stopAppointmentsSubscription();
+  state.appointments.loading = true;
+  state.appointments.loaded = false;
+  state.appointments.error = '';
+  render();
+  state.unsubscribeAppointments = subscribeToAppointments(
+    state.profile,
+    state.appointments.month,
+    state.appointments.storeId,
+    (result) => {
+      state.appointments.records = result.records;
+      state.appointments.truncated = result.truncated;
+      state.appointments.loaded = true;
+      state.appointments.loading = false;
+      render();
+    },
+    (error) => {
+      state.appointments.error = error?.code === 'permission-denied'
+        ? 'Seu perfil nao possui permissao para consultar esta agenda.'
+        : 'Nao foi possivel acompanhar a agenda. Verifique a conexao e tente novamente.';
+      state.appointments.loading = false;
+      state.appointments.loaded = false;
+      stopAppointmentsSubscription();
+      render();
+    }
+  );
+}
+
+function ensureAppointmentsData() {
+  if (state.route === 'appointments' && canManage() && !state.demoMode && !state.unsubscribeAppointments) {
+    startAppointmentsSubscription();
+  }
+}
+
 async function loadAccessData() {
   if (!isAdmin() || state.access.loading) return;
   state.access.loading = true;
@@ -1114,7 +1282,9 @@ async function handleAction(action) {
   if (action === 'demo-login') {
     sessionStorage.setItem(DEMO_SESSION_KEY, 'true');
     state.demoMode = true;
-    state.profile = demoProfile;
+    state.profile = import.meta.env.DEV && sessionStorage.getItem(DEMO_ROLE_KEY) === 'admin'
+      ? { ...demoProfile, displayName: 'Gestor de Teste', role: 'admin', storeId: 'loja-06' }
+      : demoProfile;
     state.authError = '';
     subscribeProfileLeads();
     navigate('home');
@@ -1137,6 +1307,7 @@ async function handleAction(action) {
   if (action === 'logout') {
     state.unsubscribeLeads?.();
     state.unsubscribeLeads = null;
+    stopAppointmentsSubscription();
     sessionStorage.removeItem(DEMO_SESSION_KEY);
     await signOutUser();
     state.profile = null;
@@ -1151,6 +1322,17 @@ async function handleAction(action) {
       page: 1,
       pageSize: 20,
       filters: createDefaultManagementFilters()
+    };
+    state.appointments = {
+      loading: false,
+      loaded: false,
+      error: '',
+      records: [],
+      truncated: false,
+      updatingId: '',
+      month: monthKeyFromDate(),
+      storeId: '',
+      selectedDate: toLocalDateInput(new Date())
     };
     state.access = {
       loading: false,
@@ -1198,6 +1380,19 @@ async function handleAction(action) {
     state.goals.loaded = false;
     await loadGoalsData();
   }
+
+  if (action === 'appointments-today') {
+    const today = new Date();
+    const todayMonth = monthKeyFromDate(today);
+    state.appointments.selectedDate = toLocalDateInput(today);
+    if (state.appointments.month !== todayMonth) {
+      state.appointments.month = todayMonth;
+      state.appointments.loaded = false;
+      startAppointmentsSubscription();
+    } else {
+      render();
+    }
+  }
 }
 
 export async function startApp() {
@@ -1206,6 +1401,54 @@ export async function startApp() {
     if (leadButton) navigate('lead', leadButton.dataset.openLeadId);
     const managementLeadButton = event.target.closest('[data-management-lead-id]');
     if (managementLeadButton) navigate('management-lead', managementLeadButton.dataset.managementLeadId);
+    const appointmentLeadButton = event.target.closest('[data-appointment-lead-id]');
+    if (appointmentLeadButton) {
+      const appointmentRecords = state.demoMode ? state.leads : state.appointments.records;
+      const lead = appointmentRecords.find((item) => item.id === appointmentLeadButton.dataset.appointmentLeadId);
+      if (lead) {
+        state.management.records = [lead, ...state.management.records.filter((item) => item.id !== lead.id)];
+        navigate('management-lead', lead.id);
+      }
+    }
+    const attendanceButton = event.target.closest('[data-attendance-lead]');
+    if (attendanceButton && !attendanceButton.disabled) {
+      const appointmentRecords = state.demoMode ? state.leads : state.appointments.records;
+      const lead = appointmentRecords.find((item) => item.id === attendanceButton.dataset.attendanceLead);
+      if (!lead) return;
+      state.appointments.updatingId = lead.id;
+      render();
+      try {
+        const attendance = attendanceButton.dataset.attendanceStatus;
+        if (state.demoMode) {
+          updateDemoAppointmentAttendance(lead.id, attendance, state.profile);
+        } else {
+          await setAppointmentAttendance(state.profile, lead, attendance);
+          state.appointments.records = state.appointments.records.map((item) => item.id === lead.id
+            ? { ...item, appointmentAttendance: attendance }
+            : item);
+        }
+        showToast(attendance === 'attended' ? 'Comparecimento registrado.' : 'Falta registrada.');
+      } catch (error) {
+        showToast(error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode alterar este agendamento.'
+          : 'Nao foi possivel salvar o comparecimento.', 'danger', 'circle-alert');
+      } finally {
+        state.appointments.updatingId = '';
+        render();
+      }
+    }
+    const appointmentDayButton = event.target.closest('[data-appointment-date]');
+    if (appointmentDayButton) {
+      state.appointments.selectedDate = appointmentDayButton.dataset.appointmentDate;
+      render();
+    }
+    const appointmentMonthButton = event.target.closest('[data-appointment-month]');
+    if (appointmentMonthButton && !state.appointments.loading) {
+      state.appointments.month = shiftMonth(state.appointments.month, Number(appointmentMonthButton.dataset.appointmentMonth));
+      state.appointments.selectedDate = monthRange(state.appointments.month).startDate;
+      state.appointments.loaded = false;
+      startAppointmentsSubscription();
+    }
     const deleteLeadButton = event.target.closest('[data-delete-lead]');
     if (deleteLeadButton && !deleteLeadButton.disabled) {
       const lead = state.management.records.find((item) => item.id === deleteLeadButton.dataset.deleteLead);
@@ -1224,6 +1467,7 @@ export async function startApp() {
       try {
         await deleteManagementLead(state.profile, lead.id);
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
+        state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
         navigate('management');
         showToast('Lead excluido definitivamente.');
       } catch (error) {
@@ -1301,9 +1545,11 @@ export async function startApp() {
 
   window.addEventListener('hashchange', () => {
     state.route = currentRoute();
+    if (state.route !== 'appointments') stopAppointmentsSubscription();
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     render();
     ensureManagementData();
+    ensureAppointmentsData();
     ensureAccessData();
     ensureGoalsData();
   });
@@ -1318,7 +1564,9 @@ export async function startApp() {
 
   if (sessionStorage.getItem(DEMO_SESSION_KEY) === 'true' && import.meta.env.DEV) {
     state.demoMode = true;
-    state.profile = demoProfile;
+    state.profile = sessionStorage.getItem(DEMO_ROLE_KEY) === 'admin'
+      ? { ...demoProfile, displayName: 'Gestor de Teste', role: 'admin', storeId: 'loja-06' }
+      : demoProfile;
     state.loading = false;
     subscribeProfileLeads();
     render();
@@ -1353,6 +1601,7 @@ export async function startApp() {
       state.loading = false;
       render();
       ensureManagementData();
+      ensureAppointmentsData();
       ensureAccessData();
       ensureGoalsData();
     }

@@ -56,6 +56,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       interestLabel: interest.id ? interest.label : '',
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
+      ...(input.appointmentDate?.trim() ? { appointmentAttendance: 'pending' } : {}),
       notes: input.notes?.trim() || '',
       source: 'street',
       capturedAtClient: now.toISOString(),

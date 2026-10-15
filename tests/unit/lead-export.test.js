@@ -19,6 +19,7 @@ describe('createLeadsCsv', () => {
       capturedByUid: 'captor-001',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
+      appointmentAttendance: 'attended',
       source: 'street',
       notes: 'Contato pela manha'
     }]);
@@ -28,6 +29,8 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"lead-001";"Cliente Exemplo";"Cliente";"(81) 99999-1234"');
     expect(csv).toContain('"Loja 06"');
     expect(csv).toContain('"02/10/2026";"14:30"');
+    expect(csv).toContain('"Compareceu?"');
+    expect(csv).toContain('"14:30";"Sim"');
     expect(csv).toContain('"Captacao em campo"');
     expect(csv).not.toContain('Consentimento');
   });

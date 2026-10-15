@@ -4,9 +4,9 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 1.1 |
+| Versao | 1.2 |
 | Status | Em implementacao |
-| Data | 29/09/2026 |
+| Data | 15/10/2026 |
 | Responsavel | Oticas Fascinante |
 
 ## 1. Visao geral
@@ -29,7 +29,7 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 
 - CRM completo, funil comercial ou automacao de vendas.
 - Atendimento ou campanhas pelo WhatsApp.
-- Agenda centralizada, confirmacoes ou lembretes de consultas e exames. O MVP registra somente um pre-agendamento opcional no lead.
+- Confirmacoes automaticas ou lembretes de consultas e exames. O pre-agendamento opcional do lead pode ser consultado em uma agenda mensal gerencial.
 - Anamnese, recomendacao de lentes ou provador virtual.
 - Metas de vendas, comissoes, faturamento ou conciliacao de vendas. Metas de quantidade de leads captados estao no escopo.
 - Integracao com Savwin, AppOk ou outros sistemas externos.
@@ -121,7 +121,7 @@ O navegador nao garante execucao quando o PWA estiver completamente fechado. Por
 - Manter gestores somente com consulta e exportacao dos leads da propria loja.
 - Paginar resultados para evitar leituras desnecessarias no Firestore.
 
-O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban, comparecimento, venda ou valor, pois esses dados nao sao controlados pelo FascinLead.
+O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, comparecimento, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban, venda ou valor, pois esses dados nao sao controlados pelo FascinLead.
 
 Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas de funil, tarefas comerciais ou historico de atendimento.
 
@@ -148,6 +148,18 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O progresso considera somente leads sincronizados, atribuidos ao captador e cuja data de captacao esteja dentro do periodo da meta.
 - Metas podem ser excluidas por administradores ou pelo gestor da loja correspondente sem alterar os leads contabilizados.
 - Ranking, premiacoes e gamificacao ficam reservados para uma etapa posterior.
+
+### RF-09 - Agenda gerencial de exames
+
+- Gestores e administradores visualizam em calendario mensal os leads que possuem data e horario de pre-agendamento.
+- O gestor consulta somente os pre-agendamentos da propria loja.
+- O administrador consulta todas as lojas ou filtra pelas lojas 02, 04, 05 e 06.
+- Cada dia informa a quantidade de exames e apresenta os detalhes em ordem de horario.
+- Enquanto a agenda estiver aberta, novos pre-agendamentos e alteracoes aparecem em tempo real, sem recarregar a pagina.
+- Gestores podem marcar cada agendamento como `Compareceu` ou `Nao compareceu`; enquanto nenhuma opcao for escolhida, o estado e `Aguardando`.
+- A alteracao de comparecimento registra data e usuario responsavel e nao concede ao gestor permissao para editar os demais dados do lead.
+- A agenda reutiliza os campos do lead e nao cria uma segunda fonte de dados, confirmacoes automaticas ou lembretes.
+- A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
 
 ## 4. Requisitos nao funcionais
 
@@ -266,6 +278,7 @@ FASCINLEAD/
 5. `Sincronizacao`: totais, ultimo envio, erros e acao manual.
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
 7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
+8. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
 
 ### 6.2 Navegacao mobile
 
@@ -353,6 +366,9 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "interestLabel": "Oculos completo",
   "appointmentDate": "2026-10-02",
   "appointmentTime": "14:30",
+  "appointmentAttendance": "pending",
+  "appointmentAttendanceUpdatedAt": "Timestamp opcional",
+  "appointmentAttendanceUpdatedByUid": "firebase-uid-gestor opcional",
   "notes": "Prefere contato pela manha",
   "source": "street",
   "capturedAtClient": "2026-09-28T13:45:00.000Z",
@@ -398,6 +414,7 @@ O progresso nao e gravado no documento. Ele e calculado a partir dos leads sincr
 - `leads`: `capturedByUid ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedByUid ASC, capturedAtClient DESC`.
+- `leads`: `storeId ASC, appointmentDate ASC`.
 
 Novos indices somente deverao ser adicionados a partir de consultas reais. Cada tela de gestao deve exigir periodo para evitar consultas amplas.
 
@@ -695,6 +712,7 @@ O MVP estara apto para piloto quando:
 | ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
 | ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
 | ADR-014 | Modelar atribuicoes em massa como uma meta individual por captador | Simplifica as regras por usuario, preserva a visibilidade por loja e prepara o progresso para futura gamificacao |
+| ADR-015 | Exibir os pre-agendamentos em agenda mensal derivada dos leads | Oferece visao operacional ao gestor sem duplicar dados nem transformar o sistema em um CRM ou agenda de confirmacoes |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 

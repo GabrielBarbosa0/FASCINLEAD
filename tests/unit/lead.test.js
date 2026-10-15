@@ -58,6 +58,7 @@ describe('lead validation', () => {
       phoneSearch: '81999991234',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
+      appointmentAttendance: 'pending',
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',

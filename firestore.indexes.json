@@ -24,6 +24,14 @@
         { "fieldPath": "capturedByUid", "order": "ASCENDING" },
         { "fieldPath": "capturedAtClient", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "storeId", "order": "ASCENDING" },
+        { "fieldPath": "appointmentDate", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

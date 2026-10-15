@@ -31,6 +31,10 @@ function sourceName(source) {
   return source === 'street' ? 'Captacao em campo' : source || '';
 }
 
+function attendanceLabel(attendance) {
+  return { attended: 'Sim', missed: 'Nao', pending: 'Aguardando' }[attendance] || 'Aguardando';
+}
+
 const CSV_COLUMNS = [
   ['ID do lead', (lead) => lead.id],
   ['Nome do cliente', (lead) => lead.fullName],
@@ -43,6 +47,7 @@ const CSV_COLUMNS = [
   ['Horario da captacao', (lead) => timePart(lead.capturedAtClient)],
   ['Data do pre-agendamento', (lead) => inputDatePart(lead.appointmentDate)],
   ['Horario do pre-agendamento', (lead) => lead.appointmentTime],
+  ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
   ['Interesse principal', (lead) => lead.interestLabel],
   ['Bairro', (lead) => lead.neighborhood],
   ['Cidade', (lead) => lead.city],
