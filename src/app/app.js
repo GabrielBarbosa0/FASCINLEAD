@@ -363,16 +363,32 @@ function loginView() {
     </main>`;
 }
 
+function currentPageTitle() {
+  const titles = {
+    home: 'Inicio',
+    new: 'Pre-cadastro',
+    leads: 'Meus cadastros',
+    lead: 'Detalhes do cadastro',
+    sync: 'Sincronizacao',
+    management: 'Painel de leads',
+    'management-lead': 'Detalhes do lead',
+    appointments: 'Agenda de exames',
+    access: 'Acessos da equipe',
+    goals: 'Metas',
+    settings: 'Configuracoes da agenda'
+  };
+  if (state.route === 'follow-ups') return canManage() ? 'Retornos da equipe' : 'Retornos pendentes';
+  return titles[state.route] || 'Inicio';
+}
+
 function headerView() {
   const online = navigator.onLine;
-  const stores = profileStoreIds(state.profile);
-  const storeText = state.profile.role === 'admin' ? 'Todas as lojas' : stores.length > 1 ? `${stores.length} unidades` : storeLabel(state.profile.storeId);
   return `
     <header class="app-header">
       <div class="header-inner ${['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
-          <p class="header-store">${escapeHtml(storeText)}</p>
+          <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
         </div>
         <div class="header-actions">
           ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
@@ -405,11 +421,6 @@ function homeView() {
   const followUps = pendingFollowUps();
 
   return `
-    <section class="page-heading">
-      <p class="eyebrow">CAPTACAO EM CAMPO</p>
-      <h1>Inicio</h1>
-      <p>Cadastre um novo contato em poucos passos.</p>
-    </section>
     ${profileCard()}
     ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Nao utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}
     <section class="action-grid" aria-label="Acoes principais">
@@ -515,9 +526,8 @@ function bindAmetropiaOptions(form) {
 function newLeadView() {
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   return `
-    <section class="page-heading compact">
+    <section class="page-toolbar">
       <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
-      <div><p class="eyebrow">NOVA ABORDAGEM</p><h1>Pre-cadastro</h1><p>Preencha somente o necessario.</p></div>
     </section>
     <form id="lead-form" class="form-panel" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
@@ -586,7 +596,6 @@ function leadsView() {
     : `<div class="empty-state"><i data-lucide="clipboard-x"></i><strong>Nenhum cadastro encontrado</strong><p>${state.search ? 'Tente outro nome ou telefone.' : 'Os contatos registrados aparecerao aqui.'}</p><button class="button button-primary" type="button" data-route="new"><i data-lucide="user-plus"></i>Novo cadastro</button></div>`;
 
   return `
-    <section class="page-heading compact"><div><p class="eyebrow">CAPTACAO</p><h1>Meus cadastros</h1><p>${state.leads.length} registro(s) carregado(s)</p></div></section>
     <div class="search-box"><i data-lucide="search"></i><input id="lead-search" type="search" value="${escapeHtml(state.search)}" placeholder="Buscar por nome ou telefone" aria-label="Buscar cadastros" /></div>
     ${state.dataError ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.dataError)}</span></div>` : ''}
     <section class="lead-list">${list}</section>`;
@@ -594,8 +603,7 @@ function leadsView() {
 
 function followUpsView() {
   if (!['captor', 'manager', 'admin'].includes(state.profile?.role)) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Retornos pendentes</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
   }
 
   const records = pendingFollowUps();
@@ -640,8 +648,7 @@ function followUpsView() {
       : records.map(renderItem).join(''))
     : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum retorno pendente</strong><p>As faltas registradas pela loja aparecerao aqui depois do tempo de tolerancia.</p></div>`;
 
-  return `<section class="page-heading compact"><div><p class="eyebrow">ACOMPANHAMENTO</p><h1>${managerView ? 'Retornos da equipe' : 'Retornos pendentes'}</h1><p>${managerView ? 'Acompanhe os contatos realizados por cada colaborador.' : 'Retome o contato com clientes que nao compareceram.'}</p></div></section>
-    ${state.followUps.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>${escapeHtml(state.followUps.error)}</span></div>` : ''}
+  return `${state.followUps.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>${escapeHtml(state.followUps.error)}</span></div>` : ''}
     ${state.followUps.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de 500 registros.</span></div>` : ''}
     ${managerView ? `<section class="follow-up-metrics" aria-label="Resumo dos retornos">
       <div class="metric"><span>Retornos</span><strong>${records.length}</strong><i data-lucide="bell-ring"></i></div>
@@ -655,8 +662,7 @@ function followUpsView() {
 function leadDetailView() {
   const managementMode = state.route === 'management-lead';
   if (managementMode && !isAdmin()) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Detalhes do lead</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar leads da equipe.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar leads da equipe.</span></div>`;
   }
 
   const source = managementMode
@@ -665,18 +671,17 @@ function leadDetailView() {
   const lead = source.find((item) => item.id === currentRouteParam());
   const backRoute = managementMode ? 'management' : 'leads';
   if (!lead) {
-    return `<section class="page-heading compact">
+    return `<section class="page-toolbar">
       <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
-      <div><p class="eyebrow">CADASTRO</p><h1>Cadastro nao encontrado</h1><p>Volte para a lista e tente novamente.</p></div>
-    </section>`;
+    </section><div class="notice notice-warning"><i data-lucide="info"></i><span>Cadastro nao encontrado. Volte para a lista e tente novamente.</span></div>`;
   }
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
   return `
-    <section class="page-heading compact">
+    <section class="page-toolbar detail-toolbar">
       <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
-      <div><p class="eyebrow">DETALHES DO CADASTRO</p><h1>${escapeHtml(lead.fullName)}</h1><p>Confira os dados e corrija o que for necessario.</p></div>
+      <h2>${escapeHtml(lead.fullName)}</h2>
     </section>
     <section class="lead-detail-summary" aria-label="Informacoes do cadastro">
       <div><span>Status</span><strong class="status-badge status-${syncTone}">${syncStatus}</strong></div>
@@ -724,8 +729,7 @@ function leadDetailView() {
 
 function managementView() {
   if (!canManage()) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Painel de gestao</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos dados gerenciais.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos dados gerenciais.</span></div>`;
   }
 
   const { filters, loaded, loading, error, records, truncated, pageSize } = state.management;
@@ -775,8 +779,7 @@ function managementView() {
     : `<div class="empty-state management-empty"><i data-lucide="bar-chart-3"></i><strong>${loaded ? 'Nenhum cadastro no periodo' : 'Consulte as captacoes'}</strong><p>${loaded ? 'Ajuste os filtros para ampliar a busca.' : 'Escolha o periodo e carregue os resultados.'}</p></div>`;
 
   return `
-    <section class="management-heading management-dashboard-heading">
-      <div class="management-heading-copy"><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
+    <section class="management-heading management-dashboard-heading management-toolbar">
       <div class="management-heading-actions">
         <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
         ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
@@ -808,8 +811,7 @@ function managementView() {
 
 function appointmentsView() {
   if (!canManage()) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Agenda de exames</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso a agenda gerencial.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso a agenda gerencial.</span></div>`;
   }
 
   const { loading, error, truncated, month, storeId, selectedDate, updatingId } = state.appointments;
@@ -860,8 +862,7 @@ function appointmentsView() {
     .map((store) => `<div class="agenda-store-row"><span><i data-lucide="building-2"></i>${store.label}</span><strong>${store.count} exame(s)</strong></div>`)
     .join('');
 
-  return `<section class="management-heading agenda-heading">
-      <div><p class="eyebrow">EXAMES</p><h1>Agenda de exames</h1><p>Visualize os pre-agendamentos registrados pela equipe.</p></div>
+  return `<section class="management-heading page-actions-only agenda-heading">
       <button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
@@ -891,8 +892,7 @@ function appointmentsView() {
 
 function settingsView() {
   if (!isAdmin()) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Configuracoes</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configuracoes das lojas.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configuracoes das lojas.</span></div>`;
   }
 
   const { records, selectedStoreId, loading, saving, error } = state.settings;
@@ -901,8 +901,8 @@ function settingsView() {
   const previewSlots = buildAppointmentSlots(selected);
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
 
-  return `<section class="management-heading settings-heading">
-      <div><button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><p class="eyebrow">ADMINISTRACAO</p><h1>Configuracoes da agenda</h1><p>Defina a disponibilidade de exames de cada unidade.</p></div>
+  return `<section class="page-toolbar">
+      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <section class="settings-layout" aria-busy="${loading}">
@@ -938,8 +938,7 @@ function settingsView() {
 
 function accessView() {
   if (!isAdmin()) {
-    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Acessos da equipe</h1></section>
-      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem gerenciar acessos.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem gerenciar acessos.</span></div>`;
   }
 
   const { accesses, loading, saving, error } = state.access;
@@ -966,11 +965,8 @@ function accessView() {
   }).join('');
 
   return `
-    <section class="management-heading access-heading">
-      <div>
-        <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
-        <p class="eyebrow">ADMINISTRACAO</p><h1>Acessos da equipe</h1><p>Libere o e-mail Google antes do primeiro acesso ao FascinLead.</p>
-      </div>
+    <section class="page-toolbar">
+      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
     </section>
     <section class="access-layout">
       <form id="access-form" class="access-form" novalidate>
@@ -1059,8 +1055,7 @@ function goalsView() {
     </section>`;
 
   return `
-    <section class="management-heading goals-heading">
-      <div><p class="eyebrow">DESEMPENHO DE CAPTACAO</p><h1>Metas</h1><p>${canManage() ? 'Defina objetivos e acompanhe os resultados permitidos ao seu perfil.' : 'Acompanhe suas metas individuais de captacao.'}</p></div>
+    <section class="management-heading page-actions-only goals-heading">
       <button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
@@ -1082,7 +1077,6 @@ function syncView() {
   }, {});
 
   return `
-    <section class="page-heading compact"><div><p class="eyebrow">STATUS DOS DADOS</p><h1>Sincronizacao</h1><p>Acompanhe os registros deste dispositivo.</p></div></section>
     ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="info"></i><span>No modo de desenvolvimento nao ha envio para a nuvem.</span></div>' : ''}
     <section class="sync-grid">
       <div class="metric metric-success"><span>Sincronizados</span><strong>${counts.synced || 0}</strong><i data-lucide="circle-check"></i></div>

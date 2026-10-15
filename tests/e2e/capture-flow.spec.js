@@ -40,7 +40,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByText('Somente neste navegador', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Ver cadastro de Cliente Exemplo' }).click();
-  await expect(page.getByRole('heading', { name: 'Cliente Exemplo' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cliente Exemplo', level: 2 })).toBeVisible();
   await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
   await expect(page.getByLabel('Horario')).toHaveValue('14:20');
   await expect(page.getByLabel('Miopia')).toBeChecked();
@@ -126,7 +126,6 @@ test('keeps management actions and filters organized at intermediate widths', as
 
   const layout = await page.evaluate(() => {
     const heading = document.querySelector('.management-dashboard-heading').getBoundingClientRect();
-    const copy = document.querySelector('.management-heading-copy').getBoundingClientRect();
     const actions = document.querySelector('.management-heading-actions').getBoundingClientRect();
     const filter = document.querySelector('.management-filters').getBoundingClientRect();
     const search = document.querySelector('.management-search-field').getBoundingClientRect();
@@ -135,8 +134,8 @@ test('keeps management actions and filters organized at intermediate widths', as
       .map((button) => button.getBoundingClientRect());
     return {
       headingRight: heading.right,
-      copyBottom: copy.bottom,
       actionsTop: actions.top,
+      headingTop: heading.top,
       filterRight: filter.right,
       searchWidth: search.width,
       filterButtonWidth: filterButton.width,
@@ -145,7 +144,7 @@ test('keeps management actions and filters organized at intermediate widths', as
     };
   });
 
-  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.copyBottom);
+  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.headingTop);
   expect(layout.actionButtonsRight).toBeLessThanOrEqual(layout.headingRight + 1);
   expect(layout.actionRows).toBe(2);
   expect(layout.searchWidth).toBeGreaterThan(layout.filterButtonWidth * 2);

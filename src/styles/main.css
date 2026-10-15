@@ -300,15 +300,16 @@ svg {
   padding: 10px 20px;
 }
 
-.header-store {
-  max-width: 24ch;
+.header-page-title {
+  max-width: 28ch;
   margin: 0;
   overflow: hidden;
   color: var(--ink);
   font-size: 0.95rem;
   font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
   text-overflow: ellipsis;
-  text-transform: capitalize;
   white-space: nowrap;
 }
 
@@ -387,26 +388,25 @@ svg {
   width: min(100%, 1180px);
 }
 
-.page-heading {
-  margin-bottom: 22px;
-}
-
-.page-heading h1 {
-  font-size: 1.75rem;
-  line-height: 1.2;
-}
-
-.page-heading > p:last-child,
-.page-heading > div > p:last-child {
-  margin: 7px 0 0;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.page-heading.compact {
+.page-toolbar {
+  min-height: 44px;
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.page-toolbar .back-link {
+  margin: 0;
+}
+
+.detail-toolbar h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-card {
@@ -1172,6 +1172,12 @@ svg {
   flex: 0 0 auto;
 }
 
+.page-actions-only,
+.management-toolbar {
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+
 .management-heading-actions {
   display: flex;
   gap: 10px;
@@ -1181,10 +1187,6 @@ svg {
   display: grid;
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
-}
-
-.management-dashboard-heading .management-heading-copy {
-  max-width: 620px;
 }
 
 .management-dashboard-heading .management-heading-actions {
