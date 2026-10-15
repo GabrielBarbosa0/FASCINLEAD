@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+import { buildAppointmentSlots, normalizeStoreSchedule, validateStoreSchedule } from '../../src/utils/schedule.js';
+
+describe('store schedule helpers', () => {
+  it('uses controlled twenty-minute appointments by default', () => {
+    expect(normalizeStoreSchedule({})).toEqual({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      openingTime: '08:00',
+      closingTime: '18:00'
+    });
+  });
+
+  it('creates only slots that fit completely inside the working day', () => {
+    const slots = buildAppointmentSlots({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 30,
+      openingTime: '08:00',
+      closingTime: '09:20'
+    });
+    expect(slots.map((slot) => slot.time)).toEqual(['08:00', '08:30']);
+    expect(slots.at(-1).endTime).toBe('09:00');
+  });
+
+  it('marks overlapping appointments as unavailable', () => {
+    const slots = buildAppointmentSlots({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      openingTime: '08:00',
+      closingTime: '09:00'
+    }, [{ id: 'lead-1', appointmentTime: '08:10' }]);
+    expect(slots.map(({ time, available }) => [time, available])).toEqual([
+      ['08:00', false],
+      ['08:20', false],
+      ['08:40', true]
+    ]);
+  });
+
+  it('reports every slot as unavailable when the day is full', () => {
+    const settings = {
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 30,
+      openingTime: '08:00',
+      closingTime: '09:00'
+    };
+    const slots = buildAppointmentSlots(settings, [
+      { id: 'lead-1', appointmentTime: '08:00', durationMinutes: 30 },
+      { id: 'lead-2', appointmentTime: '08:30', durationMinutes: 30 }
+    ]);
+    expect(slots.every((slot) => !slot.available)).toBe(true);
+  });
+
+  it('validates duration and working hours', () => {
+    expect(validateStoreSchedule({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 30,
+      openingTime: '18:00',
+      closingTime: '08:00'
+    })).toMatchObject({ isValid: false, errors: { closingTime: expect.any(String) } });
+  });
+});

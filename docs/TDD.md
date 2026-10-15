@@ -160,6 +160,9 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - A alteracao de comparecimento registra data e usuario responsavel e nao concede ao gestor permissao para editar os demais dados do lead.
 - A agenda reutiliza os campos do lead e nao cria uma segunda fonte de dados, confirmacoes automaticas ou lembretes.
 - A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
+- Administradores configuram por loja o modo controlado ou livre, a duracao da consulta e o inicio e fim do expediente.
+- O modo controlado e o padrao e oferece ao captador somente intervalos livres que caibam integralmente no expediente.
+- Um intervalo ocupado deixa de ser oferecido aos demais captadores assim que o agendamento aparece no Firestore.
 
 ## 4. Requisitos nao funcionais
 
@@ -279,6 +282,7 @@ FASCINLEAD/
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
 7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
 8. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
+9. `Configuracoes`: modo de agenda, duracao da consulta e expediente por loja, restritos a administradores.
 
 ### 6.2 Navegacao mobile
 
@@ -298,9 +302,29 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
   "name": "Loja 06",
   "defaultCity": "",
   "defaultState": "PE",
+  "schedulingMode": "controlled",
+  "appointmentDurationMinutes": 20,
+  "openingTime": "08:00",
+  "closingTime": "18:00",
   "active": true,
   "createdAt": "Timestamp",
   "updatedAt": "Timestamp"
+}
+```
+
+#### Reservas de horario em `appointmentSlots`
+
+Cada horario controlado possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. O lead e a reserva sao criados no mesmo lote; uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao do mesmo intervalo por captadores simultaneos.
+
+```json
+{
+  "storeId": "loja-06",
+  "appointmentDate": "2026-10-20",
+  "appointmentTime": "08:00",
+  "durationMinutes": 20,
+  "leadId": "uuid-do-lead",
+  "capturedByUid": "firebase-uid",
+  "createdAt": "Timestamp"
 }
 ```
 
@@ -713,6 +737,7 @@ O MVP estara apto para piloto quando:
 | ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
 | ADR-014 | Modelar atribuicoes em massa como uma meta individual por captador | Simplifica as regras por usuario, preserva a visibilidade por loja e prepara o progresso para futura gamificacao |
 | ADR-015 | Exibir os pre-agendamentos em agenda mensal derivada dos leads | Oferece visao operacional ao gestor sem duplicar dados nem transformar o sistema em um CRM ou agenda de confirmacoes |
+| ADR-016 | Configurar intervalos de atendimento no documento da loja | Mantem regras diferentes por unidade e permite calcular os horarios livres sem duplicar a agenda |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 

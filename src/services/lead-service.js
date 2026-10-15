@@ -9,7 +9,8 @@ import {
   serverTimestamp,
   setDoc,
   waitForPendingWrites,
-  where
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
@@ -82,17 +83,35 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
     return { ...result, id };
   }
 
-  const writePromise = setDoc(doc(db, 'leads', id), {
+  const leadData = {
     ...result.data,
     createdAtServer: serverTimestamp(),
     updatedAtServer: serverTimestamp()
-  });
+  };
+  let writePromise;
+  if (input.schedulingMode === 'controlled' && result.data.appointmentDate && result.data.appointmentTime) {
+    const slotId = `slot-${profile.storeId}-${result.data.appointmentDate}-${result.data.appointmentTime}`;
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), leadData);
+    batch.set(doc(db, 'appointmentSlots', slotId), {
+      storeId: profile.storeId,
+      appointmentDate: result.data.appointmentDate,
+      appointmentTime: result.data.appointmentTime,
+      durationMinutes: Number(input.appointmentDurationMinutes) || 20,
+      leadId: id,
+      capturedByUid: profile.uid,
+      createdAt: serverTimestamp()
+    });
+    writePromise = batch.commit();
+  } else {
+    writePromise = setDoc(doc(db, 'leads', id), leadData);
+  }
 
   writePromise.catch(onRemoteError);
   return { ...result, id, writePromise };
 }
 
-export function updateLead(id, input, demoMode, onRemoteError) {
+export function updateLead(id, input, demoMode, onRemoteError, existingLead = null) {
   const result = createLeadUpdate(input);
   if (!result.isValid) return result;
 
@@ -105,10 +124,40 @@ export function updateLead(id, input, demoMode, onRemoteError) {
     return { ...result, id };
   }
 
-  const writePromise = setDoc(doc(db, 'leads', id), {
+  const leadUpdate = {
     ...result.data,
     updatedAtServer: serverTimestamp()
-  }, { merge: true });
+  };
+  const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
+    && existingLead.appointmentDate && existingLead.appointmentTime;
+  const newControlled = result.data.appointmentSchedulingMode === 'controlled'
+    && result.data.appointmentDate && result.data.appointmentTime;
+  const oldSlotId = oldControlled
+    ? `slot-${existingLead.storeId}-${existingLead.appointmentDate}-${existingLead.appointmentTime}`
+    : '';
+  const newSlotId = newControlled
+    ? `slot-${existingLead.storeId}-${result.data.appointmentDate}-${result.data.appointmentTime}`
+    : '';
+  let writePromise;
+  if (existingLead && oldSlotId !== newSlotId && (oldSlotId || newSlotId)) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
+    if (oldSlotId) batch.delete(doc(db, 'appointmentSlots', oldSlotId));
+    if (newSlotId) {
+      batch.set(doc(db, 'appointmentSlots', newSlotId), {
+        storeId: existingLead.storeId,
+        appointmentDate: result.data.appointmentDate,
+        appointmentTime: result.data.appointmentTime,
+        durationMinutes: result.data.appointmentDurationMinutes,
+        leadId: id,
+        capturedByUid: existingLead.capturedByUid,
+        createdAt: serverTimestamp()
+      });
+    }
+    writePromise = batch.commit();
+  } else {
+    writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
+  }
 
   writePromise.catch(onRemoteError);
   return { ...result, id, writePromise };

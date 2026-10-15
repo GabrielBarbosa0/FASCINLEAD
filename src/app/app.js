@@ -45,10 +45,12 @@ import { loadAccesses, saveAccess, setAccessActive } from '../services/access-se
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
+import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { INTERESTS } from '../utils/lead.js';
+import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { STORES } from '../utils/stores.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
@@ -107,6 +109,8 @@ const state = {
   search: '',
   unsubscribeLeads: null,
   unsubscribeAppointments: null,
+  unsubscribeStoreSchedule: null,
+  unsubscribeDayAppointments: null,
   updateAction: null,
   management: {
     loading: false,
@@ -125,9 +129,27 @@ const state = {
     records: [],
     truncated: false,
     updatingId: '',
+    backfillingMonth: '',
+    backfilledMonths: [],
     month: monthKeyFromDate(),
     storeId: '',
     selectedDate: toLocalDateInput(new Date())
+  },
+  newLeadSchedule: {
+    loaded: false,
+    loading: false,
+    error: '',
+    settings: { ...DEFAULT_STORE_SCHEDULE },
+    appointmentDate: '',
+    appointments: []
+  },
+  settings: {
+    loaded: false,
+    loading: false,
+    saving: false,
+    error: '',
+    selectedStoreId: STORES[0]?.id || '',
+    records: []
   },
   access: {
     loading: false,
@@ -298,7 +320,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'appointments', 'access', 'goals'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <p class="header-store">${escapeHtml(state.profile.storeId.replaceAll('-', ' '))}</p>
@@ -376,7 +398,39 @@ function homeView() {
         <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
+      ${isAdmin() ? `<button class="action-card" type="button" data-route="settings">
+        <span class="action-icon"><i data-lucide="wrench"></i></span>
+        <span><strong>Configuracoes da agenda</strong><small>Definir horarios e duracao por loja</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>` : ''}
     </section>`;
+}
+
+function appointmentTimeField() {
+  const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
+  if (settings.schedulingMode === 'free') {
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
+  }
+
+  const slots = appointmentDate ? buildAppointmentSlots(settings, appointments) : [];
+  const availableSlots = slots.filter((slot) => slot.available);
+  let placeholder = 'Escolha primeiro uma data';
+  if (loading) placeholder = 'Consultando horarios...';
+  else if (error) placeholder = 'Horarios indisponiveis';
+  else if (appointmentDate && !availableSlots.length) placeholder = 'Dia sem horarios disponiveis';
+  else if (appointmentDate) placeholder = 'Selecione um horario';
+
+  const options = availableSlots
+    .map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`)
+    .join('');
+  return `<div class="field" data-field="appointmentTime">
+    <label for="appointmentTime">Horario disponivel</label>
+    <select id="appointmentTime" name="appointmentTime" ${!appointmentDate || loading || error || !availableSlots.length ? 'disabled' : ''}>
+      <option value="">${placeholder}</option>${options}
+    </select>
+    <small class="field-error"></small>
+    ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${availableSlots.length} de ${slots.length} horario(s) disponivel(is)</small>` : ''}
+  </div>`;
 }
 
 function newLeadView() {
@@ -387,6 +441,8 @@ function newLeadView() {
       <div><p class="eyebrow">NOVA ABORDAGEM</p><h1>Pre-cadastro</h1><p>Preencha somente o necessario.</p></div>
     </section>
     <form id="lead-form" class="form-panel" novalidate>
+      <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
+      <input name="appointmentDurationMinutes" type="hidden" value="${state.newLeadSchedule.settings.appointmentDurationMinutes}" />
       <div class="field" data-field="fullName">
         <label for="fullName">Nome <span aria-hidden="true">*</span></label>
         <input id="fullName" name="fullName" autocomplete="name" maxlength="120" placeholder="Nome do cliente" required />
@@ -411,8 +467,8 @@ function newLeadView() {
         <select id="interestId" name="interestId">${interests}</select>
       </div>
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" /><small class="field-error"></small></div>
-        <div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
+        <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
       <div class="field" data-field="notes">
         <label for="notes">Observacao rapida</label>
@@ -484,6 +540,8 @@ function leadDetailView() {
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
+      <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || 'free')}" />
+      <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required /><small class="field-error"></small></div>
       <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required /><small class="field-error"></small></div>
       <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" /></div>
@@ -571,6 +629,7 @@ function managementView() {
       <div><p class="eyebrow">GESTAO DA CAPTACAO</p><h1>Painel de leads</h1><p>Acompanhe os pre-cadastros recebidos pela equipe.</p></div>
       <div class="management-heading-actions">
         <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
+        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
       </div>
@@ -674,6 +733,46 @@ function appointmentsView() {
       <aside class="agenda-sidebar">
         <section class="agenda-summary"><div class="agenda-section-title"><i data-lucide="building-2"></i><h2>Unidades</h2></div>${storeTotals}</section>
         <section class="agenda-day-details"><div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div><div class="appointment-list">${selectedItems}</div></section>
+      </aside>
+    </section>`;
+}
+
+function settingsView() {
+  if (!isAdmin()) {
+    return `<section class="page-heading"><p class="eyebrow">ACESSO RESTRITO</p><h1>Configuracoes</h1></section>
+      <div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configuracoes das lojas.</span></div>`;
+  }
+
+  const { records, selectedStoreId, loading, saving, error } = state.settings;
+  const selected = records.find((item) => item.id === selectedStoreId)
+    || { ...STORES.find((item) => item.id === selectedStoreId), ...DEFAULT_STORE_SCHEDULE };
+  const previewSlots = buildAppointmentSlots(selected);
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
+
+  return `<section class="management-heading settings-heading">
+      <div><button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><p class="eyebrow">ADMINISTRACAO</p><h1>Configuracoes da agenda</h1><p>Defina a disponibilidade de exames de cada unidade.</p></div>
+    </section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    <section class="settings-layout" aria-busy="${loading}">
+      <form id="schedule-settings-form" class="settings-form" novalidate>
+        <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Agenda da unidade</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
+        <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
+        <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
+        <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
+          <div class="field" data-field="appointmentDurationMinutes"><label for="settings-duration">Duracao da consulta</label><div class="number-with-unit"><input id="settings-duration" name="appointmentDurationMinutes" type="number" min="5" max="180" step="5" value="${selected.appointmentDurationMinutes}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><span>min</span></div><small class="field-error"></small></div>
+          <div class="field-row schedule-hours">
+            <div class="field" data-field="openingTime"><label for="settings-opening">Inicio</label><input id="settings-opening" name="openingTime" type="time" value="${selected.openingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
+            <div class="field" data-field="closingTime"><label for="settings-closing">Fim</label><input id="settings-closing" name="closingTime" type="time" value="${selected.closingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
+          </div>
+        </div>
+        <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
+      </form>
+      <aside class="schedule-preview">
+        <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
+        ${selected.schedulingMode === 'free'
+          ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
+          : `<div class="schedule-summary-grid"><div><span>Duracao</span><strong>${selected.appointmentDurationMinutes} min</strong></div><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Capacidade diaria</span><strong>${previewSlots.length} consulta(s)</strong></div></div>
+            <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
       </aside>
     </section>`;
 }
@@ -839,16 +938,29 @@ function bottomNav() {
   ];
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   return `<nav class="bottom-nav ${canManage() ? 'has-management' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, appointments: appointmentsView, access: accessView, goals: goalsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, management: managementView, 'management-lead': leadDetailView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'appointments', 'access', 'goals'].includes(state.route);
+  const wideLayout = ['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
+}
+
+function syncAgendaSidebarHeight() {
+  const agendaLayout = document.querySelector('.agenda-layout');
+  const calendarPanel = agendaLayout?.querySelector('.calendar-panel');
+  if (!agendaLayout || !calendarPanel) return;
+
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    agendaLayout.style.removeProperty('--agenda-calendar-height');
+    return;
+  }
+
+  agendaLayout.style.setProperty('--agenda-calendar-height', `${calendarPanel.getBoundingClientRect().height}px`);
 }
 
 function render() {
@@ -874,6 +986,7 @@ function render() {
 
   createIcons({ icons: appIcons });
   bindPageEvents();
+  requestAnimationFrame(syncAgendaSidebarHeight);
 }
 
 function showToast(message, tone = 'success', icon = 'circle-check') {
@@ -902,17 +1015,49 @@ function bindPageEvents() {
   if (form) {
     const phoneInput = form.elements.phone;
     const notesInput = form.elements.notes;
+    const appointmentDateInput = form.elements.appointmentDate;
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#notes-count').textContent = notesInput.value.length; });
-    form.addEventListener('submit', (event) => {
+    appointmentDateInput.addEventListener('input', () => {
+      state.newLeadSchedule.appointmentDate = appointmentDateInput.value;
+      startDayAppointmentsSubscription();
+    });
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = Object.fromEntries(new FormData(form));
+      const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
+      if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
+        const selectedSlot = buildAppointmentSlots(state.newLeadSchedule.settings, state.newLeadSchedule.appointments)
+          .find((slot) => slot.time === values.appointmentTime);
+        if (!selectedSlot?.available) {
+          setFieldErrors(form, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
+          startDayAppointmentsSubscription();
+          return;
+        }
+      }
+      const submitButton = form.querySelector('[type="submit"]');
+      submitButton.disabled = true;
       const result = saveLead(values, state.profile, state.demoMode, () => {
-        state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
-        render();
+        if (!controlledAppointment) {
+          state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
+          render();
+        }
       });
       setFieldErrors(form, result.errors || {});
-      if (!result.isValid) return;
+      if (!result.isValid) {
+        submitButton.disabled = false;
+        return;
+      }
+      if (controlledAppointment && result.writePromise) {
+        try {
+          await result.writePromise;
+        } catch {
+          submitButton.disabled = false;
+          setFieldErrors(form, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
+          startDayAppointmentsSubscription();
+          return;
+        }
+      }
       form.reset();
       navigate('leads');
       showToast(state.demoMode ? 'Cadastro salvo somente neste navegador.' : 'Cadastro salvo. A sincronizacao seguira automaticamente.');
@@ -933,7 +1078,8 @@ function bindPageEvents() {
 
       if (editLeadForm.dataset.management === 'true') {
         try {
-          const result = await updateManagementLead(state.profile, editLeadForm.dataset.leadId, values);
+          const existingLead = state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId);
+          const result = await updateManagementLead(state.profile, existingLead, values);
           setFieldErrors(editLeadForm, result.errors || {});
           if (!result.isValid) {
             submitButton.disabled = false;
@@ -954,10 +1100,11 @@ function bindPageEvents() {
         return;
       }
 
+      const existingLead = state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
         state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
         render();
-      });
+      }, existingLead);
       setFieldErrors(editLeadForm, result.errors || {});
       if (!result.isValid) {
         submitButton.disabled = false;
@@ -1053,6 +1200,69 @@ function bindPageEvents() {
     });
   }
 
+  const scheduleSettingsForm = document.querySelector('#schedule-settings-form');
+  if (scheduleSettingsForm) {
+    scheduleSettingsForm.elements.storeId.addEventListener('change', () => {
+      state.settings.selectedStoreId = scheduleSettingsForm.elements.storeId.value;
+      render();
+    });
+    scheduleSettingsForm.elements.schedulingMode.addEventListener('change', () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (record) record.schedulingMode = scheduleSettingsForm.elements.schedulingMode.value;
+      render();
+    });
+    ['appointmentDurationMinutes', 'openingTime', 'closingTime'].forEach((name) => {
+      scheduleSettingsForm.elements[name]?.addEventListener('change', () => {
+        const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+        if (!record) return;
+        record[name] = name === 'appointmentDurationMinutes'
+          ? Number(scheduleSettingsForm.elements[name].value)
+          : scheduleSettingsForm.elements[name].value;
+      });
+    });
+    scheduleSettingsForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (state.settings.saving) return;
+      const values = Object.fromEntries(new FormData(scheduleSettingsForm));
+      if (values.schedulingMode === 'free') {
+        const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
+        values.appointmentDurationMinutes = current.appointmentDurationMinutes;
+        values.openingTime = current.openingTime;
+        values.closingTime = current.closingTime;
+      }
+      state.settings.saving = true;
+      state.settings.error = '';
+      setFieldErrors(scheduleSettingsForm, {});
+      try {
+        if (state.demoMode) {
+          const record = state.settings.records.find((item) => item.id === values.storeId);
+          Object.assign(record, values, { appointmentDurationMinutes: Number(values.appointmentDurationMinutes) });
+          if (values.storeId === state.profile.storeId) {
+            state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
+          }
+        } else {
+          const result = await saveStoreSchedule(state.profile, values.storeId, values);
+          if (!result.isValid) {
+            state.settings.saving = false;
+            setFieldErrors(scheduleSettingsForm, result.errors);
+            return;
+          }
+          const record = state.settings.records.find((item) => item.id === values.storeId);
+          Object.assign(record, result.data);
+        }
+        state.settings.saving = false;
+        render();
+        showToast('Configuracao da agenda salva.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode alterar estas configuracoes.'
+          : 'Nao foi possivel salvar a configuracao.';
+        render();
+      }
+    });
+  }
+
   const goalForm = document.querySelector('#goal-form');
   if (goalForm) {
     const readDraft = () => ({
@@ -1115,6 +1325,9 @@ function subscribeProfileLeads() {
     (leads) => {
       state.leads = leads;
       state.dataError = '';
+      if (state.route === 'new' && state.demoMode && state.newLeadSchedule.appointmentDate) {
+        state.newLeadSchedule.appointments = leads.filter((lead) => lead.appointmentDate === state.newLeadSchedule.appointmentDate);
+      }
       render();
     },
     () => {
@@ -1191,6 +1404,16 @@ function startAppointmentsSubscription() {
       state.appointments.loaded = true;
       state.appointments.loading = false;
       render();
+      if (isAdmin()
+        && !state.appointments.backfilledMonths.includes(state.appointments.month)
+        && state.appointments.backfillingMonth !== state.appointments.month) {
+        const month = state.appointments.month;
+        state.appointments.backfillingMonth = month;
+        backfillAppointmentSlots(state.profile, result.records, month)
+          .then(() => { state.appointments.backfilledMonths.push(month); })
+          .catch(() => {})
+          .finally(() => { state.appointments.backfillingMonth = ''; });
+      }
     },
     (error) => {
       state.appointments.error = error?.code === 'permission-denied'
@@ -1208,6 +1431,131 @@ function ensureAppointmentsData() {
   if (state.route === 'appointments' && canManage() && !state.demoMode && !state.unsubscribeAppointments) {
     startAppointmentsSubscription();
   }
+}
+
+function stopNewLeadScheduleSubscriptions() {
+  state.unsubscribeStoreSchedule?.();
+  state.unsubscribeStoreSchedule = null;
+  state.unsubscribeDayAppointments?.();
+  state.unsubscribeDayAppointments = null;
+}
+
+function refreshAppointmentTimeControl() {
+  const container = document.querySelector('#appointment-time-field');
+  if (container) container.innerHTML = appointmentTimeField();
+  const dateField = document.querySelector('[data-field="appointmentDate"]');
+  const dateStatus = dateField?.querySelector('.schedule-date-status');
+  const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
+  const slots = appointmentDate && settings.schedulingMode === 'controlled'
+    ? buildAppointmentSlots(settings, appointments)
+    : [];
+  const fullyBooked = Boolean(appointmentDate && !loading && !error && slots.length && !slots.some((slot) => slot.available));
+  dateField?.classList.toggle('is-fully-booked', fullyBooked);
+  if (dateStatus) dateStatus.textContent = fullyBooked ? 'Dia sem horarios disponiveis.' : '';
+}
+
+function startDayAppointmentsSubscription() {
+  state.unsubscribeDayAppointments?.();
+  state.unsubscribeDayAppointments = null;
+  state.newLeadSchedule.appointments = [];
+  state.newLeadSchedule.error = '';
+  const appointmentDate = state.newLeadSchedule.appointmentDate;
+  if (!appointmentDate || state.newLeadSchedule.settings.schedulingMode === 'free') {
+    state.newLeadSchedule.loading = false;
+    refreshAppointmentTimeControl();
+    return;
+  }
+
+  if (state.demoMode) {
+    state.newLeadSchedule.appointments = state.leads.filter((lead) => lead.appointmentDate === appointmentDate);
+    state.newLeadSchedule.loading = false;
+    refreshAppointmentTimeControl();
+    return;
+  }
+
+  state.newLeadSchedule.loading = true;
+  refreshAppointmentTimeControl();
+  try {
+    state.unsubscribeDayAppointments = subscribeToDayAppointments(
+      state.profile,
+      appointmentDate,
+      (appointments) => {
+        state.newLeadSchedule.appointments = appointments;
+        state.newLeadSchedule.loading = false;
+        state.newLeadSchedule.error = '';
+        refreshAppointmentTimeControl();
+      },
+      () => {
+        state.newLeadSchedule.loading = false;
+        state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
+        refreshAppointmentTimeControl();
+      }
+    );
+  } catch {
+    state.newLeadSchedule.loading = false;
+    state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
+    refreshAppointmentTimeControl();
+  }
+}
+
+function ensureNewLeadSchedule() {
+  if (state.route !== 'new' || !state.profile || state.newLeadSchedule.loaded) return;
+  state.newLeadSchedule.loading = true;
+  if (state.demoMode) {
+    const configured = state.settings.records.find((item) => item.id === state.profile.storeId);
+    state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...(configured || {}) };
+    state.newLeadSchedule.loaded = true;
+    state.newLeadSchedule.loading = false;
+    render();
+    return;
+  }
+  try {
+    state.unsubscribeStoreSchedule = subscribeToStoreSchedule(
+      state.profile,
+      (settings) => {
+        state.newLeadSchedule.settings = settings;
+        state.newLeadSchedule.loaded = true;
+        state.newLeadSchedule.loading = false;
+        refreshAppointmentTimeControl();
+      },
+      () => {
+        state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+        state.newLeadSchedule.loaded = true;
+        state.newLeadSchedule.loading = false;
+        state.newLeadSchedule.error = 'Usando a configuracao padrao da agenda.';
+        refreshAppointmentTimeControl();
+      }
+    );
+  } catch {
+    state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+    state.newLeadSchedule.loaded = true;
+    state.newLeadSchedule.loading = false;
+    render();
+  }
+}
+
+async function loadSettingsData() {
+  if (!isAdmin() || state.settings.loading) return;
+  state.settings.loading = true;
+  state.settings.error = '';
+  render();
+  try {
+    state.settings.records = state.demoMode
+      ? STORES.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }))
+      : await loadStoreSchedules(state.profile);
+    state.settings.loaded = true;
+  } catch (error) {
+    state.settings.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao pode consultar estas configuracoes.'
+      : 'Nao foi possivel carregar as configuracoes das lojas.';
+  } finally {
+    state.settings.loading = false;
+    render();
+  }
+}
+
+function ensureSettingsData() {
+  if (state.route === 'settings' && isAdmin() && !state.settings.loaded) loadSettingsData();
 }
 
 async function loadAccessData() {
@@ -1308,6 +1656,7 @@ async function handleAction(action) {
     state.unsubscribeLeads?.();
     state.unsubscribeLeads = null;
     stopAppointmentsSubscription();
+    stopNewLeadScheduleSubscriptions();
     sessionStorage.removeItem(DEMO_SESSION_KEY);
     await signOutUser();
     state.profile = null;
@@ -1330,9 +1679,27 @@ async function handleAction(action) {
       records: [],
       truncated: false,
       updatingId: '',
+      backfillingMonth: '',
+      backfilledMonths: [],
       month: monthKeyFromDate(),
       storeId: '',
       selectedDate: toLocalDateInput(new Date())
+    };
+    state.newLeadSchedule = {
+      loaded: false,
+      loading: false,
+      error: '',
+      settings: { ...DEFAULT_STORE_SCHEDULE },
+      appointmentDate: '',
+      appointments: []
+    };
+    state.settings = {
+      loaded: false,
+      loading: false,
+      saving: false,
+      error: '',
+      selectedStoreId: STORES[0]?.id || '',
+      records: []
     };
     state.access = {
       loading: false,
@@ -1465,7 +1832,7 @@ export async function startApp() {
       if (!lead) return;
       confirmDeleteButton.disabled = true;
       try {
-        await deleteManagementLead(state.profile, lead.id);
+        await deleteManagementLead(state.profile, lead);
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
         state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
         navigate('management');
@@ -1544,18 +1911,30 @@ export async function startApp() {
   });
 
   window.addEventListener('hashchange', () => {
+    const previousRoute = state.route;
     state.route = currentRoute();
     if (state.route !== 'appointments') stopAppointmentsSubscription();
+    if (state.route !== 'new') {
+      stopNewLeadScheduleSubscriptions();
+      state.newLeadSchedule.loaded = false;
+      state.newLeadSchedule.appointmentDate = '';
+      state.newLeadSchedule.appointments = [];
+    } else if (previousRoute !== 'new') {
+      state.newLeadSchedule.loaded = false;
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     render();
     ensureManagementData();
     ensureAppointmentsData();
+    ensureNewLeadSchedule();
     ensureAccessData();
     ensureGoalsData();
+    ensureSettingsData();
   });
 
   window.addEventListener('online', render);
   window.addEventListener('offline', render);
+  window.addEventListener('resize', syncAgendaSidebarHeight);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {
       synchronizeNow(false).catch(() => {});
@@ -1602,8 +1981,10 @@ export async function startApp() {
       render();
       ensureManagementData();
       ensureAppointmentsData();
+      ensureNewLeadSchedule();
       ensureAccessData();
       ensureGoalsData();
+      ensureSettingsData();
     }
   });
 }

@@ -190,10 +190,12 @@ As colecoes iniciais previstas sao:
 - `users`: usuarios autenticados por UID;
 - `interests`: opcoes ativas de interesse;
 - `leads`: pre-cadastros captados.
+- `appointmentSlots`: reservas minimas de horario, sem dados pessoais do cliente;
 - `goals`: metas individuais de quantidade de leads atribuidas a captadores.
 
 A agenda gerencial nao cria uma colecao propria: ela consulta `appointmentDate` e `appointmentTime` nos documentos de `leads` para manter uma unica fonte de verdade.
 Gestores podem atualizar somente o estado de comparecimento dos pre-agendamentos da propria loja; essa permissao nao se estende aos demais campos do lead.
+Cada documento em `stores` pode definir `schedulingMode`, `appointmentDurationMinutes`, `openingTime` e `closingTime`. Na ausencia desses campos, a agenda controlada usa 20 minutos e expediente das 08:00 as 18:00.
 
 O modelo detalhado, os campos e os indices estao em [`docs/TDD.md`](docs/TDD.md). Nao renomeie colecoes, mude tipos ou introduza campos obrigatorios sem avaliar:
 

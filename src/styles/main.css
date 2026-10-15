@@ -563,6 +563,35 @@ svg {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+#appointment-time-field {
+  min-width: 0;
+}
+
+.schedule-availability {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.schedule-date-status {
+  display: none;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.field.is-fully-booked input {
+  border-color: #c7ced6;
+  color: #778392;
+  background: #edf0f3;
+}
+
+.field.is-fully-booked .schedule-date-status {
+  display: block;
+}
+
 .field label:not(.checkbox-label) {
   display: block;
   margin-bottom: 7px;
@@ -1004,6 +1033,113 @@ svg {
   grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
   align-items: start;
   gap: 22px;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+  align-items: start;
+  gap: 22px;
+}
+
+.settings-form,
+.schedule-preview {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-form {
+  box-shadow: var(--shadow);
+}
+
+.schedule-settings-fields.is-disabled {
+  display: none;
+}
+
+.schedule-hours {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.number-with-unit {
+  position: relative;
+}
+
+.number-with-unit input {
+  padding-right: 52px;
+}
+
+.number-with-unit span {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  transform: translateY(-50%);
+}
+
+.schedule-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.schedule-summary-grid > div {
+  min-height: 86px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+}
+
+.schedule-summary-grid span,
+.schedule-free-state span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.schedule-summary-grid strong {
+  font-size: 1rem;
+}
+
+.schedule-slot-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.schedule-slot-preview span {
+  padding: 9px 8px;
+  border: 1px solid #b7cce5;
+  border-radius: 6px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.schedule-free-state {
+  min-height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--brand);
+  text-align: center;
+}
+
+.schedule-free-state svg {
+  width: 32px;
+  height: 32px;
 }
 
 .access-form {
@@ -1511,8 +1647,18 @@ svg {
 }
 
 .agenda-sidebar {
+  height: var(--agenda-calendar-height, auto);
+  min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
+}
+
+.agenda-day-details {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .agenda-summary,
@@ -1580,8 +1726,28 @@ svg {
 }
 
 .appointment-list {
+  min-height: 0;
+  flex: 1 1 auto;
   display: grid;
+  align-content: start;
   gap: 12px;
+  padding-right: 5px;
+  overflow-y: auto;
+  scrollbar-color: #9cb8d8 transparent;
+  scrollbar-width: thin;
+}
+
+.appointment-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.appointment-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #9cb8d8;
+}
+
+.appointment-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .appointment-item {
@@ -2228,8 +2394,13 @@ svg {
     grid-column: 1 / -1;
   }
 
-  .appointment-fields .field:first-child {
-    grid-column: auto;
+  .appointment-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .appointment-fields .field:first-child,
+  .appointment-fields > #appointment-time-field {
+    grid-column: 1;
   }
 
   .mode-badge {
@@ -2366,8 +2537,29 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .agenda-layout {
     grid-template-columns: 1fr;
+  }
+
+  .agenda-sidebar {
+    height: auto;
+    overflow: visible;
+  }
+
+  .agenda-day-details {
+    overflow: visible;
+  }
+
+  .appointment-list {
+    overflow-y: visible;
   }
 
   .calendar-panel {

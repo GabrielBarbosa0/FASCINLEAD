@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -8,7 +7,8 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  where
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadUpdate } from '../utils/lead.js';
@@ -61,19 +61,46 @@ function assertAdmin(profile) {
   }
 }
 
-export async function updateManagementLead(profile, id, input) {
+export async function updateManagementLead(profile, lead, input) {
   assertAdmin(profile);
   const validation = createLeadUpdate(input);
   if (!validation.isValid) return validation;
 
-  await setDoc(doc(db, 'leads', id), {
+  const oldControlled = lead.appointmentSchedulingMode === 'controlled' && lead.appointmentDate && lead.appointmentTime;
+  const newControlled = validation.data.appointmentSchedulingMode === 'controlled'
+    && validation.data.appointmentDate && validation.data.appointmentTime;
+  const oldSlotId = oldControlled ? `slot-${lead.storeId}-${lead.appointmentDate}-${lead.appointmentTime}` : '';
+  const newSlotId = newControlled ? `slot-${lead.storeId}-${validation.data.appointmentDate}-${validation.data.appointmentTime}` : '';
+  const update = {
     ...validation.data,
     updatedAtServer: serverTimestamp()
-  }, { merge: true });
+  };
+  if (oldSlotId !== newSlotId && (oldSlotId || newSlotId)) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', lead.id), update, { merge: true });
+    if (oldSlotId) batch.delete(doc(db, 'appointmentSlots', oldSlotId));
+    if (newSlotId) batch.set(doc(db, 'appointmentSlots', newSlotId), {
+      storeId: lead.storeId,
+      appointmentDate: validation.data.appointmentDate,
+      appointmentTime: validation.data.appointmentTime,
+      durationMinutes: validation.data.appointmentDurationMinutes,
+      leadId: lead.id,
+      capturedByUid: lead.capturedByUid,
+      createdAt: serverTimestamp()
+    });
+    await batch.commit();
+  } else {
+    await setDoc(doc(db, 'leads', lead.id), update, { merge: true });
+  }
   return validation;
 }
 
-export async function deleteManagementLead(profile, id) {
+export async function deleteManagementLead(profile, lead) {
   assertAdmin(profile);
-  await deleteDoc(doc(db, 'leads', id));
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'leads', lead.id));
+  if (lead.appointmentDate && lead.appointmentTime) {
+    batch.delete(doc(db, 'appointmentSlots', `slot-${lead.storeId}-${lead.appointmentDate}-${lead.appointmentTime}`));
+  }
+  await batch.commit();
 }

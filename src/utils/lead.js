@@ -56,7 +56,11 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       interestLabel: interest.id ? interest.label : '',
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
-      ...(input.appointmentDate?.trim() ? { appointmentAttendance: 'pending' } : {}),
+      ...(input.appointmentDate?.trim() ? {
+        appointmentAttendance: 'pending',
+        appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
+        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
+      } : {}),
       notes: input.notes?.trim() || '',
       source: 'street',
       capturedAtClient: now.toISOString(),
@@ -90,6 +94,10 @@ export function createLeadUpdate(input) {
       interestLabel: interest.id ? interest.label : '',
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
+      ...(input.appointmentDate?.trim() && input.schedulingMode ? {
+        appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
+        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
+      } : {}),
       notes: input.notes?.trim() || ''
     }
   };

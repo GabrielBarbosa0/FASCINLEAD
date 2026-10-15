@@ -71,6 +71,7 @@ service cloud.firestore {
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
+          'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
           'consentGiven', 'consentAtClient', 'source',
           'capturedAtClient', 'createdAtServer', 'updatedAtServer',
@@ -104,8 +105,33 @@ service cloud.firestore {
           || data.appointmentAttendanceUpdatedAt is timestamp)
         && (!('appointmentAttendanceUpdatedByUid' in data)
           || data.appointmentAttendanceUpdatedByUid is string)
+        && (!('appointmentSchedulingMode' in data)
+          || data.appointmentSchedulingMode in ['controlled', 'free'])
+        && (!('appointmentDurationMinutes' in data)
+          || (data.appointmentDurationMinutes is int
+            && data.appointmentDurationMinutes >= 5
+            && data.appointmentDurationMinutes <= 180))
         && data.source == 'street'
         && data.schemaVersion == 1;
+    }
+
+    function validAppointmentSlot(slotId, data) {
+      return data.keys().hasOnly([
+          'storeId', 'appointmentDate', 'appointmentTime', 'durationMinutes',
+          'leadId', 'capturedByUid', 'createdAt'
+        ])
+        && data.storeId is string
+        && data.appointmentDate is string
+        && data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.appointmentTime is string
+        && data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$')
+        && data.durationMinutes is int
+        && data.durationMinutes >= 5
+        && data.durationMinutes <= 180
+        && data.leadId is string
+        && data.capturedByUid is string
+        && data.createdAt is timestamp
+        && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.appointmentTime;
     }
 
     function isCaptorLeadCorrection() {
@@ -114,7 +140,8 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
-          'appointmentDate', 'appointmentTime', 'notes', 'updatedAtServer'
+          'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
+          'appointmentDurationMinutes', 'notes', 'updatedAtServer'
         ]);
     }
 
@@ -199,6 +226,32 @@ service cloud.firestore {
         && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate());
 
       allow delete: if isAdmin();
+    }
+
+    match /appointmentSlots/{slotId} {
+      allow get, list: if activeUser() && (
+        resource.data.storeId == userProfile().storeId || isAdmin()
+      );
+      allow create: if activeUser()
+        && validAppointmentSlot(slotId, request.resource.data)
+        && (isAdmin() || (
+          request.resource.data.storeId == userProfile().storeId
+          && request.resource.data.capturedByUid == request.auth.uid
+        ))
+        && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.storeId == request.resource.data.storeId
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentDate == request.resource.data.appointmentDate
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (activeUser()
+          && resource.data.capturedByUid == request.auth.uid
+          && (
+            !existsAfter(/databases/$(database)/documents/leads/$(resource.data.leadId))
+            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDate != resource.data.appointmentDate
+            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentTime != resource.data.appointmentTime
+          ));
     }
 
     match /goals/{goalId} {
