@@ -1,6 +1,6 @@
 # FascinLead
 
-Pre-cadastro offline para as equipes de captacao das **Oticas Fascinante**.
+Cadastro offline para as equipes de captacao das **Oticas Fascinante**.
 
 > **Status:** fundacao tecnica e primeiro fluxo de captacao em desenvolvimento.
 
@@ -10,7 +10,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 
 ## Objetivos
 
-- tornar o pre-cadastro rapido e simples no celular;
+- tornar o cadastro rapido e simples no celular;
 - funcionar em locais com conexao instavel ou inexistente;
 - evitar perda, rasura e redigitacao de fichas em papel;
 - identificar o colaborador, a loja e a data de cada captacao;
@@ -31,7 +31,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 
 - login com Google;
 - autorizacao por e-mail, perfil e loja;
-- formulario curto de pre-cadastro;
+- formulario curto de cadastro;
 - funcionamento offline depois do primeiro acesso;
 - armazenamento persistente de registros pendentes;
 - sincronizacao automatica e manual;

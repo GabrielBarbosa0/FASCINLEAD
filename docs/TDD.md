@@ -13,7 +13,7 @@
 
 O FascinLead sera uma aplicacao web progressiva (PWA) para substituir fichas de papel usadas por colaboradores durante a captacao de potenciais clientes na rua.
 
-O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a conexao for restabelecida, os registros pendentes serao sincronizados com a nuvem. O produto nao sera um CRM completo: seu foco e registrar, consultar e encaminhar contatos captados para a equipe responsavel.
+O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao for restabelecida, os registros pendentes serao sincronizados com a nuvem. O produto nao sera um CRM completo: seu foco e registrar, consultar e encaminhar contatos captados para a equipe responsavel.
 
 ### 1.1 Objetivos
 
@@ -40,7 +40,7 @@ O sistema devera permitir o pre-cadastro rapido mesmo sem internet. Quando a con
 
 | Perfil | Responsabilidade | Permissoes iniciais |
 | --- | --- | --- |
-| Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios pre-cadastros; acompanhar as proprias metas |
+| Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios cadastros; acompanhar as proprias metas |
 | Gestor | Acompanhar a captacao de uma loja | Consultar e exportar os registros, criar metas e acompanhar apenas a propria equipe |
 | Administrador | Administrar o FascinLead | Gerenciar usuarios, lojas, metas e consultar todos os registros |
 
@@ -56,7 +56,7 @@ As permissoes devem ser aplicadas pelas regras do Firestore. Ocultar botoes na i
 - A sessao devera permanecer salva no dispositivo para usos posteriores.
 - Usuarios inativos deverao perder acesso na proxima verificacao online.
 
-### RF-02 - Novo pre-cadastro
+### RF-02 - Novo cadastro
 
 Campos minimos propostos:
 
@@ -283,7 +283,7 @@ FASCINLEAD/
 
 1. `Login`: entrar com Google e informar quando a conta nao estiver autorizada.
 2. `Inicio`: atalhos, usuario/loja, conectividade e quantidade pendente.
-3. `Novo`: formulario curto de pre-cadastro.
+3. `Novo`: formulario curto de cadastro.
 4. `Cadastros`: lista pesquisavel dos registros do colaborador.
 5. `Sincronizacao`: totais, ultimo envio, erros e acao manual.
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
@@ -735,7 +735,7 @@ O MVP estara apto para piloto quando:
 | ADR-003 | Usar Firestore como armazenamento local e remoto | SDK oferece cache persistente e sincronizacao offline |
 | ADR-004 | Nao criar backend proprio no MVP | Nao ha integracoes nem processamento privilegiado que o justifique |
 | ADR-005 | Autorizar e-mails antes do primeiro acesso | Login Google sozinho nao restringe contas a colaboradores |
-| ADR-006 | Nao coletar CPF no MVP | Nao e necessario para pre-cadastro e aumenta o risco de privacidade |
+| ADR-006 | Nao coletar CPF no MVP | Nao e necessario para o cadastro e aumenta o risco de privacidade |
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |

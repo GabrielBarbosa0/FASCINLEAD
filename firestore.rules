@@ -77,7 +77,7 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
@@ -112,6 +112,19 @@ service cloud.firestore {
         ))
         && (('ametropiaIds' in data) == ('ametropiaLabels' in data))
         && (!('ametropiaIds' in data) || data.ametropiaIds.size() == data.ametropiaLabels.size())
+        && (!('pathologyIds' in data) || (
+          data.pathologyIds is list
+          && data.pathologyIds.size() <= 8
+          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'other', 'none', 'unknown'])
+          && (!data.pathologyIds.hasAny(['none', 'unknown']) || data.pathologyIds.size() == 1)
+        ))
+        && (!('pathologyLabels' in data) || (
+          data.pathologyLabels is list
+          && data.pathologyLabels.size() <= 8
+          && data.pathologyLabels.hasOnly(['Catarata', 'Glaucoma', 'Diabetes', 'Pressao alta', 'Ceratocone', 'Retinopatia', 'Olho seco', 'Outra', 'Nao possui', 'Nao sabe informar'])
+        ))
+        && (('pathologyIds' in data) == ('pathologyLabels' in data))
+        && (!('pathologyIds' in data) || data.pathologyIds.size() == data.pathologyLabels.size())
         && (!('appointmentDate' in data) || (
           data.appointmentDate is string
           && (data.appointmentDate == '' || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
@@ -171,7 +184,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentAttendance', 'notes', 'updatedAtServer'
         ])
@@ -271,7 +284,9 @@ service cloud.firestore {
       allow create: if activeUser()
         && validLead(request.resource.data)
         && request.resource.data.capturedByUid == request.auth.uid
-        && request.resource.data.storeId == userProfile().storeId;
+        && (isAdmin()
+          || request.resource.data.storeId == userProfile().storeId
+          || managerHasStore(request.resource.data.storeId));
 
       allow get, list: if activeUser() && (
         resource.data.capturedByUid == request.auth.uid
@@ -294,7 +309,7 @@ service cloud.firestore {
       );
       allow create: if activeUser()
         && validAppointmentSlot(slotId, request.resource.data)
-        && (isAdmin() || (
+        && (isAdmin() || managerHasStore(request.resource.data.storeId) || (
           request.resource.data.storeId == userProfile().storeId
           && request.resource.data.capturedByUid == request.auth.uid
         ))

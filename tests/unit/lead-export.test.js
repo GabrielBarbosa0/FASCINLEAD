@@ -12,6 +12,7 @@ describe('createLeadsCsv', () => {
       phoneSearch: '81999991234',
       interestLabel: 'Armacao',
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
+      pathologyLabels: ['Glaucoma', 'Pressao alta'],
       neighborhood: 'Centro',
       city: 'Recife',
       state: 'PE',
@@ -35,6 +36,8 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"Captacao em campo"');
     expect(csv).toContain('"Ametropias"');
     expect(csv).toContain('"Miopia, Astigmatismo"');
+    expect(csv).toContain('"Patologias e condicoes de saude"');
+    expect(csv).toContain('"Glaucoma, Pressao alta"');
     expect(csv).not.toContain('Consentimento');
   });
 

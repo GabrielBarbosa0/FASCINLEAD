@@ -97,6 +97,8 @@ describe('lead correction rules', () => {
       notes: '',
       ametropiaIds: ['myopia', 'astigmatism'],
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
+      pathologyIds: ['glaucoma', 'diabetes'],
+      pathologyLabels: ['Glaucoma', 'Diabetes'],
       source: 'street',
       schemaVersion: 1,
       capturedByUid: 'captor-uid',
@@ -108,6 +110,39 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('lets a manager schedule a lead in an additional permitted store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', 'manager-scheduled-lead'), {
+      fullName: 'Cliente do Gestor',
+      phone: '+5581999995678',
+      phoneSearch: '81999995678',
+      notes: '',
+      appointmentDate: '2026-10-20',
+      appointmentTime: '10:00',
+      appointmentSchedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      source: 'street',
+      schemaVersion: 1,
+      capturedByUid: 'manager-uid',
+      capturedByName: 'Gestor Teste',
+      storeId: 'loja-02',
+      capturedAtClient: '2026-10-16T12:00:00.000Z',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-loja-02-2026-10-20-10:00'), {
+      storeId: 'loja-02',
+      appointmentDate: '2026-10-20',
+      appointmentTime: '10:00',
+      durationMinutes: 20,
+      leadId: 'manager-scheduled-lead',
+      capturedByUid: 'manager-uid',
+      createdAt: Timestamp.now()
+    });
+    await assertSucceeds(batch.commit());
+  });
+
   it('lets the captor correct editable fields in their own lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
@@ -115,6 +150,8 @@ describe('lead correction rules', () => {
       notes: 'Prefere contato pela tarde',
       ametropiaIds: ['presbyopia'],
       ametropiaLabels: ['Presbiopia'],
+      pathologyIds: ['hypertension'],
+      pathologyLabels: ['Pressao alta'],
       updatedAtServer: Timestamp.now()
     }));
   });
@@ -124,6 +161,15 @@ describe('lead correction rules', () => {
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
       ametropiaIds: ['myopia', 'none'],
       ametropiaLabels: ['Miopia', 'Nao possui'],
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('rejects contradictory pathology answers', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      pathologyIds: ['glaucoma', 'none'],
+      pathologyLabels: ['Glaucoma', 'Nao possui'],
       updatedAtServer: Timestamp.now()
     }));
   });

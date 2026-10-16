@@ -18,6 +18,19 @@ export const AMETROPIAS = [
   { id: 'unknown', label: 'Nao sabe informar' }
 ];
 
+export const PATHOLOGIES = [
+  { id: 'cataract', label: 'Catarata' },
+  { id: 'glaucoma', label: 'Glaucoma' },
+  { id: 'diabetes', label: 'Diabetes' },
+  { id: 'hypertension', label: 'Pressao alta' },
+  { id: 'keratoconus', label: 'Ceratocone' },
+  { id: 'retinopathy', label: 'Retinopatia' },
+  { id: 'dry-eye', label: 'Olho seco' },
+  { id: 'other', label: 'Outra' },
+  { id: 'none', label: 'Nao possui' },
+  { id: 'unknown', label: 'Nao sabe informar' }
+];
+
 function normalizeAmetropias(values) {
   const requested = Array.isArray(values) ? values : [values].filter(Boolean);
   const validIds = new Set(AMETROPIAS.map((item) => item.id));
@@ -32,6 +45,23 @@ function ametropiaData(input) {
   return {
     ametropiaIds,
     ametropiaLabels: ametropiaIds.map((id) => AMETROPIAS.find((item) => item.id === id).label)
+  };
+}
+
+function normalizePathologies(values) {
+  const requested = Array.isArray(values) ? values : [values].filter(Boolean);
+  const validIds = new Set(PATHOLOGIES.map((item) => item.id));
+  const selected = [...new Set(requested.map(String).filter((id) => validIds.has(id)))];
+  if (selected.includes('none')) return ['none'];
+  if (selected.includes('unknown')) return ['unknown'];
+  return selected;
+}
+
+function pathologyData(input) {
+  const pathologyIds = normalizePathologies(input.pathologyIds);
+  return {
+    pathologyIds,
+    pathologyLabels: pathologyIds.map((id) => PATHOLOGIES.find((item) => item.id === id).label)
   };
 }
 
@@ -81,6 +111,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
+      ...pathologyData(input),
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() ? {
@@ -120,6 +151,7 @@ export function createLeadUpdate(input) {
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
+      ...pathologyData(input),
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() && input.schedulingMode ? {

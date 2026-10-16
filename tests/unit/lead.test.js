@@ -10,6 +10,7 @@ const validInput = {
   state: 'PE',
   interestId: 'complete-glasses',
   ametropiaIds: ['myopia', 'astigmatism'],
+  pathologyIds: ['glaucoma', 'diabetes'],
   appointmentDate: '2026-10-02',
   appointmentTime: '14:30',
   notes: ''
@@ -62,6 +63,8 @@ describe('lead validation', () => {
       appointmentAttendance: 'pending',
       ametropiaIds: ['myopia', 'astigmatism'],
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
+      pathologyIds: ['glaucoma', 'diabetes'],
+      pathologyLabels: ['Glaucoma', 'Diabetes'],
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -99,5 +102,15 @@ describe('lead validation', () => {
 
     expect(result.data.ametropiaIds).toEqual(['none']);
     expect(result.data.ametropiaLabels).toEqual(['Nao possui']);
+  });
+
+  it('keeps exclusive pathology answers consistent', () => {
+    const result = createLeadUpdate({
+      ...validInput,
+      pathologyIds: ['glaucoma', 'none']
+    });
+
+    expect(result.data.pathologyIds).toEqual(['none']);
+    expect(result.data.pathologyLabels).toEqual(['Nao possui']);
   });
 });

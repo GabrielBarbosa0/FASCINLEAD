@@ -50,6 +50,7 @@ const CSV_COLUMNS = [
   ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
   ['Interesse principal', (lead) => lead.interestLabel],
   ['Ametropias', (lead) => Array.isArray(lead.ametropiaLabels) ? lead.ametropiaLabels.join(', ') : ''],
+  ['Patologias e condicoes de saude', (lead) => Array.isArray(lead.pathologyLabels) ? lead.pathologyLabels.join(', ') : ''],
   ['Bairro', (lead) => lead.neighborhood],
   ['Cidade', (lead) => lead.city],
   ['UF', (lead) => lead.state],

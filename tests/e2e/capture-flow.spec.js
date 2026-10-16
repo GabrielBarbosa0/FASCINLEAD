@@ -19,13 +19,15 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   });
 
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
-  await expect(page.getByRole('heading', { name: 'Pre-cadastro' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cadastro' })).toBeVisible();
 
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
   await page.getByLabel('Miopia').check();
   await page.getByLabel('Astigmatismo').check();
+  await page.getByLabel('Glaucoma').check();
+  await page.getByLabel('Diabetes').check();
   await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
   await page.getByLabel('Horario disponivel').selectOption('14:20');
   await page.screenshot({
@@ -45,9 +47,16 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByLabel('Horario')).toHaveValue('14:20');
   await expect(page.getByLabel('Miopia')).toBeChecked();
   await expect(page.getByLabel('Astigmatismo')).toBeChecked();
-  await page.getByLabel('Nao possui').check();
+  await expect(page.getByLabel('Glaucoma')).toBeChecked();
+  await expect(page.getByLabel('Diabetes')).toBeChecked();
+  const ametropias = page.getByRole('group', { name: 'Ametropias' });
+  await ametropias.getByLabel('Nao possui').check();
   await expect(page.getByLabel('Miopia')).not.toBeChecked();
   await expect(page.getByLabel('Astigmatismo')).not.toBeChecked();
+  const pathologies = page.getByRole('group', { name: 'Patologias e condicoes de saude' });
+  await pathologies.getByLabel('Nao possui').check();
+  await expect(page.getByLabel('Glaucoma')).not.toBeChecked();
+  await expect(page.getByLabel('Diabetes')).not.toBeChecked();
   await page.screenshot({
     path: testInfo.outputPath('lead-details.png'),
     fullPage: true
@@ -186,6 +195,19 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await expect(page.getByText('Cliente Agenda A', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Agenda B', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Outro Dia', { exact: true })).not.toBeVisible();
+
+  await page.getByRole('button', { name: 'Novo cadastro' }).click();
+  const appointmentDialog = page.getByRole('dialog', { name: 'Novo agendamento' });
+  await expect(appointmentDialog).toBeVisible();
+  await expect(appointmentDialog.getByLabel('Horario disponivel').locator('option[value="08:20"]')).toHaveCount(0);
+  await appointmentDialog.getByLabel('Nome *').fill('Cliente Direto Agenda');
+  await appointmentDialog.getByLabel('Telefone ou WhatsApp *').fill('81988887777');
+  await appointmentDialog.getByLabel('Horario disponivel').selectOption('08:40');
+  await page.screenshot({ path: testInfo.outputPath('appointment-create-modal.png'), fullPage: true });
+  await appointmentDialog.getByRole('button', { name: 'Salvar cadastro' }).click();
+  await expect(appointmentDialog).not.toBeVisible();
+  await expect(selectedDay).toContainText('3 exames');
+  await expect(page.getByText('Cliente Direto Agenda', { exact: true })).toBeVisible();
 
   const attendance = page.getByRole('group', { name: 'Comparecimento de Cliente Agenda A' });
   await attendance.getByRole('button', { name: 'Compareceu', exact: true }).click();

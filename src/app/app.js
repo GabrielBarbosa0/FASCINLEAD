@@ -52,7 +52,7 @@ import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscr
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { AMETROPIAS, INTERESTS } from '../utils/lead.js';
+import { AMETROPIAS, INTERESTS, PATHOLOGIES } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
@@ -144,6 +144,13 @@ const state = {
     month: monthKeyFromDate(),
     storeId: '',
     selectedDate: toLocalDateInput(new Date())
+  },
+  appointmentCreate: {
+    loading: false,
+    saving: false,
+    error: '',
+    schedules: [],
+    storeId: ''
   },
   newLeadSchedule: {
     loaded: false,
@@ -347,7 +354,7 @@ function loginView() {
         <div class="brand-mark" aria-hidden="true">F</div>
         <p class="eyebrow">OTICAS FASCINANTE</p>
         <h1 id="login-title">FascinLead</h1>
-        <p class="login-copy">Pre-cadastro rapido para quem encontra clientes onde eles estao.</p>
+        <p class="login-copy">Cadastro rapido para quem encontra clientes onde eles estao.</p>
         ${configNotice}
         ${state.authError ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.authError)}</span></div>` : ''}
         <button class="button button-primary button-block" type="button" data-action="google-login" ${!isFirebaseConfigured ? 'disabled' : ''}>
@@ -366,7 +373,7 @@ function loginView() {
 function currentPageTitle() {
   const titles = {
     home: 'Inicio',
-    new: 'Pre-cadastro',
+    new: 'Cadastro',
     leads: 'Meus cadastros',
     lead: 'Detalhes do cadastro',
     sync: 'Sincronizacao',
@@ -506,13 +513,24 @@ function ametropiaOptions(selectedIds = []) {
   </label>`).join('');
 }
 
-function leadFormValues(form) {
-  const formData = new FormData(form);
-  return { ...Object.fromEntries(formData), ametropiaIds: formData.getAll('ametropiaIds') };
+function pathologyOptions(selectedIds = []) {
+  return PATHOLOGIES.map((item) => `<label class="ametropia-option checkbox-label">
+    <input type="checkbox" name="pathologyIds" value="${item.id}" ${selectedIds.includes(item.id) ? 'checked' : ''} />
+    <span>${item.label}</span>
+  </label>`).join('');
 }
 
-function bindAmetropiaOptions(form) {
-  const inputs = [...form.querySelectorAll('[name="ametropiaIds"]')];
+function leadFormValues(form) {
+  const formData = new FormData(form);
+  return {
+    ...Object.fromEntries(formData),
+    ametropiaIds: formData.getAll('ametropiaIds'),
+    pathologyIds: formData.getAll('pathologyIds')
+  };
+}
+
+function bindExclusiveOptions(form, fieldName) {
+  const inputs = [...form.querySelectorAll(`[name="${fieldName}"]`)];
   inputs.forEach((input) => input.addEventListener('change', () => {
     if (!input.checked) return;
     const exclusive = ['none', 'unknown'];
@@ -559,6 +577,11 @@ function newLeadView() {
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions()}</div>
+      </fieldset>
+      <fieldset class="field ametropia-field">
+        <legend>Patologias e condicoes de saude</legend>
+        <small>Marque todas que se aplicam.</small>
+        <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
@@ -705,6 +728,11 @@ function leadDetailView() {
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions(lead.ametropiaIds || [])}</div>
       </fieldset>
+      <fieldset class="field ametropia-field">
+        <legend>Patologias e condicoes de saude</legend>
+        <small>Marque todas que se aplicam.</small>
+        <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
+      </fieldset>
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
         <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
@@ -821,6 +849,7 @@ function appointmentsView() {
   const groups = appointmentsByDate(records);
   const days = calendarDays(month);
   const selected = groups[selectedDate] || [];
+  const selectedDateCanBeScheduled = selectedDate >= toLocalDateInput(new Date());
   const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const cells = days.map((day) => {
@@ -861,6 +890,7 @@ function appointmentsView() {
     .filter((store) => !storeId || store.id === storeId)
     .map((store) => `<div class="agenda-store-row"><span><i data-lucide="building-2"></i>${store.label}</span><strong>${store.count} exame(s)</strong></div>`)
     .join('');
+  const createDialog = appointmentCreateDialog(allowedStores);
 
   return `<section class="management-heading page-actions-only agenda-heading">
       <button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
@@ -885,9 +915,70 @@ function appointmentsView() {
       </div>
       <aside class="agenda-sidebar">
         <section class="agenda-summary"><div class="agenda-section-title"><i data-lucide="building-2"></i><h2>Unidades</h2></div>${storeTotals}</section>
-        <section class="agenda-day-details"><div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div><div class="appointment-list">${selectedItems}</div></section>
+        <section class="agenda-day-details">
+          <div class="agenda-day-heading">
+            <div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div>
+            <button class="button button-primary agenda-create-button" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo cadastro</span></button>
+          </div>
+          <div class="appointment-list">${selectedItems}</div>
+        </section>
       </aside>
-    </section>`;
+    </section>${createDialog}`;
+}
+
+function appointmentCreateSchedule() {
+  return state.appointmentCreate.schedules.find((item) => item.id === state.appointmentCreate.storeId)
+    || { ...DEFAULT_STORE_SCHEDULE, id: state.appointmentCreate.storeId };
+}
+
+function appointmentCreateTimeField() {
+  const schedule = appointmentCreateSchedule();
+  if (state.appointmentCreate.loading) {
+    return '<div class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
+  }
+  if (schedule.schedulingMode === 'free') {
+    return '<div class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
+  }
+  const records = (state.demoMode ? state.leads : state.appointments.records)
+    .filter((lead) => lead.storeId === state.appointmentCreate.storeId
+      && lead.appointmentDate === state.appointments.selectedDate);
+  const available = buildAppointmentSlots(schedule, records).filter((slot) => slot.available);
+  return `<div class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+}
+
+function appointmentCreateDialog(allowedStores) {
+  const { loading, saving, error, storeId } = state.appointmentCreate;
+  const schedule = appointmentCreateSchedule();
+  const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${store.id === storeId ? 'selected' : ''}>${store.label}</option>`).join('');
+  return `<dialog id="appointment-create-dialog" class="appointment-create-dialog" aria-labelledby="appointment-create-title">
+    <div class="appointment-create-header">
+      <div><span>CADASTRO</span><h2 id="appointment-create-title">Novo agendamento</h2><p>${escapeHtml(formatAppointmentDate(state.appointments.selectedDate))}</p></div>
+      <button class="icon-button" type="button" data-close-appointment-create aria-label="Fechar"><i data-lucide="circle-x"></i></button>
+    </div>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    <form id="appointment-create-form" novalidate>
+      <input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" />
+      <input name="schedulingMode" type="hidden" value="${escapeHtml(schedule.schedulingMode)}" />
+      <input name="appointmentDurationMinutes" type="hidden" value="${schedule.appointmentDurationMinutes}" />
+      <div class="appointment-create-grid">
+        <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
+        ${appointmentCreateTimeField()}
+        <div class="field appointment-create-wide" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
+        <div class="field appointment-create-wide" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" required /><small class="field-error"></small></div>
+        <div class="field appointment-create-wide"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
+      </div>
+      <details class="appointment-create-more">
+        <summary>Informacoes adicionais</summary>
+        <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" /></div>
+        <div class="field-row"><div class="field"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
+        <fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>
+        <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
+        <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3"></textarea><small class="field-error"></small></div>
+      </details>
+      <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-close-appointment-create>Cancelar</button><button class="button button-primary" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar cadastro'}</span></button></div>
+    </form>
+  </dialog>`;
 }
 
 function settingsView() {
@@ -1182,7 +1273,8 @@ function bindPageEvents() {
       state.newLeadSchedule.appointmentDate = appointmentDateInput.value;
       startDayAppointmentsSubscription();
     });
-    bindAmetropiaOptions(form);
+    bindExclusiveOptions(form, 'ametropiaIds');
+    bindExclusiveOptions(form, 'pathologyIds');
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = leadFormValues(form);
@@ -1231,7 +1323,8 @@ function bindPageEvents() {
     const notesInput = editLeadForm.elements.notes;
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
-    bindAmetropiaOptions(editLeadForm);
+    bindExclusiveOptions(editLeadForm, 'ametropiaIds');
+    bindExclusiveOptions(editLeadForm, 'pathologyIds');
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = leadFormValues(editLeadForm);
@@ -1339,6 +1432,52 @@ function bindPageEvents() {
     state.appointments.loaded = false;
     startAppointmentsSubscription();
   });
+
+  const appointmentCreateForm = document.querySelector('#appointment-create-form');
+  if (appointmentCreateForm) {
+    const phoneInput = appointmentCreateForm.elements.phone;
+    phoneInput?.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
+    bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
+    bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
+    appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {
+      state.appointmentCreate.storeId = event.target.value;
+      render();
+      document.querySelector('#appointment-create-dialog')?.showModal();
+    });
+    appointmentCreateForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = leadFormValues(appointmentCreateForm);
+      const storeId = appointmentCreateForm.elements.storeId.value;
+      if (!profileStoreIds(state.profile).includes(storeId)) {
+        setFieldErrors(appointmentCreateForm, { storeId: 'Selecione uma loja permitida.' });
+        return;
+      }
+      state.appointmentCreate.saving = true;
+      const submitButton = appointmentCreateForm.querySelector('[type="submit"]');
+      submitButton.disabled = true;
+      const result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
+        state.appointmentCreate.error = 'O cadastro nao foi aceito pela nuvem.';
+        render();
+      });
+      setFieldErrors(appointmentCreateForm, result.errors || {});
+      if (!result.isValid) {
+        state.appointmentCreate.saving = false;
+        submitButton.disabled = false;
+        return;
+      }
+      try {
+        if (result.writePromise) await result.writePromise;
+        document.querySelector('#appointment-create-dialog')?.close();
+        state.appointmentCreate.saving = false;
+        state.appointmentCreate.error = '';
+        showToast('Cadastro adicionado a agenda.');
+      } catch {
+        state.appointmentCreate.saving = false;
+        setFieldErrors(appointmentCreateForm, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
+        submitButton.disabled = false;
+      }
+    });
+  }
 
   const accessForm = document.querySelector('#access-form');
   if (accessForm) {
@@ -1695,6 +1834,33 @@ function startAppointmentsSubscription() {
   );
 }
 
+async function openAppointmentCreateDialog() {
+  const allowedStores = STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
+  const preferredStoreId = state.appointments.storeId
+    || (allowedStores.some((store) => store.id === state.profile.storeId) ? state.profile.storeId : allowedStores[0]?.id)
+    || '';
+  state.appointmentCreate = {
+    loading: true,
+    saving: false,
+    error: '',
+    schedules: [],
+    storeId: preferredStoreId
+  };
+  render();
+  document.querySelector('#appointment-create-dialog')?.showModal();
+  try {
+    state.appointmentCreate.schedules = state.demoMode
+      ? allowedStores.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }))
+      : await loadStoreSchedules(state.profile);
+  } catch {
+    state.appointmentCreate.error = 'Nao foi possivel carregar os horarios das lojas.';
+  } finally {
+    state.appointmentCreate.loading = false;
+    render();
+    document.querySelector('#appointment-create-dialog')?.showModal();
+  }
+}
+
 function ensureAppointmentsData() {
   if (state.route === 'appointments' && canManage() && !state.demoMode && !state.unsubscribeAppointments) {
     startAppointmentsSubscription();
@@ -1953,6 +2119,13 @@ async function handleAction(action) {
       storeId: '',
       selectedDate: toLocalDateInput(new Date())
     };
+    state.appointmentCreate = {
+      loading: false,
+      saving: false,
+      error: '',
+      schedules: [],
+      storeId: ''
+    };
     state.newLeadSchedule = {
       loaded: false,
       loading: false,
@@ -2097,6 +2270,10 @@ export async function startApp() {
       state.appointments.selectedDate = appointmentDayButton.dataset.appointmentDate;
       render();
     }
+    const createAppointmentButton = event.target.closest('[data-create-appointment]');
+    if (createAppointmentButton) await openAppointmentCreateDialog();
+    const closeAppointmentCreateButton = event.target.closest('[data-close-appointment-create]');
+    if (closeAppointmentCreateButton) closeAppointmentCreateButton.closest('dialog')?.close();
     const appointmentMonthButton = event.target.closest('[data-appointment-month]');
     if (appointmentMonthButton && !state.appointments.loading) {
       state.appointments.month = shiftMonth(state.appointments.month, Number(appointmentMonthButton.dataset.appointmentMonth));
