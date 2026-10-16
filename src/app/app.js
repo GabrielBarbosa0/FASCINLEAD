@@ -59,6 +59,7 @@ import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, is
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
+import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
@@ -564,6 +565,11 @@ function bindExclusiveOptions(form, fieldName) {
   }));
 }
 
+function bindCpfInput(form) {
+  const input = form.elements.customerCpf || form.elements.cpf;
+  input?.addEventListener('input', () => { input.value = formatBrazilianCpf(input.value); });
+}
+
 function newLeadView() {
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   return `
@@ -581,6 +587,11 @@ function newLeadView() {
       <div class="field" data-field="phone">
         <label for="phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label>
         <input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" placeholder="(00) 00000-0000" required />
+        <small class="field-error"></small>
+      </div>
+      <div class="field" data-field="customerCpf">
+        <label for="customerCpf">CPF</label>
+        <input id="customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" />
         <small class="field-error"></small>
       </div>
       <div class="field">
@@ -739,6 +750,7 @@ function leadDetailView() {
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required /><small class="field-error"></small></div>
       <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required /><small class="field-error"></small></div>
+      <div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" /><small class="field-error"></small></div>
       <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" /></div>
       <div class="field-row">
         <div class="field"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" /></div>
@@ -1040,6 +1052,7 @@ function appointmentsView() {
 
   return `<section class="management-heading page-actions-only agenda-heading">
       <button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+      <button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A agenda atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} exames neste mes.</span></div>` : ''}
@@ -1064,7 +1077,6 @@ function appointmentsView() {
         <section class="agenda-day-details">
           <div class="agenda-day-heading">
             <div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div>
-            <button class="button button-primary agenda-create-button" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo cadastro</span></button>
           </div>
           <div class="appointment-list">${selectedItems}</div>
         </section>
@@ -1112,6 +1124,7 @@ function appointmentCreateDialog(allowedStores) {
         ${appointmentCreateTimeField()}
         <div class="field appointment-create-wide" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field appointment-create-wide" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" required /><small class="field-error"></small></div>
+        <div class="field appointment-create-wide" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" /><small class="field-error"></small></div>
         <div class="field appointment-create-wide"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
       </div>
       <details class="appointment-create-more">
@@ -1413,6 +1426,7 @@ function bindPageEvents() {
     const phoneInput = form.elements.phone;
     const notesInput = form.elements.notes;
     const appointmentDateInput = form.elements.appointmentDate;
+    bindCpfInput(form);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#notes-count').textContent = notesInput.value.length; });
     appointmentDateInput.addEventListener('input', () => {
@@ -1467,6 +1481,7 @@ function bindPageEvents() {
   if (editLeadForm) {
     const phoneInput = editLeadForm.elements.phone;
     const notesInput = editLeadForm.elements.notes;
+    bindCpfInput(editLeadForm);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
     bindExclusiveOptions(editLeadForm, 'ametropiaIds');
@@ -1596,6 +1611,7 @@ function bindPageEvents() {
   if (appointmentCreateForm) {
     const phoneInput = appointmentCreateForm.elements.phone;
     phoneInput?.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
+    bindCpfInput(appointmentCreateForm);
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
     appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {

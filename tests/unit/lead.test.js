@@ -4,6 +4,7 @@ import { createLeadDocument, createLeadUpdate, validateLeadInput } from '../../s
 const validInput = {
   fullName: 'Cliente Exemplo',
   phone: '(81) 99999-1234',
+  customerCpf: '529.982.247-25',
   preferredName: '',
   neighborhood: '',
   city: '',
@@ -38,6 +39,12 @@ describe('lead validation', () => {
     expect(result.errors.notes).toBeDefined();
   });
 
+  it('accepts an empty CPF and rejects an invalid one', () => {
+    expect(validateLeadInput({ ...validInput, customerCpf: '' }).isValid).toBe(true);
+    const result = validateLeadInput({ ...validInput, customerCpf: '111.111.111-11' });
+    expect(result.errors.customerCpf).toBeDefined();
+  });
+
   it('requires date and time together for a pre-appointment', () => {
     const result = validateLeadInput({
       ...validInput,
@@ -58,6 +65,7 @@ describe('lead validation', () => {
       fullName: 'Cliente Exemplo',
       phone: '+5581999991234',
       phoneSearch: '81999991234',
+      customerCpf: '52998224725',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
       appointmentAttendance: 'pending',

@@ -19,3 +19,21 @@ export async function consultLocalSavwinSales({ startDate, endDate, storeIds }) 
   if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nao foi possivel consultar o SavWin.');
   return payload;
 }
+
+export async function consultLocalSavwinSalesByCpf(cpf, { startDate, endDate, storeIds, periods = [] } = {}) {
+  if (!isLocalSavwinEnabled) throw new Error('A consulta local ao SavWin nao esta disponivel nesta versao.');
+  const storeCodes = [...new Set((storeIds || []).map((storeId) => STORE_CODES[storeId]).filter(Boolean))];
+  const normalizedPeriods = periods.map((period) => ({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    storeCodes
+  }));
+  const response = await fetch('/api/savwin/sales-by-cpf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cpf, startDate, endDate, storeCodes, periods: normalizedPeriods })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nao foi possivel consultar as vendas do cliente.');
+  return payload;
+}

@@ -1,5 +1,7 @@
 const PRODUCTS_BY_OS_PATH = '/api/APIRelatoriosCR/ProdutosPorOSGrid';
 const LOCAL_ROUTE = '/api/savwin/products-by-os';
+const SALES_BY_CPF_PATH = '/api/APIVendasEntregues/RetornaVendasCPF';
+const SALES_BY_CPF_ROUTE = '/api/savwin/sales-by-cpf';
 const ALLOWED_STORE_CODES = new Set(['2', '4', '5', '6']);
 const MAX_BODY_BYTES = 32_768;
 
@@ -48,6 +50,20 @@ export function normalizeSavwinRecords(payload) {
   return [];
 }
 
+export function buildSalesByCpfBody(cpf) {
+  const digits = String(cpf || '').replace(/\D/g, '');
+  if (digits.length !== 11) throw new Error('Informe um CPF valido.');
+  return { CPF: digits };
+}
+
+export function filterSavwinRecordsByCpf(records, cpf) {
+  const digits = buildSalesByCpfBody(cpf).CPF;
+  return records.filter((record) => {
+    const recordCpf = String(record?.CPFCNPJ || record?.CPF || record?.CPFCLIENTE || '').replace(/\D/g, '');
+    return recordCpf === digits;
+  });
+}
+
 function readJson(request) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -81,15 +97,17 @@ export function createSavwinLocalProxy(env, fetchImpl = globalThis.fetch) {
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const pathname = new URL(request.url || '/', 'http://127.0.0.1').pathname;
-        if (pathname !== LOCAL_ROUTE) return next();
+        if (![LOCAL_ROUTE, SALES_BY_CPF_ROUTE].includes(pathname)) return next();
         if (request.method !== 'POST') return sendJson(response, 405, { ok: false, error: 'Metodo nao permitido.' });
         if (!config.baseUrl || !config.identificador || !config.authorization) {
           return sendJson(response, 503, { ok: false, error: 'Credenciais locais do SavWin nao configuradas.' });
         }
 
         try {
-          const body = buildProductsByOsBody(await readJson(request));
-          const upstream = await fetchImpl(`${config.baseUrl}${PRODUCTS_BY_OS_PATH}`, {
+          const requestBody = await readJson(request);
+          const byCpf = pathname === SALES_BY_CPF_ROUTE;
+          const body = byCpf ? buildSalesByCpfBody(requestBody.cpf) : buildProductsByOsBody(requestBody);
+          let upstream = await fetchImpl(`${config.baseUrl}${byCpf ? SALES_BY_CPF_PATH : PRODUCTS_BY_OS_PATH}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -101,12 +119,53 @@ export function createSavwinLocalProxy(env, fetchImpl = globalThis.fetch) {
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(config.timeoutMs)
           });
+          if (byCpf && upstream.status === 404) {
+            const periods = Array.isArray(requestBody.periods) && requestBody.periods.length
+              ? requestBody.periods.slice(0, 5)
+              : [requestBody];
+            const fallbackResponses = await Promise.all(periods.map((period) => fetchImpl(`${config.baseUrl}${PRODUCTS_BY_OS_PATH}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                  identificador: config.identificador,
+                  Authorization: config.authorization,
+                  'User-Agent': 'FascinLead-Local/0.1 leitura'
+                },
+                body: JSON.stringify(buildProductsByOsBody(period)),
+                signal: AbortSignal.timeout(config.timeoutMs)
+              })));
+            const failedResponse = fallbackResponses.find((response) => !response.ok);
+            if (failedResponse) {
+              return sendJson(response, 502, { ok: false, error: `SavWin respondeu com HTTP ${failedResponse.status}.` });
+            }
+            const fallbackPayloads = await Promise.all(fallbackResponses.map((item) => item.json()));
+            const records = filterSavwinRecordsByCpf(
+              fallbackPayloads.flatMap((payload) => normalizeSavwinRecords(payload)),
+              requestBody.cpf
+            );
+            const osCount = new Set(records.map((record) => `${record.LOJA || record.CODLOJA || ''}|${record.OS || record.N_OS || record.NUMEROOS || ''}`)).size;
+            return sendJson(response, 200, {
+              ok: true,
+              count: records.length,
+              osCount,
+              records,
+              source: 'products-by-os-fallback'
+            });
+          }
           if (!upstream.ok) {
             return sendJson(response, 502, { ok: false, error: `SavWin respondeu com HTTP ${upstream.status}.` });
           }
-          const records = normalizeSavwinRecords(await upstream.json());
-          const osCount = new Set(records.map((record) => `${record.LOJA || ''}|${record.OS || ''}`)).size;
-          return sendJson(response, 200, { ok: true, count: records.length, osCount, records });
+          const normalizedRecords = normalizeSavwinRecords(await upstream.json());
+          const records = normalizedRecords;
+          const osCount = new Set(records.map((record) => `${record.LOJA || record.CODLOJA || ''}|${record.OS || record.N_OS || record.NUMEROOS || ''}`)).size;
+          return sendJson(response, 200, {
+            ok: true,
+            count: records.length,
+            osCount,
+            records,
+            source: byCpf ? 'sales-by-cpf' : 'products-by-os'
+          });
         } catch (error) {
           const validationError = error.message?.startsWith('Informe') || error.message?.startsWith('Consulte');
           return sendJson(response, validationError ? 400 : 502, {

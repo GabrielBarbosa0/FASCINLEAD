@@ -76,6 +76,7 @@ service cloud.firestore {
     function validLead(data) {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
+          'customerCpf',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
@@ -97,6 +98,10 @@ service cloud.firestore {
         && data.phoneSearch is string
         && data.phoneSearch.size() >= 10
         && data.phoneSearch.size() <= 11
+        && (!('customerCpf' in data) || (
+          data.customerCpf is string
+          && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))
+        ))
         && data.notes is string
         && data.notes.size() <= 500
         && (!('ametropiaIds' in data) || (
@@ -178,11 +183,42 @@ service cloud.firestore {
         && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.appointmentTime;
     }
 
+    function validLeadSale(leadId, data) {
+      return data.keys().hasOnly([
+          'leadId', 'storeId', 'capturedByUid', 'customerCpf',
+          'purchaseInterest', 'matchStatus', 'savwinStoreCode',
+          'savwinOsNumber', 'savwinSaleCode', 'savwinCustomerCode',
+          'savwinSaleDate', 'savwinSaleValue', 'createdByUid',
+          'createdAt', 'updatedByUid', 'updatedAt', 'schemaVersion'
+        ])
+        && data.leadId == leadId
+        && data.storeId is string
+        && data.capturedByUid is string
+        && data.customerCpf is string
+        && data.customerCpf.matches('^\\d{11}$')
+        && data.purchaseInterest == true
+        && data.matchStatus in ['interest_registered', 'sale_linked']
+        && data.savwinStoreCode is string
+        && data.savwinOsNumber is string
+        && data.savwinSaleCode is string
+        && data.savwinCustomerCode is string
+        && data.savwinSaleDate is string
+        && (data.savwinSaleDate == '' || data.savwinSaleDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
+        && data.savwinSaleValue is number
+        && data.savwinSaleValue >= 0
+        && data.createdByUid is string
+        && data.createdAt is timestamp
+        && data.updatedByUid == request.auth.uid
+        && data.updatedAt is timestamp
+        && data.schemaVersion == 1;
+    }
+
     function isCaptorLeadCorrection() {
       return activeUser()
         && resource.data.capturedByUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
+          'customerCpf',
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
@@ -300,6 +336,26 @@ service cloud.firestore {
         && request.resource.data.createdAtServer == resource.data.createdAtServer
         && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate() || isCaptorFollowUpContactUpdate());
 
+      allow delete: if isAdmin();
+    }
+
+    match /leadSales/{leadId} {
+      allow get: if isAdmin() || (isManager()
+        && exists(/databases/$(database)/documents/leads/$(leadId))
+        && managerHasStore(get(/databases/$(database)/documents/leads/$(leadId)).data.storeId));
+      allow list: if isAdmin() || managerHasStore(resource.data.storeId);
+      allow create: if validLeadSale(leadId, request.resource.data)
+        && (isAdmin() || managerHasStore(request.resource.data.storeId))
+        && exists(/databases/$(database)/documents/leads/$(leadId))
+        && get(/databases/$(database)/documents/leads/$(leadId)).data.storeId == request.resource.data.storeId
+        && get(/databases/$(database)/documents/leads/$(leadId)).data.capturedByUid == request.resource.data.capturedByUid;
+      allow update: if validLeadSale(leadId, request.resource.data)
+        && (isAdmin() || managerHasStore(resource.data.storeId))
+        && request.resource.data.leadId == resource.data.leadId
+        && request.resource.data.storeId == resource.data.storeId
+        && request.resource.data.capturedByUid == resource.data.capturedByUid
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isAdmin();
     }
 

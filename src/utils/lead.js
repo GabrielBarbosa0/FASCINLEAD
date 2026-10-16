@@ -1,4 +1,5 @@
 import { normalizeBrazilianPhone } from './phone.js';
+import { isValidCpf, normalizeCpf } from './savwin-matching.js';
 
 export const INTERESTS = [
   { id: '', label: 'Nao informado' },
@@ -69,10 +70,12 @@ export function validateLeadInput(input) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
   const phone = normalizeBrazilianPhone(input.phone);
+  const customerCpf = normalizeCpf(input.customerCpf);
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
   if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
+  if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF valido.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no maximo 500 caracteres.';
 
   const appointmentDate = input.appointmentDate?.trim() || '';
@@ -88,7 +91,7 @@ export function validateLeadInput(input) {
     errors.appointmentTime = 'Informe um horario valido.';
   }
 
-  return { errors, isValid: Object.keys(errors).length === 0, phone };
+  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf };
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
@@ -105,6 +108,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       preferredName: input.preferredName?.trim() || '',
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
+      customerCpf: validation.customerCpf,
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
@@ -145,6 +149,7 @@ export function createLeadUpdate(input) {
       preferredName: input.preferredName?.trim() || '',
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
+      customerCpf: validation.customerCpf,
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),

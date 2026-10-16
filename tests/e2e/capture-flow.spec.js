@@ -23,6 +23,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByLabel('CPF', { exact: true }).fill('52998224725');
+  await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
   await page.getByLabel('Miopia').check();
   await page.getByLabel('Astigmatismo').check();
@@ -45,6 +47,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByRole('heading', { name: 'Cliente Exemplo', level: 2 })).toBeVisible();
   await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
   await expect(page.getByLabel('Horario')).toHaveValue('14:20');
+  await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
   await expect(page.getByLabel('Miopia')).toBeChecked();
   await expect(page.getByLabel('Astigmatismo')).toBeChecked();
   await expect(page.getByLabel('Glaucoma')).toBeChecked();
@@ -314,7 +317,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await expect(page.getByText('Cliente Agenda B', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Outro Dia', { exact: true })).not.toBeVisible();
 
-  await page.getByRole('button', { name: 'Novo cadastro' }).click();
+  await page.getByRole('button', { name: 'Novo agendamento' }).click();
   const appointmentDialog = page.getByRole('dialog', { name: 'Novo agendamento' });
   await expect(appointmentDialog).toBeVisible();
   await expect(appointmentDialog.getByLabel('Horario disponivel').locator('option[value="08:20"]')).toHaveCount(0);
@@ -392,6 +395,41 @@ test('keeps a long appointment list inside the calendar height', async ({ page }
   expect(layout.listScrollHeight).toBeGreaterThan(layout.listClientHeight);
   expect(layout.listOverflowY).toBe('auto');
   await page.screenshot({ path: testInfo.outputPath('appointments-scroll.png'), fullPage: true });
+});
+
+test('keeps new registration beside the management return action', async ({ page }, testInfo) => {
+  const now = new Date();
+  const appointmentDate = now.toISOString().slice(0, 10);
+  await page.evaluate(({ date }) => {
+    sessionStorage.setItem('fascinlead:demo-role', 'admin');
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([{
+      id: 'lead-sale-test',
+      fullName: 'Cliente Venda',
+      phone: '+5581999991234',
+      phoneSearch: '81999991234',
+      appointmentDate: date,
+      appointmentTime: '10:00',
+      appointmentAttendance: 'attended',
+      capturedAtClient: `${date}T09:00:00.000Z`,
+      capturedByUid: 'demo-admin',
+      capturedByName: 'ADM',
+      storeId: 'loja-06',
+      source: 'street',
+      schemaVersion: 1,
+      syncState: 'demo'
+    }]));
+  }, { date: appointmentDate });
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  await page.locator(`[data-appointment-date="${appointmentDate}"]`).click();
+  const heading = page.locator('.agenda-heading');
+  await expect(heading.getByRole('button', { name: 'Voltar para gestao' })).toBeVisible();
+  await expect(heading.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
+  await expect(page.locator('.agenda-day-heading').getByRole('button', { name: 'Novo agendamento' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Informar CPF|Atualizar CPF/ })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('appointment-header-actions.png'), fullPage: true });
+  await heading.getByRole('button', { name: 'Novo agendamento' }).click();
+  await expect(page.getByRole('dialog', { name: 'Novo agendamento' })).toBeVisible();
 });
 
 test('alerts the captor about a missed appointment and prepares WhatsApp follow-up', async ({ page }, testInfo) => {

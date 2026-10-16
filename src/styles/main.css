@@ -2631,21 +2631,6 @@ svg {
   gap: 10px;
 }
 
-.agenda-create-button {
-  min-height: 36px;
-  padding: 7px 10px;
-  font-size: 0.72rem;
-}
-
-.agenda-create-button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.agenda-create-button span {
-  white-space: nowrap;
-}
-
 .appointment-create-dialog {
   width: min(calc(100% - 32px), 680px);
   max-height: min(88vh, 820px);

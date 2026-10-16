@@ -94,6 +94,7 @@ describe('lead correction rules', () => {
       fullName: 'Novo Cliente',
       phone: '+5581999995678',
       phoneSearch: '81999995678',
+      customerCpf: '52998224725',
       notes: '',
       ametropiaIds: ['myopia', 'astigmatism'],
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
@@ -500,5 +501,49 @@ describe('appointment slot reservations', () => {
       where('storeId', '==', 'loja-02'),
       where('appointmentDate', '==', '2026-10-20')
     )));
+  });
+});
+
+describe('private lead sale tracking', () => {
+  const tracking = {
+    leadId: 'lead-test',
+    storeId: 'loja-06',
+    capturedByUid: 'captor-uid',
+    customerCpf: '52998224725',
+    purchaseInterest: true,
+    matchStatus: 'interest_registered',
+    savwinStoreCode: '',
+    savwinOsNumber: '',
+    savwinSaleCode: '',
+    savwinCustomerCode: '',
+    savwinSaleDate: '',
+    savwinSaleValue: 0,
+    createdByUid: 'manager-uid',
+    createdAt: Timestamp.now(),
+    updatedByUid: 'manager-uid',
+    updatedAt: Timestamp.now(),
+    schemaVersion: 1
+  };
+
+  it('lets an authorized manager register and read purchase interest', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(getDoc(doc(db, 'leadSales', 'lead-test')));
+    await assertSucceeds(setDoc(doc(db, 'leadSales', 'lead-test'), tracking));
+    await assertSucceeds(getDoc(doc(db, 'leadSales', 'lead-test')));
+  });
+
+  it('keeps CPF and sale data hidden from captors', async () => {
+    await testEnvironment.withSecurityRulesDisabled((context) => setDoc(
+      doc(context.firestore(), 'leadSales', 'lead-test'),
+      tracking
+    ));
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(getDoc(doc(db, 'leadSales', 'lead-test')));
+    await assertFails(setDoc(doc(db, 'leadSales', 'lead-test'), { ...tracking, updatedByUid: 'captor-uid' }));
+  });
+
+  it('rejects a manager assigning sale data to another store', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(setDoc(doc(db, 'leadSales', 'lead-test'), { ...tracking, storeId: 'loja-05' }));
   });
 });
