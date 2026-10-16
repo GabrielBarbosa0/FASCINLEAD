@@ -394,6 +394,7 @@ function currentPageTitle() {
     sync: 'Sincronizacao',
     management: 'Painel de leads',
     'management-lead': 'Detalhes do lead',
+    dashboard: 'Dashboard',
     reports: 'Relatorios',
     appointments: 'Agenda de exames',
     access: 'Acessos da equipe',
@@ -408,7 +409,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
@@ -829,6 +830,7 @@ function managementView() {
         ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
+        <button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>
         <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
       </div>
@@ -893,6 +895,79 @@ function reportsView() {
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatorio atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
     <section class="report-metrics" aria-label="Indicadores do periodo"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
     ${records.length ? `<section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no periodo</strong><p>Volte para a gestao e ajuste os filtros da consulta.</p></div>`}`;
+}
+
+function dashboardGroupStats(records, keyFor, labelFor) {
+  return [...records.reduce((groups, lead) => {
+    const key = keyFor(lead) || 'not-informed';
+    if (!groups.has(key)) groups.set(key, { label: labelFor(lead), records: [] });
+    groups.get(key).records.push(lead);
+    return groups;
+  }, new Map()).values()].map((group) => {
+    const scheduled = group.records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+    const attended = group.records.filter((lead) => lead.appointmentAttendance === 'attended').length;
+    const missed = group.records.filter((lead) => lead.appointmentAttendance === 'missed').length;
+    return {
+      label: group.label,
+      total: group.records.length,
+      scheduled,
+      attended,
+      missed,
+      attendanceRate: attended + missed ? Math.round((attended / (attended + missed)) * 100) : 0
+    };
+  });
+}
+
+function dashboardView() {
+  if (!canManage()) {
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso ao dashboard.</span></div>`;
+  }
+
+  const records = filteredReportRecords();
+  const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+  const attended = records.filter((lead) => lead.appointmentAttendance === 'attended').length;
+  const missed = records.filter((lead) => lead.appointmentAttendance === 'missed').length;
+  const pending = Math.max(0, scheduled - attended - missed);
+  const attendanceRate = attended + missed ? Math.round((attended / (attended + missed)) * 100) : 0;
+  const appointmentRate = records.length ? Math.round((scheduled / records.length) * 100) : 0;
+  const { filters, loading, error, truncated } = state.management;
+
+  const dailyData = [...records.reduce((days, lead) => {
+    const date = String(lead.capturedAtClient || '').slice(0, 10);
+    if (date) days.set(date, (days.get(date) || 0) + 1);
+    return days;
+  }, new Map()).entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-14);
+  const dailyMax = Math.max(1, ...dailyData.map(([, count]) => count));
+  const dailyBars = dailyData.map(([date, count]) => {
+    const height = Math.max(8, Math.round((count / dailyMax) * 100));
+    const label = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(new Date(`${date}T12:00:00`));
+    return `<div class="dashboard-chart-column" title="${count} cadastro(s) em ${label}"><strong>${count}</strong><span class="dashboard-chart-bar"><i style="height:${height}%"></i></span><small>${label}</small></div>`;
+  }).join('');
+
+  const stores = dashboardGroupStats(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'pt-BR'));
+  const storeMax = Math.max(1, ...stores.map((store) => store.total));
+  const storeRows = stores.map((store) => `<div class="dashboard-performance-row"><div><strong>${escapeHtml(store.label)}</strong><span>${store.total} cadastro(s)</span></div><div class="dashboard-progress"><i style="width:${Math.round((store.total / storeMax) * 100)}%"></i></div><strong>${store.attendanceRate}% presença</strong></div>`).join('');
+
+  const captors = dashboardGroupStats(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Nao informado')
+    .sort((a, b) => b.total - a.total || b.attendanceRate - a.attendanceRate || a.label.localeCompare(b.label, 'pt-BR'));
+  const captorRows = captors.map((captor, index) => `<div class="dashboard-ranking-row"><span>${index + 1}</span><div><strong>${escapeHtml(captor.label)}</strong><small>${captor.scheduled} agendado(s) · ${captor.attended} comparecimento(s)</small></div><strong>${captor.total}</strong></div>`).join('');
+
+  const attendanceItems = [
+    ['Compareceram', attended, 'success'],
+    ['Nao compareceram', missed, 'danger'],
+    ['Aguardando definicao', pending, 'neutral']
+  ].map(([label, count, tone]) => {
+    const percentage = scheduled ? Math.round((count / scheduled) * 100) : 0;
+    return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos agendamentos</small></div>`;
+  }).join('');
+
+  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div><button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
+    <section class="report-period"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>${formatGoalDate(filters.startDate)} a ${formatGoalDate(filters.endDate)}</strong></div></section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O dashboard atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
+    <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${records.length}</strong><small>no periodo</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>${appointmentRate}% dos cadastros</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presenca</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
+    ${records.length ? `<section class="dashboard-grid"><article class="dashboard-panel dashboard-trend-panel"><header><div><span>Evolucao</span><h2>Cadastros por dia</h2></div><strong>Ultimos ${dailyData.length} dia(s) com registros</strong></header><div class="dashboard-chart" aria-label="Grafico de cadastros por dia">${dailyBars}</div></article><article class="dashboard-panel"><header><div><span>Agenda</span><h2>Situacao dos agendamentos</h2></div><strong>${scheduled} total</strong></header><div class="dashboard-status-list">${attendanceItems}</div></article><article class="dashboard-panel"><header><div><span>Unidades</span><h2>Desempenho por loja</h2></div><strong>${stores.length} analisada(s)</strong></header><div class="dashboard-performance-list">${storeRows}</div></article><article class="dashboard-panel"><header><div><span>Equipe</span><h2>Ranking de captadores</h2></div><strong>Por cadastros</strong></header><div class="dashboard-ranking-list">${captorRows}</div></article></section>` : `<div class="empty-state dashboard-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado para exibir</strong><p>Volte para a gestao e ajuste os filtros do periodo.</p></div>`}`;
 }
 
 function appointmentsView() {
@@ -1247,15 +1322,15 @@ function bottomNav() {
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
+  const wideLayout = ['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -1852,7 +1927,7 @@ async function loadManagementData() {
 }
 
 function ensureManagementData() {
-  if (['management', 'management-lead', 'reports'].includes(state.route) && canManage() && !state.management.loaded) {
+  if (['management', 'management-lead', 'dashboard', 'reports'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
   }
 }

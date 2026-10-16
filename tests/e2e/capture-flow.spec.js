@@ -141,6 +141,19 @@ test('keeps management actions and filters organized at intermediate widths', as
     const filterButton = document.querySelector('.management-filter-button').getBoundingClientRect();
     const actionButtons = [...document.querySelectorAll('.management-heading-actions .button')]
       .map((button) => button.getBoundingClientRect());
+    const metricCards = [...document.querySelectorAll('.management-metrics > div')]
+      .map((card) => {
+        const cardRect = card.getBoundingClientRect();
+        const labelRect = card.querySelector('span').getBoundingClientRect();
+        const valueRect = card.querySelector('strong').getBoundingClientRect();
+        const iconRect = card.querySelector('svg').getBoundingClientRect();
+        const contentCenter = (labelRect.top + valueRect.bottom) / 2;
+        return {
+          cardCenter: cardRect.top + cardRect.height / 2,
+          contentCenter,
+          iconCenter: iconRect.top + iconRect.height / 2
+        };
+      });
     return {
       headingRight: heading.right,
       actionsTop: actions.top,
@@ -149,7 +162,8 @@ test('keeps management actions and filters organized at intermediate widths', as
       searchWidth: search.width,
       filterButtonWidth: filterButton.width,
       actionButtonsRight: Math.max(...actionButtons.map((button) => button.right)),
-      actionRows: new Set(actionButtons.map((button) => Math.round(button.top))).size
+      actionRows: new Set(actionButtons.map((button) => Math.round(button.top))).size,
+      metricCards
     };
   });
 
@@ -159,10 +173,14 @@ test('keeps management actions and filters organized at intermediate widths', as
   expect(layout.searchWidth).toBeGreaterThan(layout.filterButtonWidth * 2);
   expect(layout.filterButtonWidth).toBeGreaterThanOrEqual(160);
   expect(layout.filterRight).toBeLessThanOrEqual(1120);
+  for (const metric of layout.metricCards) {
+    expect(Math.abs(metric.contentCenter - metric.cardCenter)).toBeLessThanOrEqual(2);
+    expect(Math.abs(metric.iconCenter - metric.contentCenter)).toBeLessThanOrEqual(2);
+  }
   await page.screenshot({ path: testInfo.outputPath('management-responsive.png'), fullPage: true });
 });
 
-test('shows management reports grouped by store and captor', async ({ page }, testInfo) => {
+test('shows management reports and dashboard grouped by store and captor', async ({ page }, testInfo) => {
   const capturedAtClient = new Date().toISOString();
   await page.evaluate(({ capturedAtClient }) => {
     sessionStorage.setItem('fascinlead:demo-role', 'admin');
@@ -226,6 +244,18 @@ test('shows management reports grouped by store and captor', async ({ page }, te
   await expect(page.getByText('Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByText('Captador Loja 06', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('reports.png'), fullPage: true });
+
+  await page.getByRole('button', { name: 'Voltar para gestao' }).click();
+  await page.getByRole('button', { name: 'Dashboard' }).click();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  const dashboardMetrics = page.getByRole('region', { name: 'Indicadores do dashboard' });
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
+  await expect(page.getByRole('heading', { name: 'Cadastros por dia' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Situacao dos agendamentos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Desempenho por loja' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
+  await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
+  await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
 });
 
 test('groups appointments by day and registers attendance', async ({ page }, testInfo) => {
