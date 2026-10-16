@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadUpdate } from '../utils/lead.js';
-import { profileStoreIds } from '../utils/permissions.js';
+import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
 
 export const MANAGEMENT_QUERY_LIMIT = 300;
 
@@ -55,16 +55,17 @@ export async function loadManagementLeads(profile, startDate, endDate) {
   };
 }
 
-function assertAdmin(profile) {
-  if (!isFirebaseConfigured || profile?.role !== 'admin') {
-    const error = new Error('Apenas administradores podem alterar leads da equipe.');
+function assertCanUpdate(profile, lead) {
+  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)
+    || !canAccessStore(profile, lead?.storeId)) {
+    const error = new Error('Perfil sem acesso a este lead.');
     error.code = 'permission-denied';
     throw error;
   }
 }
 
 export async function updateManagementLead(profile, lead, input) {
-  assertAdmin(profile);
+  assertCanUpdate(profile, lead);
   const validation = createLeadUpdate(input);
   if (!validation.isValid) return validation;
 

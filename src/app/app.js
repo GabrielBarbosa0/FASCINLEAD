@@ -683,10 +683,10 @@ function followUpsView() {
           <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>
           ${adminView ? `<div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>` : ''}` : ''}
         </dl>
-        ${managerView ? '' : `<div class="follow-up-actions">
+        <div class="follow-up-actions">
           <a class="button button-whatsapp" data-follow-up-whatsapp="${escapeHtml(lead.id)}" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a>
-          <button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}"><i data-lucide="calendar-days"></i><span>Reagendar</span></button>
-        </div>`}
+          <button class="button button-secondary" type="button" ${managerView ? `data-follow-up-reschedule="${escapeHtml(lead.id)}"` : `data-open-lead-id="${escapeHtml(lead.id)}"`}><i data-lucide="calendar-days"></i><span>Reagendar</span></button>
+        </div>
       </article>`;
   };
   const contactedCount = records.filter(isFollowUpContacted).length;
@@ -718,8 +718,8 @@ function followUpsView() {
 
 function leadDetailView() {
   const managementMode = state.route === 'management-lead';
-  if (managementMode && !isAdmin()) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar leads da equipe.</span></div>`;
+  if (managementMode && !canManage()) {
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao pode alterar leads da equipe.</span></div>`;
   }
 
   const source = managementMode
@@ -734,6 +734,8 @@ function leadDetailView() {
   }
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
+  const managerReschedule = managementMode && state.profile?.role === 'manager';
+  const locked = managerReschedule ? 'disabled' : '';
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
   return `
     <section class="page-toolbar detail-toolbar">
@@ -748,22 +750,22 @@ function leadDetailView() {
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || 'free')}" />
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
-      <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required /><small class="field-error"></small></div>
-      <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required /><small class="field-error"></small></div>
-      <div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" /><small class="field-error"></small></div>
-      <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" /></div>
+      <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required ${locked} /><small class="field-error"></small></div>
+      <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required ${locked} /><small class="field-error"></small></div>
+      <div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" ${locked} /><small class="field-error"></small></div>
+      <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" ${locked} /></div>
       <div class="field-row">
-        <div class="field"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" /></div>
-        <div class="field"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" /></div>
-        <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" /></div>
+        <div class="field"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" ${locked} /></div>
+        <div class="field"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
+        <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
       </div>
-      <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId">${interests}</select></div>
-      <fieldset class="field ametropia-field">
+      <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
+      <fieldset class="field ametropia-field" ${locked}>
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions(lead.ametropiaIds || [])}</div>
       </fieldset>
-      <fieldset class="field ametropia-field">
+      <fieldset class="field ametropia-field" ${locked}>
         <legend>Patologias e condicoes de saude</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
@@ -772,12 +774,12 @@ function leadDetailView() {
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
         <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
       </div>
-      <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3">${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
-      <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar alteracoes</span></button>
-      ${managementMode ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
+      <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
+      <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
+      ${managementMode && isAdmin() ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>
-    ${managementMode ? `<dialog id="delete-lead-dialog" class="confirmation-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
+    ${managementMode && isAdmin() ? `<dialog id="delete-lead-dialog" class="confirmation-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
       <div class="confirmation-dialog-copy">
         <h2 id="delete-dialog-title">Excluir este lead?</h2>
@@ -1488,14 +1490,31 @@ function bindPageEvents() {
     bindExclusiveOptions(editLeadForm, 'pathologyIds');
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = leadFormValues(editLeadForm);
+      const managementEdit = editLeadForm.dataset.management === 'true';
+      const existingLead = managementEdit
+        ? state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId)
+        : state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
+      let values = leadFormValues(editLeadForm);
+      if (managementEdit && state.profile?.role === 'manager' && existingLead) {
+        values = {
+          ...existingLead,
+          phone: existingLead.phone || existingLead.phoneSearch,
+          schedulingMode: existingLead.appointmentSchedulingMode || 'free',
+          appointmentDurationMinutes: existingLead.appointmentDurationMinutes || 20,
+          appointmentDate: editLeadForm.elements.appointmentDate.value,
+          appointmentTime: editLeadForm.elements.appointmentTime.value,
+          ametropiaIds: existingLead.ametropiaIds || [],
+          pathologyIds: existingLead.pathologyIds || []
+        };
+      }
       const submitButton = editLeadForm.querySelector('[type="submit"]');
       submitButton.disabled = true;
 
-      if (editLeadForm.dataset.management === 'true') {
+      if (managementEdit) {
         try {
-          const existingLead = state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId);
-          const result = await updateManagementLead(state.profile, existingLead, values);
+          const result = state.demoMode
+            ? updateLead(editLeadForm.dataset.leadId, values, true, () => {}, existingLead)
+            : await updateManagementLead(state.profile, existingLead, values);
           setFieldErrors(editLeadForm, result.errors || {});
           if (!result.isValid) {
             submitButton.disabled = false;
@@ -1516,7 +1535,6 @@ function bindPageEvents() {
         return;
       }
 
-      const existingLead = state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
         state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
         render();
@@ -2423,8 +2441,9 @@ export async function startApp() {
   document.addEventListener('click', async (event) => {
     const followUpWhatsAppLink = event.target.closest('[data-follow-up-whatsapp]');
     if (followUpWhatsAppLink) {
-      const lead = state.leads.find((item) => item.id === followUpWhatsAppLink.dataset.followUpWhatsapp);
-      if (lead && state.profile?.role === 'captor') {
+      const lead = [...state.leads, ...state.followUps.records]
+        .find((item) => item.id === followUpWhatsAppLink.dataset.followUpWhatsapp);
+      if (lead) {
         try {
           if (state.demoMode) markDemoFollowUpContact(lead.id, state.profile);
           else await markFollowUpContactStarted(state.profile, lead);
@@ -2435,6 +2454,15 @@ export async function startApp() {
     }
     const leadButton = event.target.closest('[data-open-lead-id]');
     if (leadButton) navigate('lead', leadButton.dataset.openLeadId);
+    const followUpRescheduleButton = event.target.closest('[data-follow-up-reschedule]');
+    if (followUpRescheduleButton) {
+      const lead = [...state.followUps.records, ...state.leads]
+        .find((item) => item.id === followUpRescheduleButton.dataset.followUpReschedule);
+      if (lead) {
+        state.management.records = [lead, ...state.management.records.filter((item) => item.id !== lead.id)];
+        navigate('management-lead', lead.id);
+      }
+    }
     const managementLeadButton = event.target.closest('[data-management-lead-id]');
     if (managementLeadButton) navigate('management-lead', managementLeadButton.dataset.managementLeadId);
     const appointmentLeadButton = event.target.closest('[data-appointment-lead-id]');

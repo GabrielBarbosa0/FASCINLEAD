@@ -235,15 +235,34 @@ service cloud.firestore {
           ));
     }
 
-    function isManagerAttendanceUpdate() {
+    function isManagerLeadUpdate() {
       return isManager()
         && managerHasStore(resource.data.storeId)
-        && resource.data.appointmentDate is string
-        && resource.data.appointmentDate != ''
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'appointmentAttendance', 'appointmentAttendanceUpdatedAt',
-          'appointmentAttendanceUpdatedByUid', 'updatedAtServer'
-        ]);
+        && (
+          (
+            resource.data.appointmentDate is string
+            && resource.data.appointmentDate != ''
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'appointmentAttendance', 'appointmentAttendanceUpdatedAt',
+              'appointmentAttendanceUpdatedByUid', 'updatedAtServer'
+            ])
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'followUpContactedAt', 'followUpContactedByUid',
+              'followUpContactedByName', 'followUpContactedAppointmentKey',
+              'updatedAtServer'
+            ])
+            && request.resource.data.followUpContactedByUid == request.auth.uid
+            && request.resource.data.followUpContactedByName == userProfile().displayName
+            && request.resource.data.followUpContactedAppointmentKey
+              == resource.data.appointmentDate + '|' + resource.data.appointmentTime
+          )
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
+            'appointmentDurationMinutes', 'appointmentAttendance', 'updatedAtServer'
+          ])
+        );
     }
 
     function isCaptorFollowUpContactUpdate() {
@@ -334,7 +353,8 @@ service cloud.firestore {
         && request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdmin() || isCaptorLeadCorrection() || isManagerAttendanceUpdate() || isCaptorFollowUpContactUpdate());
+        && (isAdmin() || isCaptorLeadCorrection() || isManagerLeadUpdate()
+          || isCaptorFollowUpContactUpdate());
 
       allow delete: if isAdmin();
     }

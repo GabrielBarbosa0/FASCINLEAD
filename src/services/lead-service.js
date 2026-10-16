@@ -195,7 +195,9 @@ export function updateDemoAppointmentAttendance(id, attendance, profile) {
 
 export function markDemoFollowUpContact(id, profile) {
   const leads = readDemoLeads();
-  const index = leads.findIndex((lead) => lead.id === id && lead.capturedByUid === profile.uid);
+  const index = leads.findIndex((lead) => lead.id === id && (
+    lead.capturedByUid === profile.uid || ['manager', 'admin'].includes(profile?.role)
+  ));
   if (index === -1) return false;
   leads[index] = {
     ...leads[index],

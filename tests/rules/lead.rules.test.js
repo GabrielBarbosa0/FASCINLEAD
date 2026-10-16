@@ -344,13 +344,27 @@ describe('appointment calendar queries', () => {
     }));
   });
 
-  it('does not let a manager register contact for a captor', async () => {
+  it('lets a manager register contact for a captor in an authorized store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
-    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
       followUpContactedAt: Timestamp.now(),
       followUpContactedByUid: 'manager-uid',
       followUpContactedByName: 'Gestor Teste',
       followUpContactedAppointmentKey: '2026-10-15|09:30',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('lets a manager reschedule without changing customer data', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentDate: '2026-10-20',
+      appointmentTime: '10:30',
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      appointmentDate: '2026-10-21',
+      fullName: 'Alteracao indevida',
       updatedAtServer: Timestamp.now()
     }));
   });

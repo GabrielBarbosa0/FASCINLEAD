@@ -506,6 +506,9 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const appointmentDate = yesterday.toISOString().slice(0, 10);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const rescheduleDate = tomorrow.toISOString().slice(0, 10);
 
   await page.evaluate(({ appointmentDate }) => {
     sessionStorage.setItem('fascinlead:demo-role', 'manager');
@@ -572,8 +575,23 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Aguardando contato' })).toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Contato iniciado' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Chamar no WhatsApp' })).toHaveCount(0);
+  const awaitingCard = page.locator('.follow-up-item').filter({ hasText: 'Cliente Aguardando' });
+  const whatsAppLink = awaitingCard.getByRole('link', { name: 'Chamar no WhatsApp' });
+  await expect(whatsAppLink).toHaveAttribute('href', /wa\.me\/5581999991111/);
+  await whatsAppLink.evaluate((element) => {
+    element.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    element.click();
+  });
+  await expect(awaitingCard.getByText('Contato iniciado', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('manager-team-follow-ups.png'), fullPage: true });
+  await awaitingCard.getByRole('button', { name: 'Reagendar' }).click();
+  await expect(page.getByRole('heading', { name: 'Cliente Aguardando' })).toBeVisible();
+  await expect(page.getByLabel('Nome *')).toBeDisabled();
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
+  await page.getByLabel('Data do pre-agendamento').fill(rescheduleDate);
+  await page.getByLabel('Horario').fill('10:30');
+  await page.getByRole('button', { name: 'Salvar reagendamento' }).click();
+  await expect(page.getByText('Lead atualizado com sucesso.')).toBeVisible();
 });
 
 test('lets an administrator monitor follow-ups from every store', async ({ page }, testInfo) => {
@@ -623,6 +641,8 @@ test('lets an administrator monitor follow-ups from every store', async ({ page 
   const store06Card = page.locator('.follow-up-item').filter({ hasText: 'Cliente Loja 06' });
   await expect(store02Card.getByText('Loja 02', { exact: true })).toBeVisible();
   await expect(store06Card.getByText('Loja 06', { exact: true })).toBeVisible();
+  await expect(store02Card.getByRole('link', { name: 'Chamar no WhatsApp' })).toBeVisible();
+  await expect(store02Card.getByRole('button', { name: 'Reagendar' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('admin-all-store-follow-ups.png'), fullPage: true });
 });
 

@@ -1,7 +1,7 @@
 import { collection, doc, limit, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
-import { profileStoreIds } from '../utils/permissions.js';
+import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
 
 export const FOLLOW_UP_QUERY_LIMIT = 500;
 
@@ -32,7 +32,9 @@ export function subscribeToTeamFollowUps(profile, onData, onError) {
 }
 
 export async function markFollowUpContactStarted(profile, lead) {
-  if (!isFirebaseConfigured || profile?.role !== 'captor' || lead?.capturedByUid !== profile.uid) {
+  const captorOwnsLead = profile?.role === 'captor' && lead?.capturedByUid === profile.uid;
+  const managerCanAccess = ['manager', 'admin'].includes(profile?.role) && canAccessStore(profile, lead?.storeId);
+  if (!isFirebaseConfigured || (!captorOwnsLead && !managerCanAccess)) {
     throw permissionError('Retorno nao autorizado.');
   }
   await setDoc(doc(db, 'leads', lead.id), {
