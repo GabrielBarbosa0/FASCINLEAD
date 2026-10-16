@@ -182,6 +182,15 @@ test('keeps management actions and filters organized at intermediate widths', as
 
 test('shows management reports and dashboard grouped by store and captor', async ({ page }, testInfo) => {
   const capturedAtClient = new Date().toISOString();
+  let savwinRequest = null;
+  await page.route('**/api/savwin/products-by-os', async (route) => {
+    savwinRequest = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, count: 4, osCount: 2, records: [] })
+    });
+  });
   await page.evaluate(({ capturedAtClient }) => {
     sessionStorage.setItem('fascinlead:demo-role', 'admin');
     localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
@@ -255,6 +264,19 @@ test('shows management reports and dashboard grouped by store and captor', async
   await expect(page.getByRole('heading', { name: 'Desempenho por loja' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
   await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
+  const reportDate = capturedAtClient.slice(0, 10);
+  await page.getByLabel('Data inicial').fill(reportDate);
+  await page.getByLabel('Data final').fill(reportDate);
+  await page.getByRole('button', { name: 'Aplicar periodo' }).click();
+  await expect(page.getByLabel('Data inicial')).toHaveValue(reportDate);
+  await expect(page.getByLabel('Data final')).toHaveValue(reportDate);
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
+  await page.getByRole('button', { name: 'Consultar SavWin' }).click();
+  await expect(page.getByText('SavWin conectado localmente')).toBeVisible();
+  await expect(page.getByText('4 item(ns) encontrados em 2 OS no periodo.')).toBeVisible();
+  expect(savwinRequest.storeCodes).toEqual(['2', '4', '5', '6']);
+  expect(savwinRequest.startDate).toBe(reportDate);
+  expect(savwinRequest.endDate).toBe(reportDate);
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
 });
 

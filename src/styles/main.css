@@ -280,6 +280,15 @@ svg {
   color: var(--danger);
 }
 
+.notice-success {
+  border-color: #99d8ca;
+  background: var(--success-soft);
+}
+
+.notice-success > svg {
+  color: var(--success);
+}
+
 .app-header {
   position: sticky;
   z-index: 20;
@@ -1423,7 +1432,59 @@ svg {
 
 .dashboard-toolbar > div {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
+}
+
+.dashboard-period-filter {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, 0.45fr) minmax(150px, 0.45fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dashboard-period-title {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-period-title > svg {
+  flex: 0 0 auto;
+  width: 20px;
+  color: var(--brand);
+}
+
+.dashboard-period-title span,
+.dashboard-period-title strong {
+  display: block;
+}
+
+.dashboard-period-title span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dashboard-period-title strong {
+  margin-top: 3px;
+  font-size: 0.86rem;
+}
+
+.dashboard-period-filter .field {
+  margin: 0;
+}
+
+.dashboard-period-filter .button {
+  min-width: 150px;
 }
 
 .dashboard-metrics {
@@ -3487,6 +3548,19 @@ svg {
 }
 
 @media (max-width: 760px) {
+  .dashboard-period-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-period-title {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard-period-filter .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
   .dashboard-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -3494,7 +3568,7 @@ svg {
 
   .dashboard-toolbar > div {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   }
 
   .dashboard-toolbar > .button,
@@ -3783,6 +3857,15 @@ svg {
 }
 
 @media (max-width: 440px) {
+  .dashboard-period-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-period-title,
+  .dashboard-period-filter .button {
+    grid-column: auto;
+  }
+
   .dashboard-metrics {
     grid-template-columns: 1fr;
   }

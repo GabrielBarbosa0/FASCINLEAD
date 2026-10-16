@@ -1,7 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createSavwinLocalProxy } from './server/savwin-local-proxy.js';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return ({
   build: {
     rolldownOptions: {
       output: {
@@ -29,6 +32,7 @@ export default defineConfig({
     }
   },
   plugins: [
+    createSavwinLocalProxy(env),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['favicon.svg'],
@@ -68,4 +72,5 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/unit/**/*.test.js']
   }
+  });
 });

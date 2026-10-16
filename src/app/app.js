@@ -49,6 +49,7 @@ import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, upda
 import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
+import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
@@ -194,6 +195,11 @@ const state = {
     truncated: false,
     pendingDeleteId: '',
     draft: createDefaultGoalDraft()
+  },
+  savwin: {
+    loading: false,
+    error: '',
+    result: null
   }
 };
 
@@ -962,8 +968,15 @@ function dashboardView() {
     return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos agendamentos</small></div>`;
   }).join('');
 
-  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div><button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
-    <section class="report-period"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>${formatGoalDate(filters.startDate)} a ${formatGoalDate(filters.endDate)}</strong></div></section>
+  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
+    <form id="dashboard-period" class="dashboard-period-filter">
+      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>Defina o intervalo do dashboard</strong></div></div>
+      <div class="field"><label for="dashboard-start">Data inicial</label><input id="dashboard-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
+      <div class="field"><label for="dashboard-end">Data final</label><input id="dashboard-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
+      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar periodo'}</span></button>
+    </form>
+    ${state.savwin.error ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><div><strong>Consulta SavWin</strong><span>${escapeHtml(state.savwin.error)}</span></div></div>` : ''}
+    ${state.savwin.result ? `<div class="notice notice-success" role="status"><i data-lucide="cloud-check"></i><div><strong>SavWin conectado localmente</strong><span>${state.savwin.result.count} item(ns) encontrados em ${state.savwin.result.osCount} OS no periodo.</span></div></div>` : ''}
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O dashboard atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
     <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${records.length}</strong><small>no periodo</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>${appointmentRate}% dos cadastros</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presenca</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
@@ -1558,6 +1571,19 @@ function bindPageEvents() {
       });
     });
   }
+
+  const dashboardPeriodForm = document.querySelector('#dashboard-period');
+  dashboardPeriodForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(dashboardPeriodForm));
+    state.management.filters.startDate = values.startDate;
+    state.management.filters.endDate = values.endDate;
+    state.management.loaded = false;
+    state.management.page = 1;
+    state.savwin.error = '';
+    state.savwin.result = null;
+    loadManagementData();
+  });
 
   const appointmentsStore = document.querySelector('#appointments-store');
   appointmentsStore?.addEventListener('change', () => {
@@ -2249,6 +2275,7 @@ async function handleAction(action) {
       pageSize: 20,
       filters: createDefaultManagementFilters()
     };
+    state.savwin = { loading: false, error: '', result: null };
     state.appointments = {
       loading: false,
       loaded: false,
@@ -2334,6 +2361,23 @@ async function handleAction(action) {
   if (action === 'reload-reports') {
     state.management.loaded = false;
     await loadManagementData();
+  }
+
+  if (action === 'consult-savwin' && canManage() && isLocalSavwinEnabled) {
+    const { startDate, endDate, storeId } = state.management.filters;
+    state.savwin.loading = true;
+    state.savwin.error = '';
+    state.savwin.result = null;
+    render();
+    try {
+      const storeIds = storeId ? [storeId] : profileStoreIds(state.profile);
+      state.savwin.result = await consultLocalSavwinSales({ startDate, endDate, storeIds });
+    } catch (error) {
+      state.savwin.error = error.message || 'Nao foi possivel consultar o SavWin.';
+    } finally {
+      state.savwin.loading = false;
+      render();
+    }
   }
 
   if (action === 'reload-accesses') {

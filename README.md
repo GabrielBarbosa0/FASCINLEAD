@@ -53,6 +53,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - configuracao administrativa da duracao e do expediente de exames por loja;
 - oferta de horarios livres no cadastro, com bloqueio dos intervalos ja ocupados;
 - instalacao como PWA em celular e desktop.
+- consulta experimental somente leitura ao SavWin por proxy local durante o desenvolvimento.
 
 ## Fora do escopo
 
@@ -65,7 +66,7 @@ O FascinLead nao tera, no MVP:
 - provador virtual;
 - metas de vendas, comissoes ou conciliacao de vendas;
 - ranking, premiacoes ou gamificacao na primeira versao das metas de captacao;
-- integracao com Savwin;
+- integracao SavWin publicada para uso em producao;
 - integracao com AppOk;
 - aplicativo nativo para Android ou iOS.
 
@@ -114,6 +115,21 @@ Celular / navegador
 - Lucide Icons.
 
 Nao serao usados Cloud Functions, Cloud Run, Storage ou outros recursos que exijam o plano Blaze durante o MVP.
+
+## SavWin local
+
+Durante o desenvolvimento, o servidor do Vite disponibiliza um proxy local somente leitura para o endpoint `ProdutosPorOSGrid`. As credenciais permanecem no processo Node e nao sao enviadas no bundle do navegador.
+
+Configure no `.env.local`:
+
+```text
+SAVWIN_API_BASE_URL=https://cliapi.savwinweb.com.br
+SAVWIN_IDENTIFICADOR=
+SAVWIN_AUTHORIZATION=
+SAVWIN_TIMEOUT_SECONDS=30
+```
+
+Inicie pelo `INICIAR-FASCINLEAD.bat`, entre como gestor ou administrador e use **Consultar SavWin** no Dashboard. Esse recurso existe apenas no servidor de desenvolvimento e nao e publicado no GitHub Pages.
 
 ## Offline primeiro
 
