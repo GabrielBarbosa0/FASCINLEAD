@@ -162,6 +162,72 @@ test('keeps management actions and filters organized at intermediate widths', as
   await page.screenshot({ path: testInfo.outputPath('management-responsive.png'), fullPage: true });
 });
 
+test('shows management reports grouped by store and captor', async ({ page }, testInfo) => {
+  const capturedAtClient = new Date().toISOString();
+  await page.evaluate(({ capturedAtClient }) => {
+    sessionStorage.setItem('fascinlead:demo-role', 'admin');
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
+      {
+        id: 'report-attended',
+        fullName: 'Cliente Presente',
+        phoneSearch: '81999991111',
+        capturedAtClient,
+        capturedByUid: 'captor-06',
+        capturedByName: 'Captador Loja 06',
+        storeId: 'loja-06',
+        appointmentDate: capturedAtClient.slice(0, 10),
+        appointmentTime: '08:00',
+        appointmentAttendance: 'attended',
+        syncState: 'demo'
+      },
+      {
+        id: 'report-missed',
+        fullName: 'Cliente Ausente',
+        phoneSearch: '81999992222',
+        capturedAtClient,
+        capturedByUid: 'captor-06',
+        capturedByName: 'Captador Loja 06',
+        storeId: 'loja-06',
+        appointmentDate: capturedAtClient.slice(0, 10),
+        appointmentTime: '09:00',
+        appointmentAttendance: 'missed',
+        syncState: 'demo'
+      },
+      {
+        id: 'report-unscheduled',
+        fullName: 'Cliente Sem Agenda',
+        phoneSearch: '81999993333',
+        capturedAtClient,
+        capturedByUid: 'captor-02',
+        capturedByName: 'Captador Loja 02',
+        storeId: 'loja-02',
+        appointmentDate: '',
+        appointmentTime: '',
+        appointmentAttendance: 'pending',
+        syncState: 'demo'
+      }
+    ]));
+  }, { capturedAtClient });
+
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Painel de gestao/ }).click();
+  await expect(page.getByRole('button', { name: 'Relatorios' })).toBeVisible();
+  await page.getByRole('button', { name: 'Relatorios' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Relatorios' })).toBeVisible();
+  const metrics = page.getByRole('region', { name: 'Indicadores do periodo' });
+  await expect(metrics.locator('div', { hasText: 'Cadastros' }).locator('strong')).toHaveText('3');
+  await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
+  await expect(metrics.locator('div', { hasText: 'Comparecimentos' }).locator('strong')).toHaveText('1');
+  await expect(metrics.locator('div', { hasText: 'Taxa de comparecimento' }).locator('strong')).toHaveText('50%');
+  await expect(page.getByRole('heading', { name: 'Resultados por unidade' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
+  await expect(page.getByText('Loja 02', { exact: true })).toBeVisible();
+  await expect(page.getByText('Loja 06', { exact: true })).toBeVisible();
+  await expect(page.getByText('Captador Loja 06', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('reports.png'), fullPage: true });
+});
+
 test('groups appointments by day and registers attendance', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();

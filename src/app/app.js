@@ -336,6 +336,21 @@ function filteredManagementRecords() {
   });
 }
 
+function filteredReportRecords() {
+  const { filters } = state.management;
+  const source = state.demoMode ? state.leads : state.management.records;
+  const startDate = filters.startDate || '';
+  const endDate = filters.endDate || '';
+  return source.filter((lead) => {
+    const capturedDate = String(lead.capturedAtClient || '').slice(0, 10);
+    if (startDate && capturedDate < startDate) return false;
+    if (endDate && capturedDate > endDate) return false;
+    if (filters.storeId && lead.storeId !== filters.storeId) return false;
+    if (filters.capturedByUid && lead.capturedByUid !== filters.capturedByUid) return false;
+    return true;
+  });
+}
+
 function syncLabel(lead) {
   if (lead.syncState === 'demo') return ['Somente neste navegador', 'neutral'];
   if (lead.syncState === 'pending') return ['Pendente', 'warning'];
@@ -379,6 +394,7 @@ function currentPageTitle() {
     sync: 'Sincronizacao',
     management: 'Painel de leads',
     'management-lead': 'Detalhes do lead',
+    reports: 'Relatorios',
     appointments: 'Agenda de exames',
     access: 'Acessos da equipe',
     goals: 'Metas',
@@ -392,7 +408,7 @@ function headerView() {
   const online = navigator.onLine;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
@@ -813,6 +829,7 @@ function managementView() {
         ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
+        <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
       </div>
     </section>
@@ -835,6 +852,47 @@ function managementView() {
       <div><i data-lucide="building-2"></i><span>Lojas</span><strong>${new Set(filtered.map((lead) => lead.storeId)).size}</strong></div>
     </section>
     <section class="management-results" aria-busy="${loading}">${results}</section>`;
+}
+
+function reportGroupRows(records, keyFor, labelFor) {
+  const groups = [...records.reduce((result, lead) => {
+    const key = keyFor(lead) || 'not-informed';
+    if (!result.has(key)) result.set(key, { label: labelFor(lead), records: [] });
+    result.get(key).records.push(lead);
+    return result;
+  }, new Map()).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+  return groups.map((group) => {
+    const scheduled = group.records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+    const attended = group.records.filter((lead) => lead.appointmentAttendance === 'attended').length;
+    const missed = group.records.filter((lead) => lead.appointmentAttendance === 'missed').length;
+    const decided = attended + missed;
+    const rate = decided ? Math.round((attended / decided) * 100) : 0;
+    return `<tr><td><strong>${escapeHtml(group.label)}</strong></td><td>${group.records.length}</td><td>${scheduled}</td><td>${attended}</td><td>${missed}</td><td><strong>${rate}%</strong></td></tr>`;
+  }).join('');
+}
+
+function reportsView() {
+  if (!canManage()) {
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos relatorios.</span></div>`;
+  }
+  const records = filteredReportRecords();
+  const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+  const attended = records.filter((lead) => lead.appointmentAttendance === 'attended').length;
+  const missed = records.filter((lead) => lead.appointmentAttendance === 'missed').length;
+  const decided = attended + missed;
+  const attendanceRate = decided ? Math.round((attended / decided) * 100) : 0;
+  const storeRows = reportGroupRows(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId));
+  const captorRows = reportGroupRows(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Nao informado');
+  const { filters, loading, error, truncated } = state.management;
+  const table = (title, icon, rows) => `<section class="report-panel"><div class="report-panel-heading"><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${records.length} cadastro(s) no periodo</span></div></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+
+  return `<section class="reports-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></section>
+    <section class="report-period"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>${formatGoalDate(filters.startDate)} a ${formatGoalDate(filters.endDate)}</strong></div></section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatorio atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
+    <section class="report-metrics" aria-label="Indicadores do periodo"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
+    ${records.length ? `<section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no periodo</strong><p>Volte para a gestao e ajuste os filtros da consulta.</p></div>`}`;
 }
 
 function appointmentsView() {
@@ -1189,15 +1247,15 @@ function bottomNav() {
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
+  const wideLayout = ['management', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -1763,6 +1821,16 @@ async function loadManagementData() {
     return;
   }
 
+  if (state.demoMode) {
+    state.management.records = [...state.leads];
+    state.management.loaded = true;
+    state.management.error = '';
+    state.management.truncated = false;
+    state.management.page = 1;
+    render();
+    return;
+  }
+
   state.management.loading = true;
   state.management.error = '';
   render();
@@ -1784,7 +1852,7 @@ async function loadManagementData() {
 }
 
 function ensureManagementData() {
-  if (['management', 'management-lead'].includes(state.route) && canManage() && !state.management.loaded) {
+  if (['management', 'management-lead', 'reports'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
   }
 }
@@ -2186,6 +2254,11 @@ async function handleAction(action) {
     if (!records.length) return;
     downloadLeadsCsv(records, state.management.filters.startDate, state.management.filters.endDate);
     showToast(`${records.length} registro(s) exportado(s).`);
+  }
+
+  if (action === 'reload-reports') {
+    state.management.loaded = false;
+    await loadManagementData();
   }
 
   if (action === 'reload-accesses') {
