@@ -574,6 +574,78 @@ svg {
   margin-bottom: 18px;
 }
 
+.follow-up-metric-filter {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.follow-up-metric-filter:hover,
+.follow-up-metric-filter:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 5px 14px rgba(0, 59, 126, 0.12);
+  transform: translateY(-1px);
+}
+
+.follow-up-metric-filter.is-active {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.follow-up-captor-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.follow-up-captor-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.follow-up-captor-card > div strong,
+.follow-up-captor-card > div span {
+  display: block;
+}
+
+.follow-up-captor-card > div span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.follow-up-captor-card dl {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+}
+
+.follow-up-captor-card dl div {
+  text-align: right;
+}
+
+.follow-up-captor-card dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.follow-up-captor-card dd {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
 .follow-up-team-list {
   display: grid;
   gap: 18px;
@@ -1055,6 +1127,13 @@ svg {
   font-size: 0.88rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lead-detail-summary .status-badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
 }
 
 .confirmation-dialog {
@@ -3613,6 +3692,21 @@ svg {
 
   .follow-up-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .follow-up-captor-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .follow-up-captor-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .follow-up-captor-card dl {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
   }
 
   .management-heading {

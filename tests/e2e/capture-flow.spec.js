@@ -568,13 +568,20 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await page.getByRole('button', { name: /Retornos da equipe/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
-  await expect(page.getByText('Ana Captadora', { exact: true })).toBeVisible();
-  await expect(page.getByText('Bruno Captador', { exact: true })).toBeVisible();
+  await expect(page.locator('.follow-up-team-heading').getByText('Ana Captadora', { exact: true })).toBeVisible();
+  await expect(page.locator('.follow-up-team-heading').getByText('Bruno Captador', { exact: true })).toBeVisible();
   await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('display', 'grid');
   await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('place-items', 'center');
   await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Aguardando contato' })).toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Contato iniciado' })).toBeVisible();
+  await page.locator('[data-follow-up-filter="contacted"]').click();
+  await expect(page.getByText('Cliente Contatado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Aguardando', { exact: true })).not.toBeVisible();
+  await page.locator('[data-follow-up-filter="waiting"]').click();
+  await expect(page.getByText('Cliente Aguardando', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Contatado', { exact: true })).not.toBeVisible();
+  await page.locator('[data-follow-up-filter="all"]').click();
   const awaitingCard = page.locator('.follow-up-item').filter({ hasText: 'Cliente Aguardando' });
   const whatsAppLink = awaitingCard.getByRole('link', { name: 'Chamar no WhatsApp' });
   await expect(whatsAppLink).toHaveAttribute('href', /wa\.me\/5581999991111/);
@@ -583,6 +590,13 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
     element.click();
   });
   await expect(awaitingCard.getByText('Contato iniciado', { exact: true })).toBeVisible();
+  await expect(awaitingCard.getByText('Gestor de Teste', { exact: true })).toBeVisible();
+  await page.locator('[data-follow-up-filter="contacted"]').click();
+  await expect(page.getByText('Cliente Aguardando', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cliente Contatado', { exact: true })).toBeVisible();
+  await page.locator('[data-follow-up-filter="captors"]').click();
+  await expect(page.locator('.follow-up-captor-card')).toHaveCount(2);
+  await page.locator('[data-follow-up-filter="all"]').click();
   await page.screenshot({ path: testInfo.outputPath('manager-team-follow-ups.png'), fullPage: true });
   await awaitingCard.getByRole('button', { name: 'Reagendar' }).click();
   await expect(page.getByRole('heading', { name: 'Cliente Aguardando' })).toBeVisible();

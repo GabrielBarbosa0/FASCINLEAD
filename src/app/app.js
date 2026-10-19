@@ -55,7 +55,7 @@ import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, m
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, INTERESTS, PATHOLOGIES } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
-import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
@@ -167,6 +167,7 @@ const state = {
     error: '',
     records: [],
     truncated: false,
+    filter: 'all',
     settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
@@ -663,9 +664,15 @@ function followUpsView() {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
   }
 
-  const records = pendingFollowUps();
+  const allRecords = pendingFollowUps();
   const managerView = canManage();
   const adminView = isAdmin();
+  const activeFilter = state.followUps.filter || 'all';
+  const records = activeFilter === 'waiting'
+    ? allRecords.filter((lead) => !isFollowUpContacted(lead))
+    : activeFilter === 'contacted'
+      ? allRecords.filter(isFollowUpContacted)
+      : allRecords;
   const renderItem = (lead) => {
       const whatsAppUrl = buildWhatsAppFollowUpUrl(lead);
       const manuallyMissed = lead.appointmentAttendance === 'missed';
@@ -681,6 +688,7 @@ function followUpsView() {
           <div><dt>Retorno liberado</dt><dd>${escapeHtml(formatFollowUpAvailableAt(lead))}</dd></div>
           ${managerView ? `<div><dt>Situacao</dt><dd>${manuallyMissed ? 'Nao compareceu' : 'Sem confirmacao'}</dd></div>
           <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>
+          ${contacted ? `<div><dt>Contato por</dt><dd>${escapeHtml(lead.followUpContactedByName || 'Nao informado')}</dd></div>` : ''}
           ${adminView ? `<div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>` : ''}` : ''}
         </dl>
         <div class="follow-up-actions">
@@ -689,29 +697,41 @@ function followUpsView() {
         </div>
       </article>`;
   };
-  const contactedCount = records.filter(isFollowUpContacted).length;
-  const captorGroups = [...records.reduce((groups, lead) => {
+  const contactedCount = allRecords.filter(isFollowUpContacted).length;
+  const captorGroups = [...allRecords.reduce((groups, lead) => {
     const key = lead.capturedByUid || lead.capturedByName || 'captor';
     if (!groups.has(key)) groups.set(key, { name: lead.capturedByName || 'Captador nao informado', records: [] });
     groups.get(key).records.push(lead);
     return groups;
   }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const visibleCaptorGroups = [...records.reduce((groups, lead) => {
+    const key = lead.capturedByUid || lead.capturedByName || 'captor';
+    if (!groups.has(key)) groups.set(key, { name: lead.capturedByName || 'Captador nao informado', records: [] });
+    groups.get(key).records.push(lead);
+    return groups;
+  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const captorSummary = captorGroups.map((group) => {
+    const groupContacted = group.records.filter(isFollowUpContacted).length;
+    return `<article class="follow-up-captor-card"><span class="avatar">${escapeHtml(profileInitials(group.name))}</span><div><strong>${escapeHtml(group.name)}</strong><span>${group.records.length} retorno(s)</span></div><dl><div><dt>Aguardando</dt><dd>${group.records.length - groupContacted}</dd></div><div><dt>Iniciados</dt><dd>${groupContacted}</dd></div></dl></article>`;
+  }).join('');
   const items = records.length
-    ? (managerView
-      ? captorGroups.map((group) => `<section class="follow-up-team-group">
+    ? (managerView && activeFilter === 'captors'
+      ? `<section class="follow-up-captor-summary">${captorSummary}</section>`
+      : managerView
+      ? visibleCaptorGroups.map((group) => `<section class="follow-up-team-group">
           <header class="follow-up-team-heading"><span class="avatar">${escapeHtml(profileInitials(group.name))}</span><div><strong>${escapeHtml(group.name)}</strong><span>${group.records.length} retorno(s)</span></div></header>
           <div class="follow-up-list">${group.records.map(renderItem).join('')}</div>
         </section>`).join('')
       : records.map(renderItem).join(''))
-    : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum retorno pendente</strong><p>As faltas registradas pela loja aparecerao aqui depois do tempo de tolerancia.</p></div>`;
+    : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>${activeFilter === 'all' ? 'Nenhum retorno pendente' : 'Nenhum retorno nesta categoria'}</strong><p>${activeFilter === 'all' ? 'As faltas registradas pela loja aparecerao aqui depois do tempo de tolerancia.' : 'Selecione outro indicador para consultar os contatos.'}</p></div>`;
 
   return `${state.followUps.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>${escapeHtml(state.followUps.error)}</span></div>` : ''}
     ${state.followUps.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de 500 registros.</span></div>` : ''}
     ${managerView ? `<section class="follow-up-metrics" aria-label="Resumo dos retornos">
-      <div class="metric"><span>Retornos</span><strong>${records.length}</strong><i data-lucide="bell-ring"></i></div>
-      <div class="metric metric-warning"><span>Aguardando contato</span><strong>${records.length - contactedCount}</strong><i data-lucide="clock-3"></i></div>
-      <div class="metric metric-success"><span>Contato iniciado</span><strong>${contactedCount}</strong><i data-lucide="message-circle"></i></div>
-      <div class="metric"><span>Captadores</span><strong>${captorGroups.length}</strong><i data-lucide="users"></i></div>
+      <button class="metric follow-up-metric-filter ${activeFilter === 'all' ? 'is-active' : ''}" type="button" data-follow-up-filter="all" aria-pressed="${activeFilter === 'all'}"><span>Retornos</span><strong>${allRecords.length}</strong><i data-lucide="bell-ring"></i></button>
+      <button class="metric metric-warning follow-up-metric-filter ${activeFilter === 'waiting' ? 'is-active' : ''}" type="button" data-follow-up-filter="waiting" aria-pressed="${activeFilter === 'waiting'}"><span>Aguardando contato</span><strong>${allRecords.length - contactedCount}</strong><i data-lucide="clock-3"></i></button>
+      <button class="metric metric-success follow-up-metric-filter ${activeFilter === 'contacted' ? 'is-active' : ''}" type="button" data-follow-up-filter="contacted" aria-pressed="${activeFilter === 'contacted'}"><span>Contato iniciado</span><strong>${contactedCount}</strong><i data-lucide="message-circle"></i></button>
+      <button class="metric follow-up-metric-filter ${activeFilter === 'captors' ? 'is-active' : ''}" type="button" data-follow-up-filter="captors" aria-pressed="${activeFilter === 'captors'}"><span>Captadores</span><strong>${captorGroups.length}</strong><i data-lucide="users"></i></button>
     </section>` : ''}
     <section class="${managerView ? 'follow-up-team-list' : 'follow-up-list'}">${items}</section>`;
 }
@@ -851,7 +871,7 @@ function managementView() {
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>
-        <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="bar-chart-3"></i><span>Relatorios</span></button>
+        <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>
         <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
       </div>
     </section>
@@ -1878,6 +1898,7 @@ function startFollowUpScheduleSubscription() {
     error: '',
     records: [],
     truncated: false,
+    filter: state.followUps.filter || 'all',
     settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   };
@@ -2343,6 +2364,7 @@ async function handleAction(action) {
       error: '',
       records: [],
       truncated: false,
+      filter: 'all',
       settingsByStore: {},
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
@@ -2439,6 +2461,11 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const followUpFilterButton = event.target.closest('[data-follow-up-filter]');
+    if (followUpFilterButton) {
+      state.followUps.filter = followUpFilterButton.dataset.followUpFilter;
+      render();
+    }
     const followUpWhatsAppLink = event.target.closest('[data-follow-up-whatsapp]');
     if (followUpWhatsAppLink) {
       const lead = [...state.leads, ...state.followUps.records]
@@ -2447,6 +2474,16 @@ export async function startApp() {
         try {
           if (state.demoMode) markDemoFollowUpContact(lead.id, state.profile);
           else await markFollowUpContactStarted(state.profile, lead);
+          const contactUpdate = {
+            followUpContactedAt: new Date().toISOString(),
+            followUpContactedByUid: state.profile.uid,
+            followUpContactedByName: state.profile.displayName,
+            followUpContactedAppointmentKey: followUpAppointmentKey(lead)
+          };
+          state.leads = state.leads.map((item) => item.id === lead.id ? { ...item, ...contactUpdate } : item);
+          state.followUps.records = state.followUps.records.map((item) => item.id === lead.id ? { ...item, ...contactUpdate } : item);
+          if (state.followUps.filter === 'waiting') state.followUps.filter = 'contacted';
+          render();
         } catch {
           showToast('O WhatsApp foi aberto, mas o contato nao foi registrado.', 'warning', 'circle-alert');
         }

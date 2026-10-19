@@ -119,14 +119,14 @@ service cloud.firestore {
         && (!('ametropiaIds' in data) || data.ametropiaIds.size() == data.ametropiaLabels.size())
         && (!('pathologyIds' in data) || (
           data.pathologyIds is list
-          && data.pathologyIds.size() <= 8
-          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'other', 'none', 'unknown'])
+          && data.pathologyIds.size() <= 10
+          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'macular-degeneration', 'retinal-detachment', 'other', 'none', 'unknown'])
           && (!data.pathologyIds.hasAny(['none', 'unknown']) || data.pathologyIds.size() == 1)
         ))
         && (!('pathologyLabels' in data) || (
           data.pathologyLabels is list
-          && data.pathologyLabels.size() <= 8
-          && data.pathologyLabels.hasOnly(['Catarata', 'Glaucoma', 'Diabetes', 'Pressao alta', 'Ceratocone', 'Retinopatia', 'Olho seco', 'Outra', 'Nao possui', 'Nao sabe informar'])
+          && data.pathologyLabels.size() <= 10
+          && data.pathologyLabels.hasOnly(['Catarata', 'Glaucoma', 'Diabetes', 'Pressao alta', 'Ceratocone', 'Retinopatia', 'Olho seco', 'Degeneracao macular', 'Descolamento de retina', 'Outra', 'Nao possui', 'Nao sabe informar'])
         ))
         && (('pathologyIds' in data) == ('pathologyLabels' in data))
         && (!('pathologyIds' in data) || data.pathologyIds.size() == data.pathologyLabels.size())

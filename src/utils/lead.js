@@ -27,6 +27,8 @@ export const PATHOLOGIES = [
   { id: 'keratoconus', label: 'Ceratocone' },
   { id: 'retinopathy', label: 'Retinopatia' },
   { id: 'dry-eye', label: 'Olho seco' },
+  { id: 'macular-degeneration', label: 'Degeneracao macular' },
+  { id: 'retinal-detachment', label: 'Descolamento de retina' },
   { id: 'other', label: 'Outra' },
   { id: 'none', label: 'Nao possui' },
   { id: 'unknown', label: 'Nao sabe informar' }

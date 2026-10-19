@@ -157,6 +157,15 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('accepts the additional eye conditions', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      pathologyIds: ['macular-degeneration', 'retinal-detachment'],
+      pathologyLabels: ['Degeneracao macular', 'Descolamento de retina'],
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('rejects contradictory ametropia answers', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
