@@ -24,6 +24,7 @@ O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao
 - Centralizar os registros na nuvem quando houver conexao.
 - Entregar uma interface simples para celular e instalavel como aplicativo.
 - Permanecer, inicialmente, dentro dos recursos gratuitos do Firebase.
+- Permitir encaminhamento incremental e seguro dos leads para CRMs externos, sem transformar o FascinLead em CRM.
 
 ### 1.2 Fora do escopo
 
@@ -32,7 +33,8 @@ O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao
 - Confirmacoes automaticas antes de consultas e exames. O pre-agendamento pode ser consultado na agenda, e faltas confirmadas geram retorno interno para o captador.
 - Anamnese, recomendacao de lentes ou provador virtual.
 - Metas de vendas, comissoes, faturamento ou conciliacao de vendas. Metas de quantidade de leads captados estao no escopo.
-- Integracao com Savwin, AppOk ou outros sistemas externos.
+- Integracoes de escrita com SavWin, AppOk ou CRMs externos.
+- Automacoes, funis e operacao de CRM dentro do FascinLead; a API de saida de leads e uma fronteira de integracao aprovada.
 - Envio de notificacoes push na primeira versao.
 - Funcionamento como aplicativo nativo publicado nas lojas Android e iOS.
 
@@ -232,7 +234,15 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 
 Nao serao utilizados Cloud Functions, Cloud Run, Storage ou extensoes pagas no MVP.
 
-### 5.2 Estrutura inicial de diretorios
+### 5.2 API de integracao com CRM
+
+O ambiente de desenvolvimento disponibiliza uma API Node local e somente leitura sob `/api/v1`. Ela permite que um CRM consulte leads por pagina, loja e instante da ultima atualizacao. A consulta incremental usa `updatedAtServer`, de modo que correcoes, comparecimento e inicio de retorno reaparecem para o consumidor.
+
+A API nao faz parte do bundle da PWA nem do GitHub Pages. A versao local usa Firebase Admin com Firestore Emulator, Application Default Credentials ou conta de servico mantida fora do repositorio. Uma publicacao futura exigira um backend HTTPS, armazenamento seguro de segredos, rotacao de tokens, limites de requisicao e auditoria; essa publicacao nao sera feita no plano Spark sem decisao explicita sobre custos.
+
+O contrato inicial e versionado em `/api/v1` e documentado em `docs/fascinlead-api.openapi.yaml`. CPF e informacoes de saude ficam excluidos por padrao e exigem habilitacao no servidor e solicitacao explicita do consumidor.
+
+### 5.3 Estrutura inicial de diretorios
 
 ```text
 FASCINLEAD/
@@ -555,6 +565,8 @@ Testes automatizados de regras serao obrigatorios antes do deploy.
 - Content Security Policy restrita aos dominios necessarios.
 - Configuracao do Firebase separada por ambiente.
 - Nenhum segredo administrativo, chave privada ou conta de servico no frontend.
+- Tokens da API e credenciais administrativas existem apenas no processo servidor, nunca no bundle ou em URLs.
+- A API externa e negada por padrao, exige Bearer token e nao libera campos sensiveis sem configuracao dupla.
 - Nenhum dado pessoal em `console.log`, telemetria ou mensagens tecnicas.
 - Dependencias atualizadas e auditadas com `npm audit`.
 - Firebase App Check sera avaliado apos o MVP, sem ser requisito de lancamento.
@@ -622,6 +634,9 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - lead invalido e rejeitado;
 - UUID repetido nao cria duplicata;
 - escrita offline reaparece apos reiniciar a pagina e sincroniza ao voltar online.
+- API rejeita token ausente ou invalido;
+- API pagina os leads e valida filtros, lojas e cursores;
+- CPF e informacoes de saude nao aparecem na resposta padrao.
 
 ### 14.3 Ponta a ponta
 
@@ -733,7 +748,7 @@ O MVP estara apto para piloto quando:
 | ADR-001 | Usar PWA, nao aplicativo nativo | Distribuicao simples e um unico codigo para celulares e desktop |
 | ADR-002 | Usar JavaScript sem framework de UI | Escopo pequeno, menor peso e menor curva de manutencao |
 | ADR-003 | Usar Firestore como armazenamento local e remoto | SDK oferece cache persistente e sincronizacao offline |
-| ADR-004 | Nao criar backend proprio no MVP | Nao ha integracoes nem processamento privilegiado que o justifique |
+| ADR-004 | Manter o aplicativo principal sem backend obrigatorio | Captacao, operacao offline e telas continuam independentes da API de integracao |
 | ADR-005 | Autorizar e-mails antes do primeiro acesso | Login Google sozinho nao restringe contas a colaboradores |
 | ADR-006 | Nao coletar CPF no MVP | Nao e necessario para o cadastro e aumenta o risco de privacidade |
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
@@ -746,6 +761,7 @@ O MVP estara apto para piloto quando:
 | ADR-014 | Modelar atribuicoes em massa como uma meta individual por captador | Simplifica as regras por usuario, preserva a visibilidade por loja e prepara o progresso para futura gamificacao |
 | ADR-015 | Exibir os pre-agendamentos em agenda mensal derivada dos leads | Oferece visao operacional ao gestor sem duplicar dados nem transformar o sistema em um CRM ou agenda de confirmacoes |
 | ADR-016 | Configurar intervalos de atendimento no documento da loja | Mantem regras diferentes por unidade e permite calcular os horarios livres sem duplicar a agenda |
+| ADR-017 | Expor uma API versionada e somente leitura para CRMs | Separa captacao de operacao comercial, permite sincronizacao incremental e preserva um contrato estavel |
 
 ## 20. Questoes para fechar antes do desenvolvimento
 

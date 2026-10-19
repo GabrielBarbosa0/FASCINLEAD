@@ -1,0 +1,157 @@
+openapi: 3.1.0
+info:
+  title: FascinLead Integration API
+  version: 1.0.0
+  description: API somente leitura para sincronizacao de leads com sistemas de CRM.
+servers:
+  - url: http://127.0.0.1:5173/api/v1
+    description: Desenvolvimento local
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Verifica se o processo da API esta ativo
+      responses:
+        '200':
+          description: Processo ativo
+  /leads:
+    get:
+      summary: Lista leads em ordem crescente de atualizacao
+      parameters:
+        - in: query
+          name: updated_since
+          schema: { type: string, format: date-time }
+          description: Retorna apenas registros alterados depois deste instante.
+        - in: query
+          name: store_id
+          schema: { type: array, items: { type: string } }
+          style: form
+          explode: true
+          description: Pode ser repetido para consultar mais de uma unidade.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+          description: Cursor opaco retornado pela pagina anterior.
+        - in: query
+          name: include_sensitive
+          schema: { type: boolean, default: false }
+          description: Exige FASCINLEAD_API_SENSITIVE_FIELDS=true no servidor.
+      responses:
+        '200':
+          description: Pagina de leads
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Lead' }
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /leads/{leadId}:
+    get:
+      summary: Consulta um lead pelo identificador
+      parameters:
+        - in: path
+          name: leadId
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - in: query
+          name: include_sensitive
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Lead encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Lead' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: integration-token
+  responses:
+    Error:
+      description: Erro padronizado
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+              requestId: { type: string, format: uuid }
+  schemas:
+    Pagination:
+      type: object
+      required: [limit, nextCursor, hasMore]
+      properties:
+        limit: { type: integer }
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+    Lead:
+      type: object
+      required: [id, fullName, phone, storeId, capturedAt, updatedAt]
+      properties:
+        id: { type: string }
+        fullName: { type: string }
+        preferredName: { type: string }
+        phone: { type: string }
+        customerCpf:
+          type: string
+          description: Presente apenas quando campos sensiveis estao habilitados e solicitados.
+        storeId: { type: string }
+        neighborhood: { type: string }
+        city: { type: string }
+        state: { type: string }
+        interest:
+          type: object
+          properties:
+            id: { type: string }
+            label: { type: string }
+        capturedAt: { type: string, format: date-time }
+        capturedBy:
+          type: object
+          properties:
+            uid: { type: string }
+            name: { type: string }
+        source: { type: string }
+        appointment:
+          type: [object, 'null']
+          properties:
+            date: { type: string, format: date }
+            time: { type: string }
+            attendance: { type: string, enum: [pending, attended, missed] }
+            durationMinutes: { type: [integer, 'null'] }
+        followUp:
+          type: object
+          properties:
+            contactedAt: { type: string }
+            contactedByName: { type: string }
+        notes: { type: string }
+        health:
+          type: object
+          description: Presente apenas quando campos sensiveis estao habilitados e solicitados.
+          properties:
+            ametropias: { type: array, items: { type: string } }
+            conditions: { type: array, items: { type: string } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        schemaVersion: { type: integer }

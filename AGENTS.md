@@ -43,7 +43,7 @@ O FascinLead **nao e um CRM completo**. Nao ampliar o projeto silenciosamente pa
 - conciliacao de vendas;
 - integracao com Savwin;
 - integracao com AppOk;
-- integracoes externas nao aprovadas;
+- integracoes externas de escrita nao aprovadas; a API de saida de leads para CRMs e uma fronteira aprovada e documentada no TDD;
 - aplicativo nativo para Play Store ou App Store.
 
 Uma solicitacao futura pode alterar o escopo, mas isso deve ser uma decisao explicita e refletida primeiro no TDD.
@@ -90,7 +90,7 @@ A arquitetura inicial e deliberadamente pequena:
 - Playwright para testes de interface e fluxos offline;
 - Lucide para icones de interface.
 
-Nao introduza framework de UI, backend proprio, banco adicional ou gerenciador de estado complexo sem uma necessidade demonstrada e uma alteracao aprovada no TDD.
+Nao introduza framework de UI, banco adicional ou gerenciador de estado complexo sem uma necessidade demonstrada e uma alteracao aprovada no TDD. O servidor local da API de integracao e a excecao aprovada para preparar o consumo de leads por CRMs.
 
 ## 7. Restricao de custos
 
@@ -105,6 +105,7 @@ No MVP:
 - nao exigir conta de cobranca;
 - nao fazer consultas amplas ou listeners em tempo real sobre toda a base;
 - desenvolver e testar preferencialmente com a Emulator Suite;
+- manter a API de CRM apenas local enquanto nao houver decisao explicita sobre hospedagem e custos;
 - paginar consultas gerenciais;
 - monitorar leituras, escritas e armazenamento.
 

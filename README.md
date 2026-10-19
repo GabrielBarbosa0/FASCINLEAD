@@ -54,6 +54,7 @@ O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pre
 - oferta de horarios livres no cadastro, com bloqueio dos intervalos ja ocupados;
 - instalacao como PWA em celular e desktop.
 - consulta experimental somente leitura ao SavWin por proxy local durante o desenvolvimento.
+- API local versionada e somente leitura para integracao futura com sistemas de CRM.
 
 ## Fora do escopo
 
@@ -130,6 +131,22 @@ SAVWIN_TIMEOUT_SECONDS=30
 ```
 
 Inicie pelo `INICIAR-FASCINLEAD.bat`, entre como gestor ou administrador e use **Consultar SavWin** no Dashboard. Esse recurso existe apenas no servidor de desenvolvimento e nao e publicado no GitHub Pages.
+
+## API de integracao com CRM
+
+Durante o desenvolvimento, o Vite expoe uma API servidor-a-servidor somente leitura em `/api/v1`. Ela nao e incluida no GitHub Pages e nao altera o funcionamento offline do aplicativo.
+
+Endpoints iniciais:
+
+- `GET /api/v1/health`;
+- `GET /api/v1/leads` com `updated_since`, `store_id`, `limit` e `cursor`;
+- `GET /api/v1/leads/{leadId}`.
+
+As rotas de leads exigem `Authorization: Bearer <token>`. Configure `FASCINLEAD_API_TOKEN` com pelo menos 32 caracteres e restrinja as unidades em `FASCINLEAD_API_ALLOWED_STORES`. Use credenciais administrativas somente no processo Node. Para desenvolvimento sem custo, a API pode apontar para o Firestore Emulator por meio de `FASCINLEAD_API_FIRESTORE_EMULATOR_HOST=127.0.0.1:8180`. Para consultar o projeto remoto localmente, use Application Default Credentials ou uma conta de servico em `FASCINLEAD_API_SERVICE_ACCOUNT_JSON`; nunca use prefixo `VITE_` nem versione esse valor.
+
+CPF, ametropias e condicoes de saude ficam fora da resposta padrao. Eles somente sao retornados quando `FASCINLEAD_API_SENSITIVE_FIELDS=true` e a requisicao inclui `include_sensitive=true`. O contrato completo esta em [`docs/fascinlead-api.openapi.yaml`](docs/fascinlead-api.openapi.yaml).
+
+A versao `v1` usa consulta ativa do CRM (polling) e nao oferece webhooks nem eventos de exclusao. O consumidor deve guardar `updatedAt` e o `cursor` para continuar a sincronizacao sem reler toda a base. Webhooks, credenciais separadas por parceiro e tombstones de exclusao ficam previstos para a etapa de hospedagem da API.
 
 ## Offline primeiro
 
