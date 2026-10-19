@@ -46,7 +46,7 @@ import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, up
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
-import { createGoals, deleteGoal, GOALS_LEAD_LIMIT, loadGoalsDashboard } from '../services/goal-service.js';
+import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
@@ -195,7 +195,8 @@ const state = {
     records: [],
     members: [],
     truncated: false,
-    pendingDeleteId: '',
+    editingGroupId: '',
+    pendingDeleteGroupId: '',
     draft: createDefaultGoalDraft()
   },
   savwin: {
@@ -407,7 +408,7 @@ function currentPageTitle() {
     appointments: 'Agenda de exames',
     access: 'Acessos da equipe',
     goals: 'Metas',
-    settings: 'Configuracoes da agenda'
+    settings: 'Configuracoes'
   };
   if (state.route === 'follow-ups') return canManage() ? 'Retornos da equipe' : 'Retornos pendentes';
   return titles[state.route] || 'Inicio';
@@ -498,7 +499,7 @@ function homeView() {
       </button>` : ''}
       ${isAdmin() ? `<button class="action-card" type="button" data-route="settings">
         <span class="action-icon"><i data-lucide="wrench"></i></span>
-        <span><strong>Configuracoes da agenda</strong><small>Definir horarios e duracao por loja</small></span>
+        <span><strong>Configuracoes</strong><small>Agenda e preferencias do sistema</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
     </section>`;
@@ -868,7 +869,7 @@ function managementView() {
       <div class="management-heading-actions">
         <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
         ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
-        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configurar agenda</span></button>' : ''}
+        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configuracoes</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         <button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>
         <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>
@@ -1179,7 +1180,7 @@ function settingsView() {
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <section class="settings-layout" aria-busy="${loading}">
       <form id="schedule-settings-form" class="settings-form" novalidate>
-        <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Agenda da unidade</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
+        <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configuracoes da agenda</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
         <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
         <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
@@ -1267,13 +1268,41 @@ function goalStatus(goal) {
   return ['Em andamento', 'warning'];
 }
 
+function groupGoalRecords(records) {
+  const groups = new Map();
+  records.forEach((goal) => {
+    const groupId = goal.groupId || goal.id;
+    if (!groups.has(groupId)) groups.set(groupId, []);
+    groups.get(groupId).push(goal);
+  });
+  return [...groups.entries()].map(([id, goals]) => {
+    const first = goals[0];
+    const completed = goals.reduce((total, goal) => total + goal.completed, 0);
+    const targetCount = goals.reduce((total, goal) => total + goal.targetCount, 0);
+    return {
+      id,
+      goals: goals.sort((a, b) => a.assigneeName.localeCompare(b.assigneeName, 'pt-BR')),
+      title: first.title,
+      storeId: first.storeId,
+      startDate: first.startDate,
+      endDate: first.endDate,
+      targetPerPerson: first.targetCount,
+      completed,
+      targetCount,
+      remaining: Math.max(0, targetCount - completed),
+      percentage: targetCount ? Math.min(100, Math.round((completed / targetCount) * 100)) : 0
+    };
+  });
+}
+
 function goalsView() {
-  const { records, members, loading, saving, error, truncated, draft, pendingDeleteId } = state.goals;
+  const { records, members, loading, saving, error, truncated, draft, editingGroupId, pendingDeleteGroupId } = state.goals;
+  const groups = groupGoalRecords(records);
   const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
   const selectedCount = draft.assigneeUids.filter((uid) => visibleMembers.some((member) => member.uid === uid)).length;
-  const completedGoals = records.filter((goal) => goal.completed >= goal.targetCount).length;
+  const completedGoals = groups.filter((goal) => goal.completed >= goal.targetCount).length;
   const totalCaptured = records.reduce((total, goal) => total + goal.completed, 0);
-  const selectedGoal = records.find((goal) => goal.id === pendingDeleteId);
+  const selectedGroup = groups.find((group) => group.id === pendingDeleteGroupId);
   const goalStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   const storeOptions = goalStores.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const memberOptions = visibleMembers.length
@@ -1284,26 +1313,35 @@ function goalsView() {
       </label>`).join('')
     : '<p class="goal-members-empty">Nenhum captador ativo nesta loja.</p>';
 
-  const goalCards = records.length
-    ? records.map((goal) => {
-        const [status, tone] = goalStatus(goal);
+  const goalCards = groups.length
+    ? groups.map((group) => {
+        const [status, tone] = goalStatus(group);
+        const people = group.goals.map((goal) => `<div class="goal-person">
+          <span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span>
+          <div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${goal.completed} de ${goal.targetCount} leads</span></div>
+          <strong class="goal-person-percentage">${goal.percentage}%</strong>
+        </div>`).join('');
         return `<article class="goal-card">
           <div class="goal-card-heading">
-            <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(goal.title)}</h2></div>
+            <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(group.title)}</h2></div>
             ${canManage()
-              ? `<button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(goal.id)}" title="Excluir meta"><i data-lucide="trash-2"></i></button>`
-              : `<div class="goal-percentage" aria-label="${goal.percentage}% da meta atingida"><strong>${goal.percentage}%</strong><span>da meta</span></div>`}
+              ? `<div class="goal-card-actions">
+                  <button class="icon-button" type="button" data-edit-goal="${escapeHtml(group.id)}" title="Editar meta" aria-label="Editar meta"><i data-lucide="pencil"></i></button>
+                  <button class="icon-button" type="button" data-duplicate-goal="${escapeHtml(group.id)}" title="Duplicar meta" aria-label="Duplicar meta"><i data-lucide="copy"></i></button>
+                  <button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(group.id)}" title="Excluir meta" aria-label="Excluir meta"><i data-lucide="trash-2"></i></button>
+                </div>`
+              : `<div class="goal-percentage" aria-label="${group.percentage}% da meta atingida"><strong>${group.percentage}%</strong><span>da meta</span></div>`}
           </div>
-          ${canManage() ? `<div class="goal-person"><span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span><div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${escapeHtml(storeLabel(goal.storeId))}</span></div></div>` : ''}
-          <div class="goal-progress-copy"><strong>${goal.completed} de ${goal.targetCount} leads</strong><span>${goal.percentage}%</span></div>
-          <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${goal.percentage}"><span style="width: ${goal.percentage}%"></span></div>
-          <div class="goal-card-footer"><span>${formatGoalDate(goal.startDate)} a ${formatGoalDate(goal.endDate)}</span><strong>${goal.remaining ? `${goal.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
+          ${canManage() ? `<div class="goal-participants">${people}</div>` : ''}
+          <div class="goal-progress-copy"><strong>${group.completed} de ${group.targetCount} leads</strong><span>${group.percentage}%</span></div>
+          <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${group.percentage}"><span style="width: ${group.percentage}%"></span></div>
+          <div class="goal-card-footer"><span>${formatGoalDate(group.startDate)} a ${formatGoalDate(group.endDate)} · ${escapeHtml(storeLabel(group.storeId))}</span><strong>${group.remaining ? `${group.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
         </article>`;
       }).join('')
     : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${canManage() ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
 
   const creator = canManage() ? `<form id="goal-form" class="goal-form" novalidate>
-      <div class="filter-title"><i data-lucide="target"></i><div><strong>Nova meta</strong><span>Quantidade de leads sincronizados no periodo.</span></div></div>
+      <div class="goal-form-heading"><div class="filter-title"><i data-lucide="${editingGroupId ? 'pencil' : 'target'}"></i><div><strong>${editingGroupId ? 'Editar meta' : 'Nova meta'}</strong><span>Quantidade de leads por colaborador no periodo.</span></div></div>${editingGroupId ? '<button class="icon-button" type="button" data-cancel-goal-edit title="Cancelar edicao" aria-label="Cancelar edicao"><i data-lucide="x"></i></button>' : ''}</div>
       <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
       <div class="goal-form-grid">
         <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
@@ -1314,15 +1352,15 @@ function goalsView() {
         ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
         : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
       <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
-      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="target"></i><span>${saving ? 'Criando...' : 'Criar metas'}</span></button>
+      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : 'Criar metas'}</span></button>
     </form>` : '';
   const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
-      <div><span>Metas</span><strong>${records.length}</strong></div>
+      <div><span>Metas</span><strong>${groups.length}</strong></div>
       <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
       <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
     </section>`;
   const results = `<section class="goals-results" aria-busy="${loading}">
-      <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${records.length} meta(s)</span></div></div>
+      <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${groups.length} meta(s)</span></div></div>
       ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
     </section>`;
 
@@ -1335,10 +1373,10 @@ function goalsView() {
     ${canManage()
       ? `${metrics}<section class="goals-layout">${creator}${results}</section>`
       : `<section class="personal-goals">${results}<h2 class="personal-goals-summary">Resumo</h2>${metrics}</section>`}
-    ${selectedGoal ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
+    ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
-      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta de ${escapeHtml(selectedGoal.assigneeName)} sera excluida. As captacoes permanecem intactas.</p></div>
-      <div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-close-goal-dialog>Cancelar</button><button class="button button-danger-solid" type="button" data-confirm-delete-goal="${escapeHtml(selectedGoal.id)}"><i data-lucide="trash-2"></i><span>Excluir meta</span></button></div>
+      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta &ldquo;${escapeHtml(selectedGroup.title)}&rdquo; sera removida de ${selectedGroup.goals.length} colaborador(es). As captacoes permanecem intactas.</p></div>
+      <div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-close-goal-dialog>Cancelar</button><button class="button button-danger-solid" type="button" data-confirm-delete-goal="${escapeHtml(selectedGroup.id)}"><i data-lucide="trash-2"></i><span>Excluir meta</span></button></div>
     </dialog>` : ''}`;
 }
 
@@ -1842,7 +1880,10 @@ function bindPageEvents() {
       setFieldErrors(goalForm, {});
 
       try {
-        const result = await createGoals(state.profile, state.goals.draft, state.goals.members);
+        const editingGroup = groupGoalRecords(state.goals.records).find((group) => group.id === state.goals.editingGroupId);
+        const result = editingGroup
+          ? await updateGoalGroup(state.profile, editingGroup.goals, state.goals.draft, state.goals.members)
+          : await createGoals(state.profile, state.goals.draft, state.goals.members);
         if (!result.isValid) {
           state.goals.saving = false;
           setFieldErrors(goalForm, result.errors);
@@ -1850,14 +1891,15 @@ function bindPageEvents() {
         }
         const createdCount = state.goals.draft.assigneeUids.length;
         state.goals.draft = createDefaultGoalDraft(state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId);
+        state.goals.editingGroupId = '';
         state.goals.loaded = false;
         await loadGoalsData();
-        showToast(`${createdCount} meta(s) criada(s).`);
+        showToast(editingGroup ? 'Meta atualizada.' : `${createdCount} meta(s) criada(s).`);
       } catch (error) {
         state.goals.saving = false;
         state.goals.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao possui permissao para criar estas metas.'
-          : 'Nao foi possivel criar as metas. Verifique a conexao e tente novamente.';
+          ? 'Seu perfil nao possui permissao para salvar esta meta.'
+          : 'Nao foi possivel salvar a meta. Verifique a conexao e tente novamente.';
         render();
       }
     });
@@ -2392,7 +2434,8 @@ async function handleAction(action) {
       records: [],
       members: [],
       truncated: false,
-      pendingDeleteId: '',
+      editingGroupId: '',
+      pendingDeleteGroupId: '',
       draft: createDefaultGoalDraft()
     };
     render();
@@ -2620,30 +2663,72 @@ export async function startApp() {
       form.elements.displayName.focus();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    const editGoalButton = event.target.closest('[data-edit-goal]');
+    if (editGoalButton && !editGoalButton.disabled) {
+      const group = groupGoalRecords(state.goals.records).find((item) => item.id === editGoalButton.dataset.editGoal);
+      if (!group) return;
+      state.goals.editingGroupId = group.id;
+      state.goals.draft = {
+        title: group.title,
+        targetCount: group.targetPerPerson,
+        startDate: group.startDate,
+        endDate: group.endDate,
+        storeId: group.storeId,
+        assigneeUids: group.goals.map((goal) => goal.assigneeUid)
+      };
+      render();
+      document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector('#goal-title')?.focus();
+    }
+    const duplicateGoalButton = event.target.closest('[data-duplicate-goal]');
+    if (duplicateGoalButton && !duplicateGoalButton.disabled) {
+      const group = groupGoalRecords(state.goals.records).find((item) => item.id === duplicateGoalButton.dataset.duplicateGoal);
+      if (!group) return;
+      state.goals.editingGroupId = '';
+      state.goals.draft = {
+        title: `${group.title} - copia`.slice(0, 80),
+        targetCount: group.targetPerPerson,
+        startDate: group.startDate,
+        endDate: group.endDate,
+        storeId: group.storeId,
+        assigneeUids: group.goals.map((goal) => goal.assigneeUid)
+      };
+      render();
+      document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector('#goal-title')?.focus();
+      showToast('Meta duplicada no formulario. Revise e salve.');
+    }
+    const cancelGoalEditButton = event.target.closest('[data-cancel-goal-edit]');
+    if (cancelGoalEditButton) {
+      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
+      state.goals.editingGroupId = '';
+      state.goals.draft = createDefaultGoalDraft(storeId);
+      render();
+    }
     const deleteGoalButton = event.target.closest('[data-delete-goal]');
     if (deleteGoalButton && !deleteGoalButton.disabled) {
-      state.goals.pendingDeleteId = deleteGoalButton.dataset.deleteGoal;
+      state.goals.pendingDeleteGroupId = deleteGoalButton.dataset.deleteGoal;
       render();
       document.querySelector('#delete-goal-dialog')?.showModal();
     }
     const closeGoalDialogButton = event.target.closest('[data-close-goal-dialog]');
     if (closeGoalDialogButton) {
       closeGoalDialogButton.closest('dialog')?.close();
-      state.goals.pendingDeleteId = '';
+      state.goals.pendingDeleteGroupId = '';
     }
     const confirmDeleteGoalButton = event.target.closest('[data-confirm-delete-goal]');
     if (confirmDeleteGoalButton && !confirmDeleteGoalButton.disabled) {
-      const goal = state.goals.records.find((item) => item.id === confirmDeleteGoalButton.dataset.confirmDeleteGoal);
-      if (!goal) return;
+      const group = groupGoalRecords(state.goals.records).find((item) => item.id === confirmDeleteGoalButton.dataset.confirmDeleteGoal);
+      if (!group) return;
       confirmDeleteGoalButton.disabled = true;
       try {
-        await deleteGoal(state.profile, goal);
-        state.goals.pendingDeleteId = '';
+        await deleteGoalGroup(state.profile, group.goals);
+        state.goals.pendingDeleteGroupId = '';
         state.goals.loaded = false;
         await loadGoalsData();
         showToast('Meta excluida.');
       } catch (error) {
-        state.goals.pendingDeleteId = '';
+        state.goals.pendingDeleteGroupId = '';
         state.goals.error = error?.code === 'permission-denied'
           ? 'Seu perfil nao pode excluir esta meta.'
           : 'Nao foi possivel excluir a meta.';

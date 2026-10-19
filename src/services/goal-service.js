@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -91,20 +90,23 @@ export async function loadGoalsDashboard(profile) {
   return { goals: progress, members, truncated };
 }
 
-export async function createGoals(profile, values, members) {
+function validateGoalMembers(profile, values, members) {
   if (!isFirebaseConfigured || !canManageGoals(profile)) {
-    const error = new Error('Seu perfil nao pode criar metas.');
+    const error = new Error('Seu perfil nao pode gerenciar metas.');
     error.code = 'permission-denied';
     throw error;
   }
 
   const validation = validateGoal(values);
-  if (!validation.isValid) return validation;
+  if (!validation.isValid) return { validation, selectedMembers: [] };
   const selectedMembers = validation.data.assigneeUids
     .map((uid) => members.find((member) => member.uid === uid))
     .filter(Boolean);
   if (selectedMembers.length !== validation.data.assigneeUids.length) {
-    return { ...validation, isValid: false, errors: { assigneeUids: 'Um dos colaboradores selecionados nao esta disponivel.' } };
+    return {
+      validation: { ...validation, isValid: false, errors: { assigneeUids: 'Um dos colaboradores selecionados nao esta disponivel.' } },
+      selectedMembers: []
+    };
   }
   if (profile.role === 'manager' && (
     !canAccessStore(profile, validation.data.storeId)
@@ -114,6 +116,13 @@ export async function createGoals(profile, values, members) {
     error.code = 'permission-denied';
     throw error;
   }
+
+  return { validation, selectedMembers };
+}
+
+export async function createGoals(profile, values, members) {
+  const { validation, selectedMembers } = validateGoalMembers(profile, values, members);
+  if (!validation.isValid) return validation;
 
   const batch = writeBatch(db);
   const groupId = crypto.randomUUID();
@@ -139,12 +148,72 @@ export async function createGoals(profile, values, members) {
   return validation;
 }
 
-export async function deleteGoal(profile, goal) {
+export async function updateGoalGroup(profile, goals, values, members) {
+  const currentGoals = Array.isArray(goals) ? goals : [];
+  if (!currentGoals.length) throw new Error('Meta nao encontrada.');
+  const { validation, selectedMembers } = validateGoalMembers(profile, values, members);
+  if (!validation.isValid) return validation;
+  if (profile.role === 'manager' && currentGoals.some((goal) => !canAccessStore(profile, goal.storeId))) {
+    const error = new Error('Seu perfil nao pode editar esta meta.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+
+  const batch = writeBatch(db);
+  const selectedByUid = new Map(selectedMembers.map((member) => [member.uid, member]));
+  const currentByUid = new Map(currentGoals.map((goal) => [goal.assigneeUid, goal]));
+  const groupId = currentGoals[0].groupId || currentGoals[0].id;
+
+  currentGoals.forEach((goal) => {
+    const member = selectedByUid.get(goal.assigneeUid);
+    const goalRef = doc(db, 'goals', goal.id);
+    if (!member) {
+      batch.delete(goalRef);
+      return;
+    }
+    batch.update(goalRef, {
+      title: validation.data.title,
+      targetCount: validation.data.targetCount,
+      startDate: validation.data.startDate,
+      endDate: validation.data.endDate,
+      storeId: validation.data.storeId,
+      assigneeName: member.displayName
+    });
+  });
+
+  selectedMembers.forEach((member) => {
+    if (currentByUid.has(member.uid)) return;
+    batch.set(doc(collection(db, 'goals')), {
+      title: validation.data.title,
+      metric: GOAL_METRIC,
+      targetCount: validation.data.targetCount,
+      startDate: validation.data.startDate,
+      endDate: validation.data.endDate,
+      storeId: validation.data.storeId,
+      assigneeUid: member.uid,
+      assigneeName: member.displayName,
+      createdByUid: profile.uid,
+      createdByName: profile.displayName,
+      createdAt: serverTimestamp(),
+      groupId,
+      schemaVersion: 1
+    });
+  });
+
+  await batch.commit();
+  return validation;
+}
+
+export async function deleteGoalGroup(profile, goals) {
+  const currentGoals = Array.isArray(goals) ? goals : [];
   if (!isFirebaseConfigured || !canManageGoals(profile)
-    || (profile.role === 'manager' && !canAccessStore(profile, goal.storeId))) {
+    || !currentGoals.length
+    || (profile.role === 'manager' && currentGoals.some((goal) => !canAccessStore(profile, goal.storeId)))) {
     const error = new Error('Seu perfil nao pode excluir esta meta.');
     error.code = 'permission-denied';
     throw error;
   }
-  await deleteDoc(doc(db, 'goals', goal.id));
+  const batch = writeBatch(db);
+  currentGoals.forEach((goal) => batch.delete(doc(db, 'goals', goal.id)));
+  await batch.commit();
 }

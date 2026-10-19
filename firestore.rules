@@ -64,7 +64,7 @@ service cloud.firestore {
         && data.assigneeName is string
         && data.assigneeName.size() >= 2
         && data.assigneeName.size() <= 120
-        && data.createdByUid == request.auth.uid
+        && data.createdByUid is string
         && data.createdByName is string
         && data.groupId is string
         && data.groupId.size() >= 8
@@ -414,13 +414,28 @@ service cloud.firestore {
 
       allow create: if canManageGoals()
         && validGoal(request.resource.data)
+        && request.resource.data.createdByUid == request.auth.uid
         && exists(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid))
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.active == true
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.role == 'captor'
         && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.storeId == request.resource.data.storeId
         && (isAdmin() || managerHasStore(request.resource.data.storeId));
 
-      allow update: if false;
+      allow update: if canManageGoals()
+        && validGoal(request.resource.data)
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.resource.data.createdByName == resource.data.createdByName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.assigneeUid == resource.data.assigneeUid
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid))
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.active == true
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.role == 'captor'
+        && get(/databases/$(database)/documents/users/$(request.resource.data.assigneeUid)).data.storeId == request.resource.data.storeId
+        && (isAdmin() || (
+          managerHasStore(resource.data.storeId)
+          && managerHasStore(request.resource.data.storeId)
+        ));
       allow delete: if isAdmin()
         || managerHasStore(resource.data.storeId);
     }

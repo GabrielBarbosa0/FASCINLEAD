@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 
 const projectId = 'demo-fascinlead-goals';
 let testEnvironment;
@@ -83,5 +83,29 @@ describe('goal security rules', () => {
     const db = authenticatedDb('manager-06', 'manager06@example.com', 'manager');
     await assertSucceeds(deleteDoc(doc(db, 'goals', 'same')));
     await assertFails(deleteDoc(doc(db, 'goals', 'other')));
+  });
+
+  it('allows managers and administrators to edit goals within their scope', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'goals', 'same'), goalData('captor-06-a', 'loja-06', 'admin-uid'));
+      await setDoc(doc(context.firestore(), 'goals', 'other'), goalData('captor-05', 'loja-05', 'admin-uid'));
+    });
+    const managerDb = authenticatedDb('manager-06', 'manager06@example.com', 'manager');
+    const adminDb = authenticatedDb('admin-uid', 'admin@example.com', 'admin');
+
+    await assertSucceeds(updateDoc(doc(managerDb, 'goals', 'same'), { title: 'Meta revisada', targetCount: 30 }));
+    await assertFails(updateDoc(doc(managerDb, 'goals', 'other'), { title: 'Alteracao indevida' }));
+    await assertSucceeds(updateDoc(doc(adminDb, 'goals', 'other'), { title: 'Meta da loja 05' }));
+  });
+
+  it('does not allow changing the assignee of an existing goal', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'goals', 'same'), goalData('captor-06-a', 'loja-06', 'admin-uid'));
+    });
+    const db = authenticatedDb('manager-06', 'manager06@example.com', 'manager');
+    await assertFails(updateDoc(doc(db, 'goals', 'same'), {
+      assigneeUid: 'captor-06-b',
+      assigneeName: 'captor-06-b'
+    }));
   });
 });

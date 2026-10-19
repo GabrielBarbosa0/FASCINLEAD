@@ -663,8 +663,9 @@ test('lets an administrator monitor follow-ups from every store', async ({ page 
 test('configures appointment duration and hides occupied slots', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Configuracoes da agenda/ }).click();
-  await expect(page.getByRole('heading', { name: 'Configuracoes da agenda' })).toBeVisible();
+  await page.getByRole('button', { name: /Configuracoes/ }).click();
+  await expect(page.getByRole('heading', { name: 'Configuracoes' })).toBeVisible();
+  await expect(page.getByText('Configuracoes da agenda', { exact: true })).toBeVisible();
 
   await page.getByLabel('Loja').selectOption('loja-06');
   await page.getByLabel('Duracao da consulta').fill('30');

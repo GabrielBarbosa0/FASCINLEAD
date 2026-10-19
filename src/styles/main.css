@@ -3265,6 +3265,22 @@ svg {
   box-shadow: var(--shadow);
 }
 
+.goal-form-heading,
+.goal-card-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.goal-form-heading .filter-title {
+  flex: 1;
+}
+
+.goal-card-actions {
+  flex: 0 0 auto;
+}
+
 .goal-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3411,6 +3427,28 @@ svg {
   width: 40px;
   height: 40px;
   color: var(--danger);
+}
+
+.goal-participants {
+  margin: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.goal-participants .goal-person {
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+}
+
+.goal-participants .goal-person + .goal-person {
+  border-top: 1px solid var(--line);
+}
+
+.goal-person-percentage {
+  margin-left: auto;
+  color: var(--brand);
+  font-size: 0.84rem;
 }
 
 .goal-percentage {
