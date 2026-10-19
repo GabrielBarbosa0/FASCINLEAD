@@ -30,6 +30,22 @@ service cloud.firestore {
       return activeUser() && userProfile().role == 'manager';
     }
 
+    function legacyPermission(permission) {
+      return permission in ['leads.create', 'leads.view_own', 'leads.edit_own', 'followups.own', 'goals.view_own']
+        || (userProfile().role == 'manager' && permission in [
+          'management.view', 'appointments.view', 'appointments.attendance',
+          'followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'
+        ]);
+    }
+
+    function hasPermission(permission) {
+      return isPrimaryAdmin() || (activeUser() && (
+        userProfile().role == 'admin'
+        || (('permissions' in userProfile()) && permission in userProfile().permissions)
+        || (!('permissions' in userProfile()) && legacyPermission(permission))
+      ));
+    }
+
     function managerHasStore(storeId) {
       return isManager() && (
         userProfile().storeId == storeId
@@ -38,7 +54,7 @@ service cloud.firestore {
     }
 
     function canManageGoals() {
-      return isAdmin() || isManager();
+      return hasPermission('goals.manage');
     }
 
     function validGoal(data) {
@@ -183,6 +199,41 @@ service cloud.firestore {
         && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.appointmentTime;
     }
 
+    function validCaptorCorrectionData(data) {
+      return data.fullName is string
+        && data.fullName.size() >= 2
+        && data.fullName.size() <= 120
+        && data.phone is string
+        && data.phone.size() >= 12
+        && data.phone.size() <= 14
+        && data.phoneSearch is string
+        && data.phoneSearch.matches('^\\d{10,11}$')
+        && (!('customerCpf' in data) || (data.customerCpf is string
+          && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))))
+        && data.notes is string
+        && data.notes.size() <= 500
+        && (!('ametropiaIds' in data) || (data.ametropiaIds is list
+          && data.ametropiaIds.size() <= 4
+          && data.ametropiaIds.hasOnly(['myopia', 'hyperopia', 'astigmatism', 'presbyopia', 'none', 'unknown'])
+          && (!data.ametropiaIds.hasAny(['none', 'unknown']) || data.ametropiaIds.size() == 1)))
+        && (!('pathologyIds' in data) || (data.pathologyIds is list
+          && data.pathologyIds.size() <= 10
+          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'macular-degeneration', 'retinal-detachment', 'other', 'none', 'unknown'])
+          && (!data.pathologyIds.hasAny(['none', 'unknown']) || data.pathologyIds.size() == 1)))
+        && (!('appointmentDate' in data) || data.appointmentDate == ''
+          || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
+        && (!('appointmentTime' in data) || data.appointmentTime == ''
+          || data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$'))
+        && (!('appointmentAttendance' in data)
+          || data.appointmentAttendance in ['pending', 'attended', 'missed'])
+        && (!('appointmentSchedulingMode' in data)
+          || data.appointmentSchedulingMode in ['controlled', 'free'])
+        && (!('appointmentDurationMinutes' in data)
+          || (data.appointmentDurationMinutes is int
+            && data.appointmentDurationMinutes >= 5
+            && data.appointmentDurationMinutes <= 180));
+    }
+
     function validLeadSale(leadId, data) {
       return data.keys().hasOnly([
           'leadId', 'storeId', 'capturedByUid', 'customerCpf',
@@ -236,10 +287,19 @@ service cloud.firestore {
     }
 
     function isManagerLeadUpdate() {
-      return isManager()
-        && managerHasStore(resource.data.storeId)
+      return (isAdmin() || (isManager() && managerHasStore(resource.data.storeId)))
+        && (!('appointmentDate' in request.resource.data)
+          || request.resource.data.appointmentDate == ''
+          || request.resource.data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
+        && (!('appointmentTime' in request.resource.data)
+          || request.resource.data.appointmentTime == ''
+          || request.resource.data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$'))
+        && (!('appointmentAttendance' in request.resource.data)
+          || request.resource.data.appointmentAttendance in ['pending', 'attended', 'missed'])
         && (
           (
+            hasPermission('appointments.attendance')
+            &&
             resource.data.appointmentDate is string
             && resource.data.appointmentDate != ''
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -248,6 +308,8 @@ service cloud.firestore {
             ])
           )
           || (
+            hasPermission('followups.team')
+            &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'followUpContactedAt', 'followUpContactedByUid',
               'followUpContactedByName', 'followUpContactedAppointmentKey',
@@ -258,15 +320,17 @@ service cloud.firestore {
             && request.resource.data.followUpContactedAppointmentKey
               == resource.data.appointmentDate + '|' + resource.data.appointmentTime
           )
-          || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-            'appointmentDurationMinutes', 'appointmentAttendance', 'updatedAtServer'
-          ])
+          || (hasPermission('appointments.attendance')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
+              'appointmentDurationMinutes', 'appointmentAttendance', 'updatedAtServer'
+            ]))
         );
     }
 
     function isCaptorFollowUpContactUpdate() {
       return activeUser()
+        && hasPermission('followups.own')
         && userProfile().role == 'captor'
         && resource.data.capturedByUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -276,8 +340,21 @@ service cloud.firestore {
         ])
         && request.resource.data.followUpContactedByUid == request.auth.uid
         && request.resource.data.followUpContactedByName == userProfile().displayName
+        && request.resource.data.followUpContactedAt is timestamp
+        && request.resource.data.followUpContactedAppointmentKey is string
         && request.resource.data.followUpContactedAppointmentKey
           == resource.data.appointmentDate + '|' + resource.data.appointmentTime;
+    }
+
+    function isAdminLeadCorrection() {
+      return isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf',
+          'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
+          'appointmentDurationMinutes', 'appointmentAttendance', 'notes', 'updatedAtServer'
+        ]);
     }
 
     match /allowedEmails/{email} {
@@ -305,6 +382,10 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.active == true
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.role
+        && (!('roleProfileId' in get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data)
+          || request.resource.data.roleProfileId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.roleProfileId)
+        && (!('permissions' in get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data)
+          || request.resource.data.permissions == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.permissions)
         && request.resource.data.storeId == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeId
         && (!('storeIds' in get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data)
           || request.resource.data.storeIds == get(/databases/$(database)/documents/allowedEmails/$(request.auth.token.email)).data.storeIds);
@@ -322,6 +403,11 @@ service cloud.firestore {
         || managerHasStore(resource.data.storeId);
     }
 
+    match /roleProfiles/{roleProfileId} {
+      allow get: if activeUser();
+      allow list, create, update, delete: if isAdmin();
+    }
+
     match /stores/{storeId} {
       allow get: if isPrimaryAdmin() || (activeUser() && (
         userProfile().storeId == storeId || managerHasStore(storeId) || isAdmin()
@@ -337,6 +423,7 @@ service cloud.firestore {
 
     match /leads/{leadId} {
       allow create: if activeUser()
+        && hasPermission('leads.create')
         && validLead(request.resource.data)
         && request.resource.data.capturedByUid == request.auth.uid
         && (isAdmin()
@@ -344,19 +431,24 @@ service cloud.firestore {
           || managerHasStore(request.resource.data.storeId));
 
       allow get, list: if activeUser() && (
-        resource.data.capturedByUid == request.auth.uid
-        || managerHasStore(resource.data.storeId)
+        (resource.data.capturedByUid == request.auth.uid && hasPermission('leads.view_own'))
+        || (managerHasStore(resource.data.storeId) && hasPermission('management.view'))
         || isAdmin()
       );
 
-      allow update: if validLead(request.resource.data)
+      allow update: if request.resource.data.capturedByUid == resource.data.capturedByUid
+        && request.resource.data.storeId == resource.data.storeId
+        && request.resource.data.createdAtServer == resource.data.createdAtServer
+        && (isManagerLeadUpdate() || isCaptorFollowUpContactUpdate());
+
+      allow update: if validCaptorCorrectionData(request.resource.data)
         && request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdmin() || isCaptorLeadCorrection() || isManagerLeadUpdate()
-          || isCaptorFollowUpContactUpdate());
+        && (isAdminLeadCorrection() || (isCaptorLeadCorrection()
+          && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)));
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() && hasPermission('leads.delete');
     }
 
     match /leadSales/{leadId} {
@@ -381,7 +473,9 @@ service cloud.firestore {
 
     match /appointmentSlots/{slotId} {
       allow get, list: if activeUser() && (
-        resource.data.storeId == userProfile().storeId || managerHasStore(resource.data.storeId) || isAdmin()
+        (resource.data.storeId == userProfile().storeId && hasPermission('leads.create'))
+        || (managerHasStore(resource.data.storeId) && hasPermission('appointments.view'))
+        || isAdmin()
       );
       allow create: if activeUser()
         && validAppointmentSlot(slotId, request.resource.data)
@@ -407,8 +501,8 @@ service cloud.firestore {
 
     match /goals/{goalId} {
       allow get, list: if activeUser() && (
-        resource.data.assigneeUid == request.auth.uid
-        || managerHasStore(resource.data.storeId)
+        (resource.data.assigneeUid == request.auth.uid && hasPermission('goals.view_own'))
+        || (managerHasStore(resource.data.storeId) && hasPermission('goals.manage'))
         || isAdmin()
       );
 

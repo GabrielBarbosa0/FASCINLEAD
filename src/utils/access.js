@@ -26,10 +26,12 @@ export function formatAccessStoreSummary(access = {}) {
   };
 }
 
-export function validateAccess(values) {
+export function validateAccess(values, roleProfiles = []) {
   const displayName = String(values.displayName || '').trim();
   const email = normalizeAccessEmail(values.email);
-  const role = String(values.role || '');
+  const roleProfileId = String(values.roleProfileId || '');
+  const selectedProfile = roleProfiles.find((profile) => profile.id === roleProfileId && profile.active !== false);
+  const role = selectedProfile?.baseRole || String(values.role || '');
   const storeId = String(values.storeId || '').trim().toLowerCase();
   const requestedStoreIds = Array.isArray(values.storeIds) ? values.storeIds : [values.storeIds].filter(Boolean);
   const errors = {};
@@ -42,7 +44,7 @@ export function validateAccess(values) {
     errors.email = 'Informe um e-mail valido.';
   }
 
-  if (!VALID_ROLES.has(role)) {
+  if (!VALID_ROLES.has(role) || (roleProfileId && !selectedProfile)) {
     errors.role = 'Escolha um perfil valido.';
   }
 
@@ -60,6 +62,6 @@ export function validateAccess(values) {
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
-    data: { displayName, email, role, storeId, storeIds }
+    data: { displayName, email, role, roleProfileId: selectedProfile?.id || '', storeId, storeIds }
   };
 }

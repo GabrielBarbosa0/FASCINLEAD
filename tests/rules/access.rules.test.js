@@ -72,6 +72,19 @@ function authenticatedDb(uid, email, role = 'admin') {
 }
 
 describe('access administration rules', () => {
+  it('lets an administrator manage role profiles', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    const profileRef = doc(db, 'roleProfiles', 'regional');
+    await assertSucceeds(setDoc(profileRef, {
+      name: 'Gestor regional',
+      scope: 'stores',
+      baseRole: 'manager',
+      permissions: ['management.view', 'reports.view'],
+      active: true
+    }));
+    await assertSucceeds(getDocs(collection(db, 'roleProfiles')));
+  });
+
   it('lets an administrator list the collections used by the screen', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
 
@@ -143,6 +156,13 @@ describe('access administration rules', () => {
     });
 
     await assertFails(batch.commit());
+    await assertFails(setDoc(doc(db, 'roleProfiles', 'indevido'), {
+      name: 'Perfil indevido',
+      scope: 'own',
+      baseRole: 'captor',
+      permissions: ['leads.create'],
+      active: true
+    }));
   });
 
   it('lets an authorized collaborator create the profile on first login', async () => {

@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, authPersistenceReady, db, isFirebaseConfigured } from './client.js';
+import { systemRoleProfileForRole } from '../utils/role-profile.js';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
@@ -71,6 +72,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
   }
 
   const permission = permissionSnapshot.data();
+  const initialRoleProfile = systemRoleProfileForRole(permission.role);
+  const assignedPermissions = Array.isArray(permission.permissions) ? permission.permissions : initialRoleProfile.permissions;
   const profileRef = doc(db, 'users', firebaseUser.uid);
   const profileSnapshot = await getDoc(profileRef);
 
@@ -80,6 +83,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
       displayName: permission.displayName || firebaseUser.displayName || 'Colaborador',
       photoUrl: firebaseUser.photoURL || '',
       role: permission.role,
+      roleProfileId: permission.roleProfileId || '',
+      permissions: assignedPermissions,
       storeId: permission.storeId,
       storeIds: permission.storeIds || [permission.storeId],
       active: true,
@@ -95,6 +100,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
         displayName: permission.displayName || firebaseUser.displayName || 'Colaborador',
         photoUrl: firebaseUser.photoURL || '',
         role: permission.role,
+        roleProfileId: permission.roleProfileId || '',
+        permissions: assignedPermissions,
         storeId: permission.storeId,
         storeIds: permission.storeIds || [permission.storeId],
         active: true
@@ -104,7 +111,16 @@ export async function loadAuthorizedProfile(firebaseUser) {
     throw new Error('Este acesso esta inativo. Procure o administrador.');
   }
 
-  return { uid: firebaseUser.uid, ...profile };
+  let roleProfile = systemRoleProfileForRole(profile.role);
+  if (profile.roleProfileId && !profile.roleProfileId.startsWith('system-')) {
+    const roleSnapshot = await getDoc(doc(db, 'roleProfiles', profile.roleProfileId));
+    if (!roleSnapshot.exists() || roleSnapshot.data().active === false) {
+      throw new Error('O perfil de acesso desta conta nao esta disponivel. Procure o administrador.');
+    }
+    roleProfile = { id: roleSnapshot.id, ...roleSnapshot.data() };
+  }
+
+  return { uid: firebaseUser.uid, ...profile, roleProfileName: roleProfile.name, permissions: roleProfile.permissions };
 }
 
 export async function signOutUser() {

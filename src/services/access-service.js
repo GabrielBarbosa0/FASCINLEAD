@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { normalizeAccessEmail, validateAccess } from '../utils/access.js';
+import { permissionsForProfile } from '../utils/role-profile.js';
 
 function assertAdmin(profile) {
   if (!isFirebaseConfigured || profile?.role !== 'admin') {
@@ -40,6 +41,7 @@ export async function loadAccesses(profile) {
       email,
       displayName: permission.displayName || user?.displayName || 'Colaborador',
       role: permission.role || user?.role || 'captor',
+      roleProfileId: permission.roleProfileId || user?.roleProfileId || '',
       storeId: permission.storeId || user?.storeId || '',
       storeIds: permission.storeIds || user?.storeIds || [permission.storeId || user?.storeId].filter(Boolean),
       active: permission.active === true && user?.active !== false,
@@ -56,12 +58,14 @@ export async function loadAccesses(profile) {
   return { accesses, storeIds: [...storeIds].sort() };
 }
 
-export async function saveAccess(profile, values) {
+export async function saveAccess(profile, values, roleProfiles = []) {
   assertAdmin(profile);
-  const validation = validateAccess(values);
+  const validation = validateAccess(values, roleProfiles);
   if (!validation.isValid) return validation;
 
-  const { email, displayName, role, storeId, storeIds } = validation.data;
+  const { email, displayName, role, roleProfileId, storeId, storeIds } = validation.data;
+  const selectedRoleProfile = roleProfiles.find((item) => item.id === roleProfileId) || { role };
+  const permissions = permissionsForProfile({ role, permissions: selectedRoleProfile.permissions });
   if (email === normalizeAccessEmail(profile.email) && role !== 'admin') {
     return { ...validation, isValid: false, errors: { role: 'Voce nao pode remover seu proprio perfil de administrador.' } };
   }
@@ -76,6 +80,8 @@ export async function saveAccess(profile, values) {
     email,
     displayName,
     role,
+    roleProfileId,
+    permissions,
     storeId,
     storeIds,
     active: true,
@@ -90,7 +96,7 @@ export async function saveAccess(profile, values) {
 
   batch.set(permissionRef, permissionData, { merge: true });
   usersSnapshot.docs.forEach((item) => {
-    batch.update(item.ref, { displayName, role, storeId, storeIds, active: true });
+    batch.update(item.ref, { displayName, role, roleProfileId, permissions, storeId, storeIds, active: true });
   });
   await batch.commit();
   return validation;

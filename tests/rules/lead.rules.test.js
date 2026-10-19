@@ -88,6 +88,25 @@ function authenticatedDb(uid, email) {
 }
 
 describe('lead correction rules', () => {
+  it('enforces the permissions stored for a custom manager profile', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'users', 'manager-uid'), {
+        roleProfileId: 'custom-agenda-only',
+        permissions: ['appointments.view']
+      });
+    });
+    const restrictedDb = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(getDoc(doc(restrictedDb, 'leads', 'lead-test')));
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'users', 'manager-uid'), {
+        permissions: ['appointments.view', 'management.view']
+      });
+    });
+    const managementDb = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(getDoc(doc(managementDb, 'leads', 'lead-test')));
+  });
+
   it('lets the captor create a lead without consent fields', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(setDoc(doc(db, 'leads', 'lead-without-consent'), {

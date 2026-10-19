@@ -115,7 +115,7 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Acessos da equipe/ }).click();
 
-  await page.getByLabel('Perfil').selectOption('manager');
+  await page.getByLabel('Perfil').selectOption('system-manager');
   await expect(page.getByText('Unidades permitidas', { exact: true })).toBeVisible();
   await page.getByLabel('Loja 02').check();
   await page.getByLabel('Loja 06').check();
@@ -284,6 +284,8 @@ test('shows management reports and dashboard grouped by store and captor', async
 });
 
 test('groups appointments by day and registers attendance', async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-10-15T12:00:00-03:00'));
+  await page.reload();
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
@@ -705,4 +707,60 @@ test('configures appointment duration and hides occupied slots', async ({ page }
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(0);
+});
+
+test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Configuracoes/ }).click();
+  await page.getByRole('tab', { name: 'Perfis e permissoes' }).click();
+
+  await expect(page.getByText('Novo perfil', { exact: true })).toBeVisible();
+  await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
+  await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
+  await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
+  await expect(page.getByText('Perfil protegido do sistema')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Colaborador' }).click();
+  const detailsDialog = page.getByRole('dialog', { name: 'Colaborador' });
+  await expect(detailsDialog).toBeVisible();
+  await expect(detailsDialog.locator('.role-details-permission')).toHaveCount(18);
+  await expect(detailsDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
+  await expect(detailsDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('role-permissions-details.png') });
+  await detailsDialog.getByRole('button', { name: 'Concluir' }).click();
+  await expect(detailsDialog).not.toBeVisible();
+  await expect(page.getByLabel('Cadastrar leads')).toBeChecked();
+  await expect(page.getByLabel('Acessar a gestao de leads')).toHaveCount(0);
+  await page.getByLabel('Alcance dos dados').selectOption('stores');
+  await expect(page.getByLabel('Acessar a gestao de leads')).toBeChecked();
+  await page.getByLabel('Nome do perfil').fill('Supervisor de teste');
+  await page.getByRole('button', { name: 'Criar perfil' }).click();
+  const customCard = page.locator('.role-profile-card').filter({ hasText: 'Supervisor de teste' });
+  await expect(customCard).toBeVisible();
+
+  await customCard.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.getByText('Editar perfil', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Nome do perfil')).toBeFocused();
+  await page.getByLabel('Nome do perfil').fill('Supervisor atualizado');
+  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  const updatedCard = page.locator('.role-profile-card').filter({ hasText: 'Supervisor atualizado' });
+  await expect(updatedCard).toBeVisible();
+
+  await updatedCard.getByTitle('Excluir perfil').click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Excluir perfil?' });
+  await expect(deleteDialog).toBeVisible();
+  await expect(deleteDialog).toHaveJSProperty('open', true);
+  await deleteDialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(deleteDialog).not.toBeVisible();
+
+  await updatedCard.getByTitle('Excluir perfil').click();
+  await page.getByRole('dialog', { name: 'Excluir perfil?' }).getByRole('button', { name: 'Excluir perfil' }).click();
+  await expect(updatedCard).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('role-profiles-desktop.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.role-settings-layout')).toHaveCSS('grid-template-columns', /[0-9.]+px/);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath('role-profiles-mobile.png'), fullPage: true });
 });

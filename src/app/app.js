@@ -45,6 +45,7 @@ import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
+import { deleteRoleProfile, loadRoleProfiles, saveRoleProfile } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
@@ -59,6 +60,7 @@ import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey,
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
+import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, permissionsForScope, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
@@ -177,7 +179,13 @@ const state = {
     saving: false,
     error: '',
     selectedStoreId: STORES[0]?.id || '',
-    records: []
+    records: [],
+    section: 'schedule',
+    roleProfiles: SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] })),
+    roleDraft: createDefaultRoleDraft(),
+    editingRoleId: '',
+    pendingDeleteRoleId: '',
+    detailsRoleId: ''
   },
   access: {
     loading: false,
@@ -223,6 +231,10 @@ function createDefaultManagementFilters() {
   };
 }
 
+function createDefaultRoleDraft(scope = 'own') {
+  return { name: '', scope, permissions: permissionsForScope(scope) };
+}
+
 function createDefaultGoalDraft(storeId = '') {
   const today = new Date();
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -265,6 +277,11 @@ function roleLabel(role) {
   return { captor: 'Captador', manager: 'Gestor', admin: 'Administrador' }[role] || 'Colaborador';
 }
 
+function roleProfileLabel(access = {}) {
+  return state.settings.roleProfiles.find((profile) => profile.id === access.roleProfileId)?.name
+    || roleLabel(access.role);
+}
+
 function profileInitials(displayName = '') {
   return String(displayName)
     .trim()
@@ -277,11 +294,19 @@ function profileInitials(displayName = '') {
 }
 
 function canManage() {
-  return ['manager', 'admin'].includes(state.profile?.role);
+  return hasAccess('management.view');
 }
 
 function isAdmin() {
   return state.profile?.role === 'admin';
+}
+
+function hasAccess(permission) {
+  return profileHasPermission(state.profile, permission);
+}
+
+function canManageGoals() {
+  return hasAccess('goals.manage');
 }
 
 function pendingFollowUps() {
@@ -472,9 +497,9 @@ function homeView() {
         <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
       </button>
-      ${['captor', 'manager', 'admin'].includes(state.profile.role) ? `<button class="action-card" type="button" data-route="follow-ups">
+      ${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups">
         <span class="action-icon"><i data-lucide="bell-ring"></i></span>
-        <span><strong>${canManage() ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
+        <span><strong>${hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
         ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendencia(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
       </button>` : ''}
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
@@ -482,16 +507,16 @@ function homeView() {
         <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
-      ${canManage() ? `<button class="action-card" type="button" data-route="appointments">
+      ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="appointments">
         <span class="action-icon"><i data-lucide="calendar-days"></i></span>
         <span><strong>Agenda de exames</strong><small>Visualizar os pre-agendamentos</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
-      <button class="action-card" type="button" data-route="goals">
+      ${hasAccess('goals.view_own') || canManageGoals() ? `<button class="action-card" type="button" data-route="goals">
         <span class="action-icon"><i data-lucide="target"></i></span>
-        <span><strong>Metas</strong><small>${canManage() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'}</small></span>
+        <span><strong>Metas</strong><small>${canManageGoals() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'}</small></span>
         <i data-lucide="chevron-right"></i>
-      </button>
+      </button>` : ''}
       ${isAdmin() ? `<button class="action-card" type="button" data-route="access">
         <span class="action-icon"><i data-lucide="user-round-cog"></i></span>
         <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
@@ -661,12 +686,12 @@ function leadsView() {
 }
 
 function followUpsView() {
-  if (!['captor', 'manager', 'admin'].includes(state.profile?.role)) {
+  if (!hasAccess('followups.own') && !hasAccess('followups.team')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
   }
 
   const allRecords = pendingFollowUps();
-  const managerView = canManage();
+  const managerView = hasAccess('followups.team');
   const adminView = isAdmin();
   const activeFilter = state.followUps.filter || 'all';
   const records = activeFilter === 'waiting'
@@ -867,13 +892,13 @@ function managementView() {
   return `
     <section class="management-heading management-dashboard-heading management-toolbar">
       <div class="management-heading-actions">
-        <button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>
-        ${canManage() ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
+        ${hasAccess('appointments.view') ? '<button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>' : ''}
+        ${hasAccess('followups.team') ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configuracoes</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
-        <button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>
-        <button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>
-        <button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>
+        ${hasAccess('dashboard.view') ? '<button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>' : ''}
+        ${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>' : ''}
+        ${hasAccess('leads.export') ? `<button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>` : ''}
       </div>
     </section>
     <form id="management-filters" class="management-filters">
@@ -916,7 +941,7 @@ function reportGroupRows(records, keyFor, labelFor) {
 }
 
 function reportsView() {
-  if (!canManage()) {
+  if (!hasAccess('reports.view')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos relatorios.</span></div>`;
   }
   const records = filteredReportRecords();
@@ -960,7 +985,7 @@ function dashboardGroupStats(records, keyFor, labelFor) {
 }
 
 function dashboardView() {
-  if (!canManage()) {
+  if (!hasAccess('dashboard.view')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso ao dashboard.</span></div>`;
   }
 
@@ -1019,7 +1044,7 @@ function dashboardView() {
 }
 
 function appointmentsView() {
-  if (!canManage()) {
+  if (!hasAccess('appointments.view')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso a agenda gerencial.</span></div>`;
   }
 
@@ -1057,10 +1082,10 @@ function appointmentsView() {
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
         <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small></div>
-        <div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
+        ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
           <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Nao compareceu</span></button>
-        </div>
+        </div>` : ''}
         ${isAdmin() ? `<button class="icon-button appointment-open" type="button" data-appointment-lead-id="${escapeHtml(lead.id)}" title="Abrir cadastro" aria-label="Abrir cadastro de ${escapeHtml(lead.fullName)}"><i data-lucide="chevron-right"></i></button>` : ''}
       </article>`;
     }).join('')
@@ -1168,17 +1193,28 @@ function settingsView() {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configuracoes das lojas.</span></div>`;
   }
 
-  const { records, selectedStoreId, loading, saving, error } = state.settings;
+  const { records, selectedStoreId, loading, saving, error, section } = state.settings;
+  const content = section === 'roles' ? roleProfilesSettingsView() : scheduleSettingsView();
+
+  return `<section class="page-toolbar settings-toolbar">
+      <div class="settings-tabs" role="tablist" aria-label="Categorias de configuracao">
+        <button class="settings-tab ${section === 'schedule' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'schedule'}" data-settings-section="schedule"><i data-lucide="calendar-days"></i><span>Agenda</span></button>
+        <button class="settings-tab ${section === 'roles' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'roles'}" data-settings-section="roles"><i data-lucide="shield-check"></i><span>Perfis e permissoes</span></button>
+      </div>
+      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+    </section>
+    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+    <div aria-busy="${loading || saving}">${content}</div>`;
+}
+
+function scheduleSettingsView() {
+  const { records, selectedStoreId, loading, saving } = state.settings;
   const selected = records.find((item) => item.id === selectedStoreId)
     || { ...STORES.find((item) => item.id === selectedStoreId), ...DEFAULT_STORE_SCHEDULE };
   const previewSlots = buildAppointmentSlots(selected);
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
 
-  return `<section class="page-toolbar">
-      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
-    </section>
-    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    <section class="settings-layout" aria-busy="${loading}">
+  return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
         <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configuracoes da agenda</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
@@ -1209,6 +1245,71 @@ function settingsView() {
     </section>`;
 }
 
+function roleProfilesSettingsView() {
+  const { roleProfiles, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, saving } = state.settings;
+  const compatiblePermissionIds = new Set(permissionsForScope(roleDraft.scope));
+  const scopeOptions = ROLE_SCOPES.map((scope) => `<option value="${scope.id}" ${scope.id === roleDraft.scope ? 'selected' : ''}>${scope.label}</option>`).join('');
+  const permissionGroups = PERMISSION_GROUPS
+    .map((group) => {
+      const permissions = group.permissions.filter((permission) => compatiblePermissionIds.has(permission.id));
+      if (!permissions.length) return '';
+      return `<fieldset class="role-permission-group"><legend>${escapeHtml(group.label)}</legend>${permissions.map((permission) => `<label class="setting-toggle role-permission-toggle" for="role-permission-${escapeHtml(permission.id)}">
+        <span><strong>${escapeHtml(permission.label)}</strong></span>
+        <input id="role-permission-${escapeHtml(permission.id)}" name="permissions" type="checkbox" value="${escapeHtml(permission.id)}" ${roleDraft.permissions.includes(permission.id) ? 'checked' : ''} />
+        <span class="setting-toggle-control" aria-hidden="true"></span>
+      </label>`).join('')}</fieldset>`;
+    }).join('');
+  const cards = roleProfiles.map((profile) => {
+    const permissionLabels = PERMISSION_GROUPS.flatMap((group) => group.permissions)
+      .filter((permission) => profile.permissions.includes(permission.id))
+      .map((permission) => permission.label);
+    return `<article class="role-profile-card ${editingRoleId === profile.id ? 'is-editing' : ''}">
+      <button class="role-profile-card-heading" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}">
+        <span class="role-profile-heading-copy"><span class="role-profile-icon"><i data-lucide="shield-check"></i></span><span><strong>${escapeHtml(profile.name)}</strong><small>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</small></span></span>
+        <span class="role-profile-heading-meta"><span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? 'Padrao' : 'Personalizado'}</span><i data-lucide="chevron-right"></i></span>
+      </button>
+      <p>${permissionLabels.length} permissao(oes) ativa(s)</p>
+      <div class="role-profile-permissions" title="${escapeHtml(permissionLabels.join(', '))}">${permissionLabels.slice(0, 3).map((label) => `<span>${escapeHtml(label)}</span>`).join('')}${permissionLabels.length > 3 ? `<span>+${permissionLabels.length - 3}</span>` : ''}</div>
+      <div class="role-profile-actions">
+        ${profile.system ? '<small>Perfil protegido do sistema</small>' : `<button class="button button-secondary" type="button" data-role-edit="${escapeHtml(profile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i><span>Editar</span></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir perfil" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
+      </div>
+    </article>`;
+  }).join('');
+  const deleting = roleProfiles.find((profile) => profile.id === pendingDeleteRoleId);
+  const detailsProfile = roleProfiles.find((profile) => profile.id === detailsRoleId);
+  const detailGroups = detailsProfile ? PERMISSION_GROUPS.map((group) => `<fieldset class="role-details-group"><legend>${escapeHtml(group.label)}</legend>${group.permissions.map((permission) => {
+    const active = detailsProfile.permissions.includes(permission.id);
+    return `<div class="role-details-permission ${active ? 'is-active' : ''}"><span><strong>${escapeHtml(permission.label)}</strong><small>${active ? 'Ativada' : 'Desativada'}</small></span><span class="setting-toggle-control" aria-hidden="true"></span></div>`;
+  }).join('')}</fieldset>`) : [];
+  const detailGroupsLayout = detailsProfile
+    ? `<div class="role-details-column">${detailGroups[0]}${detailGroups[2]}</div><div class="role-details-column">${detailGroups[1]}</div>`
+    : '';
+
+  return `<section class="role-settings-layout">
+    <form id="role-profile-form" class="settings-form role-profile-form ${editingRoleId ? 'is-editing' : ''}" novalidate>
+      <div class="filter-title"><i data-lucide="shield-check"></i><div><strong>${editingRoleId ? 'Editar perfil' : 'Novo perfil'}</strong><span>Defina o alcance e as acoes liberadas para este cargo.</span></div></div>
+      <div class="field" data-field="name"><label for="role-profile-name">Nome do perfil</label><input id="role-profile-name" name="name" maxlength="60" value="${escapeHtml(roleDraft.name)}" placeholder="Ex.: Supervisor de atendimento" required /><small class="field-error"></small></div>
+      <div class="field" data-field="scope"><label for="role-profile-scope">Alcance dos dados</label><select id="role-profile-scope" name="scope">${scopeOptions}</select><small class="field-error"></small></div>
+      <div class="role-permissions-heading"><strong>Permissoes</strong><span>Ative somente o necessario para este perfil.</span></div>
+      <div class="role-permission-groups" data-field="permissions">${permissionGroups}<small class="field-error"></small></div>
+      <div class="role-form-actions">
+        ${editingRoleId ? '<button class="button button-secondary" type="button" data-role-cancel>Cancelar</button>' : ''}
+        <button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar perfil'}</span></button>
+      </div>
+    </form>
+    <section class="role-profile-list-panel">
+      <div class="access-list-heading"><div><strong>Perfis cadastrados</strong><span>${roleProfiles.length} perfil(is)</span></div></div>
+      <div class="role-profile-list">${cards}</div>
+    </section>
+  </section>
+  ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir perfil?</h2><p id="delete-role-description">O perfil <strong>${escapeHtml(deleting.name)}</strong> sera removido. A exclusao so sera permitida se nenhuma pessoa estiver usando este perfil.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir perfil</button></div></dialog>` : ''}
+  ${detailsProfile ? `<dialog id="role-details-dialog" class="role-details-dialog" aria-labelledby="role-details-title">
+    <header><div><span class="eyebrow">PERFIL DE ACESSO</span><h2 id="role-details-title">${escapeHtml(detailsProfile.name)}</h2><p>${detailsProfile.scope === 'admin' ? 'Acesso completo ao sistema' : detailsProfile.scope === 'stores' ? 'Acesso limitado as unidades permitidas' : 'Acesso aos proprios dados'}</p></div><button class="icon-button" type="button" data-role-details-close title="Fechar" aria-label="Fechar permissoes"><i data-lucide="circle-x"></i></button></header>
+    <div class="role-details-body">${detailGroupsLayout}</div>
+    <footer><span><strong>${detailsProfile.permissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><button class="button button-primary" type="button" data-role-details-close>Concluir</button></footer>
+  </dialog>` : ''}`;
+}
+
 function accessView() {
   if (!isAdmin()) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem gerenciar acessos.</span></div>`;
@@ -1217,6 +1318,7 @@ function accessView() {
   const { accesses, loading, saving, error } = state.access;
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${state.profile.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
   const storeChecks = STORES.map((store) => `<label class="access-store-option checkbox-label"><input type="checkbox" name="storeIds" value="${store.id}" /><span>${store.label}</span></label>`).join('');
+  const roleProfileOptions = state.settings.roleProfiles.map((profile) => `<option value="${escapeHtml(profile.id)}" data-base-role="${escapeHtml(profile.baseRole)}">${escapeHtml(profile.name)}</option>`).join('');
   const rows = accesses.map((access) => {
     const isCurrentUser = access.email === state.profile.email?.toLowerCase();
     const storeSummary = formatAccessStoreSummary(access);
@@ -1225,7 +1327,7 @@ function accessView() {
         <span class="avatar access-avatar">${escapeHtml(profileInitials(access.displayName))}</span>
         <div class="access-identity-copy"><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
       </div>
-      <div class="access-detail access-permissions"><span>Perfil e unidades</span><strong>${roleLabel(access.role)}</strong><small title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</small></div>
+      <div class="access-detail access-permissions"><span>Perfil e unidades</span><strong>${escapeHtml(roleProfileLabel(access))}</strong><small title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</small></div>
       <div class="access-detail"><span>Primeiro acesso</span><strong>${access.hasLoggedIn ? 'Realizado' : 'Pendente'}</strong></div>
       <span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span>
       <div class="access-actions">
@@ -1246,7 +1348,7 @@ function accessView() {
         <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador entrara usando esta conta Google.</span></div></div>
         <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field" data-field="email"><label for="access-email">E-mail Google</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@gmail.com" required /><small class="field-error"></small></div>
-        <div class="field" data-field="role"><label for="access-role">Perfil</label><select id="access-role" name="role" required><option value="captor">Colaborador (captador)</option><option value="manager">Gestor de unidades</option><option value="admin">Administrador</option></select><small class="field-error"></small></div>
+        <div class="field" data-field="role"><label for="access-role-profile">Perfil</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
         <div class="field" data-field="storeId"><label for="access-store">Loja</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
         <fieldset id="access-stores-field" class="field access-store-picker" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
         <button class="button button-primary button-block" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>${saving ? 'Salvando...' : 'Salvar acesso'}</span></button>
@@ -1298,6 +1400,7 @@ function groupGoalRecords(records) {
 function goalsView() {
   const { records, members, loading, saving, error, truncated, draft, editingGroupId, pendingDeleteGroupId } = state.goals;
   const groups = groupGoalRecords(records);
+  const goalManagerView = canManageGoals();
   const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
   const selectedCount = draft.assigneeUids.filter((uid) => visibleMembers.some((member) => member.uid === uid)).length;
   const completedGoals = groups.filter((goal) => goal.completed >= goal.targetCount).length;
@@ -1324,7 +1427,7 @@ function goalsView() {
         return `<article class="goal-card">
           <div class="goal-card-heading">
             <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(group.title)}</h2></div>
-            ${canManage()
+            ${goalManagerView
               ? `<div class="goal-card-actions">
                   <button class="icon-button" type="button" data-edit-goal="${escapeHtml(group.id)}" title="Editar meta" aria-label="Editar meta"><i data-lucide="pencil"></i></button>
                   <button class="icon-button" type="button" data-duplicate-goal="${escapeHtml(group.id)}" title="Duplicar meta" aria-label="Duplicar meta"><i data-lucide="copy"></i></button>
@@ -1332,15 +1435,15 @@ function goalsView() {
                 </div>`
               : `<div class="goal-percentage" aria-label="${group.percentage}% da meta atingida"><strong>${group.percentage}%</strong><span>da meta</span></div>`}
           </div>
-          ${canManage() ? `<div class="goal-participants">${people}</div>` : ''}
+          ${goalManagerView ? `<div class="goal-participants">${people}</div>` : ''}
           <div class="goal-progress-copy"><strong>${group.completed} de ${group.targetCount} leads</strong><span>${group.percentage}%</span></div>
           <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${group.percentage}"><span style="width: ${group.percentage}%"></span></div>
           <div class="goal-card-footer"><span>${formatGoalDate(group.startDate)} a ${formatGoalDate(group.endDate)} · ${escapeHtml(storeLabel(group.storeId))}</span><strong>${group.remaining ? `${group.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
         </article>`;
       }).join('')
-    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${canManage() ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
+    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
 
-  const creator = canManage() ? `<form id="goal-form" class="goal-form" novalidate>
+  const creator = goalManagerView ? `<form id="goal-form" class="goal-form" novalidate>
       <div class="goal-form-heading"><div class="filter-title"><i data-lucide="${editingGroupId ? 'pencil' : 'target'}"></i><div><strong>${editingGroupId ? 'Editar meta' : 'Nova meta'}</strong><span>Quantidade de leads por colaborador no periodo.</span></div></div>${editingGroupId ? '<button class="icon-button" type="button" data-cancel-goal-edit title="Cancelar edicao" aria-label="Cancelar edicao"><i data-lucide="x"></i></button>' : ''}</div>
       <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
       <div class="goal-form-grid">
@@ -1360,7 +1463,7 @@ function goalsView() {
       <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
     </section>`;
   const results = `<section class="goals-results" aria-busy="${loading}">
-      <div class="access-list-heading"><div><strong>${canManage() ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${groups.length} meta(s)</span></div></div>
+      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${groups.length} meta(s)</span></div></div>
       ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
     </section>`;
 
@@ -1370,7 +1473,7 @@ function goalsView() {
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
-    ${canManage()
+    ${goalManagerView
       ? `${metrics}<section class="goals-layout">${creator}${results}</section>`
       : `<section class="personal-goals">${results}<h2 class="personal-goals-summary">Resumo</h2>${metrics}</section>`}
     ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
@@ -1404,7 +1507,7 @@ function bottomNav() {
     ['leads', 'clipboard-list', 'Cadastros'],
     ['sync', 'refresh-cw', 'Sync']
   ];
-  if (state.profile?.role === 'captor') items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
+  if (hasAccess('followups.own') && !hasAccess('followups.team')) items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
@@ -1733,7 +1836,8 @@ function bindPageEvents() {
   const accessForm = document.querySelector('#access-form');
   if (accessForm) {
     const syncStorePicker = () => {
-      const manager = accessForm.elements.role.value === 'manager';
+      const selected = state.settings.roleProfiles.find((profile) => profile.id === accessForm.elements.roleProfileId.value);
+      const manager = selected?.baseRole === 'manager';
       const picker = document.querySelector('#access-stores-field');
       picker.hidden = !manager;
       if (manager && !new FormData(accessForm).getAll('storeIds').length) {
@@ -1741,7 +1845,7 @@ function bindPageEvents() {
         if (primary) primary.checked = true;
       }
     };
-    accessForm.elements.role.addEventListener('change', syncStorePicker);
+    accessForm.elements.roleProfileId.addEventListener('change', syncStorePicker);
     accessForm.elements.storeId.addEventListener('change', syncStorePicker);
     syncStorePicker();
     accessForm.addEventListener('submit', async (event) => {
@@ -1753,7 +1857,7 @@ function bindPageEvents() {
       const values = { ...Object.fromEntries(formData), storeIds: formData.getAll('storeIds') };
 
       try {
-        const result = await saveAccess(state.profile, values);
+        const result = await saveAccess(state.profile, values, state.settings.roleProfiles);
         if (!result.isValid) {
           state.access.saving = false;
           setFieldErrors(accessForm, result.errors);
@@ -1773,6 +1877,75 @@ function bindPageEvents() {
       }
     });
   }
+
+  const roleProfileForm = document.querySelector('#role-profile-form');
+  if (roleProfileForm) {
+    roleProfileForm.elements.scope.addEventListener('change', () => {
+      state.settings.roleDraft.scope = roleProfileForm.elements.scope.value;
+      state.settings.roleDraft.permissions = permissionsForScope(state.settings.roleDraft.scope);
+      render();
+    });
+    roleProfileForm.querySelectorAll('[name="permissions"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        state.settings.roleDraft.permissions = [...roleProfileForm.querySelectorAll('[name="permissions"]:checked')].map((item) => item.value);
+      });
+    });
+    roleProfileForm.elements.name.addEventListener('input', () => {
+      state.settings.roleDraft.name = roleProfileForm.elements.name.value;
+    });
+    roleProfileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (state.settings.saving) return;
+      const formData = new FormData(roleProfileForm);
+      const values = { ...Object.fromEntries(formData), permissions: formData.getAll('permissions') };
+      state.settings.saving = true;
+      state.settings.error = '';
+      setFieldErrors(roleProfileForm, {});
+      try {
+        const result = state.demoMode
+          ? { ...validateRoleProfile(values), id: state.settings.editingRoleId || crypto.randomUUID() }
+          : await saveRoleProfile(state.profile, values, state.settings.editingRoleId);
+        if (!result.isValid) {
+          state.settings.saving = false;
+          setFieldErrors(roleProfileForm, result.errors);
+          return;
+        }
+        if (state.demoMode) {
+          const savedProfile = { id: result.id, ...result.data, active: true, system: false };
+          state.settings.roleProfiles = state.settings.editingRoleId
+            ? state.settings.roleProfiles.map((item) => item.id === result.id ? savedProfile : item)
+            : [...state.settings.roleProfiles, savedProfile];
+          state.settings.saving = false;
+        }
+        state.settings.roleDraft = createDefaultRoleDraft();
+        state.settings.editingRoleId = '';
+        if (!state.demoMode) await loadRoleProfilesData();
+        showToast('Perfil salvo com sucesso.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode gerenciar perfis e permissoes.'
+          : 'Nao foi possivel salvar o perfil.';
+        render();
+      }
+    });
+  }
+
+  const roleDetailsDialog = document.querySelector('#role-details-dialog');
+  roleDetailsDialog?.addEventListener('click', (event) => {
+    if (event.target !== roleDetailsDialog) return;
+    roleDetailsDialog.close();
+    state.settings.detailsRoleId = '';
+    render();
+  });
+
+  const deleteRoleDialog = document.querySelector('#delete-role-dialog');
+  deleteRoleDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    deleteRoleDialog.close();
+    state.settings.pendingDeleteRoleId = '';
+    render();
+  });
 
   const scheduleSettingsForm = document.querySelector('#schedule-settings-form');
   if (scheduleSettingsForm) {
@@ -1978,7 +2151,7 @@ function startFollowUpScheduleSubscription() {
     state.followUps.error = 'Nao foi possivel carregar a tolerancia da loja. Usando 30 minutos.';
   }
 
-  if (['manager', 'admin'].includes(state.profile.role)) {
+  if (hasAccess('followups.team')) {
     try {
       state.unsubscribeFollowUpLeads = subscribeToTeamFollowUps(
         state.profile,
@@ -2061,7 +2234,7 @@ function stopAppointmentsSubscription() {
 }
 
 function startAppointmentsSubscription() {
-  if (!canManage() || state.demoMode || state.route !== 'appointments') return;
+  if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'appointments') return;
   stopAppointmentsSubscription();
   state.appointments.loading = true;
   state.appointments.loaded = false;
@@ -2128,7 +2301,7 @@ async function openAppointmentCreateDialog() {
 }
 
 function ensureAppointmentsData() {
-  if (state.route === 'appointments' && canManage() && !state.demoMode && !state.unsubscribeAppointments) {
+  if (state.route === 'appointments' && hasAccess('appointments.view') && !state.demoMode && !state.unsubscribeAppointments) {
     startAppointmentsSubscription();
   }
 }
@@ -2240,9 +2413,11 @@ async function loadSettingsData() {
   state.settings.error = '';
   render();
   try {
-    state.settings.records = state.demoMode
-      ? STORES.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }))
-      : await loadStoreSchedules(state.profile);
+    const [records, roleProfiles] = state.demoMode
+      ? [STORES.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE })), SYSTEM_ROLE_PROFILES]
+      : await Promise.all([loadStoreSchedules(state.profile), loadRoleProfiles(state.profile)]);
+    state.settings.records = records;
+    state.settings.roleProfiles = roleProfiles.map((item) => ({ ...item, permissions: [...item.permissions] }));
     state.settings.loaded = true;
   } catch (error) {
     state.settings.error = error?.code === 'permission-denied'
@@ -2250,6 +2425,22 @@ async function loadSettingsData() {
       : 'Nao foi possivel carregar as configuracoes das lojas.';
   } finally {
     state.settings.loading = false;
+    render();
+  }
+}
+
+async function loadRoleProfilesData() {
+  if (!isAdmin()) return;
+  try {
+    const profiles = state.demoMode ? SYSTEM_ROLE_PROFILES : await loadRoleProfiles(state.profile);
+    state.settings.roleProfiles = profiles.map((item) => ({ ...item, permissions: [...item.permissions] }));
+    state.settings.saving = false;
+    render();
+  } catch (error) {
+    state.settings.saving = false;
+    state.settings.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao pode consultar os perfis de acesso.'
+      : 'Nao foi possivel carregar os perfis de acesso.';
     render();
   }
 }
@@ -2267,6 +2458,13 @@ async function loadAccessData() {
     const result = await loadAccesses(state.profile);
     state.access.accesses = result.accesses;
     state.access.storeIds = result.storeIds;
+    try {
+      const roleProfiles = await loadRoleProfiles(state.profile);
+      state.settings.roleProfiles = roleProfiles.map((item) => ({ ...item, permissions: [...item.permissions] }));
+    } catch {
+      state.settings.roleProfiles = SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] }));
+      state.access.error = 'Os acessos foram carregados, mas os perfis personalizados estao temporariamente indisponiveis.';
+    }
     state.access.loaded = true;
   } catch (error) {
     state.access.error = error?.code === 'permission-denied'
@@ -2416,7 +2614,13 @@ async function handleAction(action) {
       saving: false,
       error: '',
       selectedStoreId: STORES[0]?.id || '',
-      records: []
+      records: [],
+      section: 'schedule',
+      roleProfiles: SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] })),
+      roleDraft: createDefaultRoleDraft(),
+      editingRoleId: '',
+      pendingDeleteRoleId: '',
+      detailsRoleId: ''
     };
     state.access = {
       loading: false,
@@ -2504,6 +2708,80 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const settingsSectionButton = event.target.closest('[data-settings-section]');
+    if (settingsSectionButton) {
+      state.settings.section = settingsSectionButton.dataset.settingsSection;
+      render();
+    }
+    const editRoleButton = event.target.closest('[data-role-edit]');
+    if (editRoleButton) {
+      const profile = state.settings.roleProfiles.find((item) => item.id === editRoleButton.dataset.roleEdit && !item.system);
+      if (profile) {
+        state.settings.editingRoleId = profile.id;
+        state.settings.roleDraft = { name: profile.name, scope: profile.scope, permissions: [...profile.permissions] };
+        render();
+        const form = document.querySelector('#role-profile-form');
+        form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const nameInput = form?.elements.name;
+        nameInput?.focus({ preventScroll: true });
+        nameInput?.select();
+      }
+      return;
+    }
+    const roleDetailsButton = event.target.closest('[data-role-details]');
+    if (roleDetailsButton) {
+      state.settings.detailsRoleId = roleDetailsButton.dataset.roleDetails;
+      render();
+      document.querySelector('#role-details-dialog')?.showModal();
+    }
+    const closeRoleDetailsButton = event.target.closest('[data-role-details-close]');
+    if (closeRoleDetailsButton) {
+      document.querySelector('#role-details-dialog')?.close();
+      state.settings.detailsRoleId = '';
+      render();
+    }
+    if (event.target.closest('[data-role-cancel]')) {
+      state.settings.editingRoleId = '';
+      state.settings.roleDraft = createDefaultRoleDraft();
+      render();
+    }
+    const deleteRoleButton = event.target.closest('[data-role-delete]');
+    if (deleteRoleButton) {
+      state.settings.pendingDeleteRoleId = deleteRoleButton.dataset.roleDelete;
+      render();
+      document.querySelector('#delete-role-dialog')?.showModal();
+      return;
+    }
+    if (event.target.closest('[data-role-delete-cancel]')) {
+      document.querySelector('#delete-role-dialog')?.close();
+      state.settings.pendingDeleteRoleId = '';
+      render();
+      return;
+    }
+    const confirmRoleDeleteButton = event.target.closest('[data-role-delete-confirm]');
+    if (confirmRoleDeleteButton && !confirmRoleDeleteButton.disabled) {
+      const roleProfile = state.settings.roleProfiles.find((item) => item.id === confirmRoleDeleteButton.dataset.roleDeleteConfirm);
+      if (roleProfile) {
+        state.settings.saving = true;
+        render();
+        try {
+          if (state.demoMode) {
+            state.settings.roleProfiles = state.settings.roleProfiles.filter((item) => item.id !== roleProfile.id);
+            state.settings.saving = false;
+          } else {
+            await deleteRoleProfile(state.profile, roleProfile);
+          }
+          state.settings.pendingDeleteRoleId = '';
+          if (!state.demoMode) await loadRoleProfilesData();
+          showToast('Perfil excluido.');
+        } catch (error) {
+          state.settings.saving = false;
+          state.settings.pendingDeleteRoleId = '';
+          state.settings.error = error?.code === 'role-in-use' ? error.message : 'Nao foi possivel excluir o perfil.';
+          render();
+        }
+      }
+    }
     const followUpFilterButton = event.target.closest('[data-follow-up-filter]');
     if (followUpFilterButton) {
       state.followUps.filter = followUpFilterButton.dataset.followUpFilter;
@@ -2654,12 +2932,12 @@ export async function startApp() {
       if (!access || !form) return;
       form.elements.displayName.value = access.displayName;
       form.elements.email.value = access.email;
-      form.elements.role.value = access.role;
+      form.elements.roleProfileId.value = access.roleProfileId || systemRoleProfileForRole(access.role).id;
       form.elements.storeId.value = access.storeId;
       form.querySelectorAll('[name="storeIds"]').forEach((input) => {
         input.checked = access.storeIds.includes(input.value);
       });
-      form.elements.role.dispatchEvent(new Event('change'));
+      form.elements.roleProfileId.dispatchEvent(new Event('change'));
       form.elements.displayName.focus();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
