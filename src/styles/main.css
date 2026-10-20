@@ -2657,7 +2657,7 @@ svg {
   accent-color: var(--brand);
 }
 
-.service-store-option > span {
+.field label.service-store-option > span {
   color: var(--ink);
 }
 

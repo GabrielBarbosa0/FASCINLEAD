@@ -783,6 +783,7 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   const dialog = page.getByRole('dialog', { name: 'Novo servico' });
   await dialog.getByLabel('Nome do servico').fill('Avaliacao especializada');
   await dialog.getByLabel('Duracao').fill('45');
+  await expect(dialog.getByText('Loja 02', { exact: true })).toHaveCSS('color', 'rgb(20, 32, 51)');
   await dialog.getByLabel('Loja 02').uncheck();
   await dialog.getByLabel('Loja 06').check();
   await dialog.getByLabel('Loja 04').check();
