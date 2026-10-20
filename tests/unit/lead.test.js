@@ -14,6 +14,10 @@ const validInput = {
   pathologyIds: ['glaucoma', 'diabetes'],
   appointmentDate: '2026-10-02',
   appointmentTime: '14:30',
+  appointmentServiceId: 'service-eye-exam',
+  appointmentServiceName: 'Exame de vista',
+  appointmentDurationMinutes: 30,
+  schedulingMode: 'controlled',
   notes: ''
 };
 
@@ -69,6 +73,9 @@ describe('lead validation', () => {
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
       appointmentAttendance: 'pending',
+      appointmentServiceId: 'service-eye-exam',
+      appointmentServiceName: 'Exame de vista',
+      appointmentDurationMinutes: 30,
       ametropiaIds: ['myopia', 'astigmatism'],
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyIds: ['glaucoma', 'diabetes'],

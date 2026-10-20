@@ -53,6 +53,10 @@ service cloud.firestore {
       );
     }
 
+    function permittedStoreIds() {
+      return ('storeIds' in userProfile()) ? userProfile().storeIds : [userProfile().storeId];
+    }
+
     function canManageGoals() {
       return hasPermission('goals.manage');
     }
@@ -97,6 +101,7 @@ service cloud.firestore {
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
+          'appointmentServiceId', 'appointmentServiceName',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
           'followUpContactedAt', 'followUpContactedByUid',
           'followUpContactedByName', 'followUpContactedAppointmentKey',
@@ -176,8 +181,39 @@ service cloud.firestore {
           || (data.appointmentDurationMinutes is int
             && data.appointmentDurationMinutes >= 5
             && data.appointmentDurationMinutes <= 180))
+        && (!('appointmentServiceId' in data)
+          || (data.appointmentServiceId is string
+            && data.appointmentServiceId.size() >= 1
+            && data.appointmentServiceId.size() <= 120))
+        && (!('appointmentServiceName' in data)
+          || (data.appointmentServiceName is string
+            && data.appointmentServiceName.size() >= 2
+            && data.appointmentServiceName.size() <= 80))
         && data.source == 'street'
         && data.schemaVersion == 1;
+    }
+
+    function validAppointmentService(data) {
+      return data.keys().hasOnly([
+          'name', 'storeIds', 'durationMinutes', 'active', 'schemaVersion',
+          'createdAt', 'createdByUid', 'updatedAt', 'updatedByUid'
+        ])
+        && data.name is string
+        && data.name.size() >= 2
+        && data.name.size() <= 80
+        && data.storeIds is list
+        && data.storeIds.size() >= 1
+        && data.storeIds.size() <= 4
+        && data.storeIds.hasOnly(['loja-02', 'loja-04', 'loja-05', 'loja-06'])
+        && data.durationMinutes is int
+        && data.durationMinutes >= 5
+        && data.durationMinutes <= 180
+        && data.active is bool
+        && data.schemaVersion == 2
+        && data.createdAt is timestamp
+        && data.createdByUid is string
+        && data.updatedAt is timestamp
+        && data.updatedByUid == request.auth.uid;
     }
 
     function validAppointmentSlot(slotId, data) {
@@ -231,7 +267,11 @@ service cloud.firestore {
         && (!('appointmentDurationMinutes' in data)
           || (data.appointmentDurationMinutes is int
             && data.appointmentDurationMinutes >= 5
-            && data.appointmentDurationMinutes <= 180));
+            && data.appointmentDurationMinutes <= 180))
+        && (!('appointmentServiceId' in data)
+          || (data.appointmentServiceId is string && data.appointmentServiceId.size() <= 120))
+        && (!('appointmentServiceName' in data)
+          || (data.appointmentServiceName is string && data.appointmentServiceName.size() <= 80));
     }
 
     function validLeadSale(leadId, data) {
@@ -273,7 +313,8 @@ service cloud.firestore {
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-          'appointmentDurationMinutes', 'appointmentAttendance', 'notes', 'updatedAtServer'
+          'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+          'appointmentAttendance', 'notes', 'updatedAtServer'
         ])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
           || (
@@ -323,7 +364,8 @@ service cloud.firestore {
           || (hasPermission('appointments.attendance')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-              'appointmentDurationMinutes', 'appointmentAttendance', 'updatedAtServer'
+              'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+              'appointmentAttendance', 'updatedAtServer'
             ]))
         );
     }
@@ -353,7 +395,8 @@ service cloud.firestore {
           'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-          'appointmentDurationMinutes', 'appointmentAttendance', 'notes', 'updatedAtServer'
+          'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+          'appointmentAttendance', 'notes', 'updatedAtServer'
         ]);
     }
 
@@ -419,6 +462,20 @@ service cloud.firestore {
     match /interests/{interestId} {
       allow read: if activeUser();
       allow write: if isAdmin();
+    }
+
+    match /appointmentServices/{serviceId} {
+      allow get, list: if isAdmin() || (activeUser()
+        && resource.data.active == true
+        && resource.data.storeIds.hasAny(permittedStoreIds()));
+      allow create: if isAdmin()
+        && validAppointmentService(request.resource.data)
+        && request.resource.data.createdByUid == request.auth.uid;
+      allow update: if isAdmin()
+        && validAppointmentService(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdByUid == resource.data.createdByUid;
+      allow delete: if false;
     }
 
     match /leads/{leadId} {

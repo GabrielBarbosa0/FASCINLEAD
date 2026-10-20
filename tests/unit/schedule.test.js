@@ -52,6 +52,21 @@ describe('store schedule helpers', () => {
     expect(slots.every((slot) => !slot.available)).toBe(true);
   });
 
+  it('uses each saved appointment duration when services have different lengths', () => {
+    const slots = buildAppointmentSlots({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 15,
+      openingTime: '08:00',
+      closingTime: '09:00'
+    }, [{ id: 'lead-1', appointmentTime: '08:15', appointmentDurationMinutes: 30 }]);
+    expect(slots.map(({ time, available }) => [time, available])).toEqual([
+      ['08:00', true],
+      ['08:15', false],
+      ['08:30', false],
+      ['08:45', true]
+    ]);
+  });
+
   it('validates duration and working hours', () => {
     expect(validateStoreSchedule({
       schedulingMode: 'controlled',

@@ -77,7 +77,9 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
     .filter((appointment) => appointment.id !== ignoredLeadId)
     .map((appointment) => {
       const appointmentStart = timeToMinutes(appointment.appointmentTime);
-      const appointmentDuration = Number(appointment.durationMinutes) || duration;
+      const appointmentDuration = Number(appointment.durationMinutes)
+        || Number(appointment.appointmentDurationMinutes)
+        || duration;
       return appointmentStart === null ? null : [appointmentStart, appointmentStart + appointmentDuration];
     })
     .filter(Boolean);

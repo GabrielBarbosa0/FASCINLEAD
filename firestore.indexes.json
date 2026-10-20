@@ -48,6 +48,14 @@
         { "fieldPath": "storeId", "order": "ASCENDING" },
         { "fieldPath": "appointmentDate", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "appointmentServices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "storeIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "active", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

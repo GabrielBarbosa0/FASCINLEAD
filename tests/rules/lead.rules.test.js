@@ -460,6 +460,59 @@ describe('store schedule settings', () => {
   });
 });
 
+describe('appointment service catalog', () => {
+  const service = {
+    name: 'Exame de vista',
+    storeIds: ['loja-02', 'loja-06'],
+    durationMinutes: 30,
+    active: true,
+    schemaVersion: 2,
+    createdAt: Timestamp.now(),
+    createdByUid: 'admin-uid',
+    updatedAt: Timestamp.now(),
+    updatedByUid: 'admin-uid'
+  };
+
+  it('lets an administrator create and edit a service', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    const reference = doc(db, 'appointmentServices', 'eye-exam');
+    await assertSucceeds(setDoc(reference, service));
+    await assertSucceeds(updateDoc(reference, {
+      durationMinutes: 45,
+      updatedAt: Timestamp.now(),
+      updatedByUid: 'admin-uid'
+    }));
+  });
+
+  it('lets a captor list active services from their own store', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'appointmentServices', 'eye-exam'), service);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'appointmentServices'),
+      where('storeIds', 'array-contains', 'loja-06'),
+      where('active', '==', true)
+    )));
+  });
+
+  it('does not let a captor read inactive services or manage the catalog', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'appointmentServices', 'inactive-service'), {
+        ...service,
+        active: false
+      });
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(getDoc(doc(db, 'appointmentServices', 'inactive-service')));
+    await assertFails(setDoc(doc(db, 'appointmentServices', 'new-service'), {
+      ...service,
+      createdByUid: 'captor-uid',
+      updatedByUid: 'captor-uid'
+    }));
+  });
+});
+
 describe('appointment slot reservations', () => {
   const lead = {
     fullName: 'Cliente com horario',

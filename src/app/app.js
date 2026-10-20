@@ -31,6 +31,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  Stethoscope,
   Target,
   Trash2,
   UserPlus,
@@ -52,6 +53,7 @@ import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, upda
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
+import { ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
@@ -65,6 +67,7 @@ import { formatAccessStoreSummary } from '../utils/access.js';
 import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, permissionsForScope, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { duplicateGoalDraft } from '../utils/goal.js';
+import { defaultAppointmentService, servicesForStore, validateAppointmentService } from '../utils/service-catalog.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
@@ -103,6 +106,7 @@ const appIcons = {
   Save,
   Search,
   ShieldCheck,
+  Stethoscope,
   Target,
   Trash2,
   UserPlus,
@@ -160,7 +164,9 @@ const state = {
     saving: false,
     error: '',
     schedules: [],
-    storeId: ''
+    storeId: '',
+    services: [],
+    serviceId: ''
   },
   newLeadSchedule: {
     loaded: false,
@@ -168,7 +174,9 @@ const state = {
     error: '',
     settings: { ...DEFAULT_STORE_SCHEDULE },
     appointmentDate: '',
-    appointments: []
+    appointments: [],
+    services: [],
+    serviceId: ''
   },
   followUps: {
     loaded: false,
@@ -188,6 +196,9 @@ const state = {
     records: [],
     section: 'schedule',
     roleProfiles: SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] })),
+    services: [],
+    serviceEditorOpen: false,
+    editingServiceId: '',
     roleDraft: createDefaultRoleDraft(),
     editingRoleId: '',
     pendingDeleteRoleId: '',
@@ -550,11 +561,13 @@ function homeView() {
 
 function appointmentTimeField() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
+  const service = selectedNewLeadService();
+  const serviceSchedule = { ...settings, appointmentDurationMinutes: service.durationMinutes };
   if (settings.schedulingMode === 'free') {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
   }
 
-  const slots = appointmentDate ? buildAppointmentSlots(settings, appointments) : [];
+  const slots = appointmentDate ? buildAppointmentSlots(serviceSchedule, appointments) : [];
   const availableSlots = slots.filter((slot) => slot.available);
   let placeholder = 'Escolha primeiro uma data';
   if (loading) placeholder = 'Consultando horarios...';
@@ -573,6 +586,13 @@ function appointmentTimeField() {
     <small class="field-error"></small>
     ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${availableSlots.length} de ${slots.length} horario(s) disponivel(is)</small>` : ''}
   </div>`;
+}
+
+function selectedNewLeadService() {
+  const available = servicesForStore(state.newLeadSchedule.services, state.profile?.storeId);
+  return available.find((service) => service.id === state.newLeadSchedule.serviceId)
+    || available[0]
+    || defaultAppointmentService(state.profile?.storeId || '', state.newLeadSchedule.settings.appointmentDurationMinutes);
 }
 
 function ametropiaOptions(selectedIds = []) {
@@ -617,13 +637,19 @@ function bindCpfInput(form) {
 
 function newLeadView() {
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
+  const selectedService = selectedNewLeadService();
+  const availableServices = servicesForStore(state.newLeadSchedule.services, state.profile.storeId);
+  const serviceOptions = (availableServices.length ? availableServices : [selectedService])
+    .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
+    .join('');
   return `
     <section class="page-toolbar">
       <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
     </section>
     <form id="lead-form" class="form-panel" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
-      <input name="appointmentDurationMinutes" type="hidden" value="${state.newLeadSchedule.settings.appointmentDurationMinutes}" />
+      <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
+      <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
       <div class="field" data-field="fullName">
         <label for="fullName">Nome <span aria-hidden="true">*</span></label>
         <input id="fullName" name="fullName" autocomplete="name" maxlength="120" placeholder="Nome do cliente" required />
@@ -651,6 +677,11 @@ function newLeadView() {
       <div class="field">
         <label for="interestId">Interesse principal</label>
         <select id="interestId" name="interestId">${interests}</select>
+      </div>
+      <div class="field" data-field="appointmentServiceId">
+        <label for="appointmentServiceId">Servico do agendamento</label>
+        <select id="appointmentServiceId" name="appointmentServiceId">${serviceOptions}</select>
+        <small class="field-error"></small>
       </div>
       <fieldset class="field ametropia-field">
         <legend>Ametropias</legend>
@@ -814,6 +845,7 @@ function leadDetailView() {
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || 'free')}" />
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
+      ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required ${locked} /><small class="field-error"></small></div>
       <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required ${locked} /><small class="field-error"></small></div>
       <div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" ${locked} /><small class="field-error"></small></div>
@@ -1099,7 +1131,7 @@ function appointmentsView() {
       const updating = updatingId === lead.id;
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
-        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small></div>
+        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small></div>
         ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
           <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Nao compareceu</span></button>
@@ -1155,26 +1187,41 @@ function appointmentCreateSchedule() {
     || { ...DEFAULT_STORE_SCHEDULE, id: state.appointmentCreate.storeId };
 }
 
+function appointmentCreateService() {
+  const schedule = appointmentCreateSchedule();
+  const available = servicesForStore(state.appointmentCreate.services, state.appointmentCreate.storeId);
+  return available.find((service) => service.id === state.appointmentCreate.serviceId)
+    || available[0]
+    || defaultAppointmentService(state.appointmentCreate.storeId, schedule.appointmentDurationMinutes);
+}
+
 function appointmentCreateTimeField() {
   const schedule = appointmentCreateSchedule();
+  const service = appointmentCreateService();
   if (state.appointmentCreate.loading) {
-    return '<div class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
+    return '<div id="appointment-create-time-field" class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
   }
   if (schedule.schedulingMode === 'free') {
-    return '<div class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
   }
   const records = (state.demoMode ? state.leads : state.appointments.records)
     .filter((lead) => lead.storeId === state.appointmentCreate.storeId
       && lead.appointmentDate === state.appointments.selectedDate);
-  const available = buildAppointmentSlots(schedule, records).filter((slot) => slot.available);
-  return `<div class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+  const available = buildAppointmentSlots({ ...schedule, appointmentDurationMinutes: service.durationMinutes }, records)
+    .filter((slot) => slot.available);
+  return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
 }
 
 function appointmentCreateDialog(allowedStores) {
   const { loading, saving, error, storeId } = state.appointmentCreate;
   const schedule = appointmentCreateSchedule();
+  const selectedService = appointmentCreateService();
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${store.id === storeId ? 'selected' : ''}>${store.label}</option>`).join('');
+  const availableServices = servicesForStore(state.appointmentCreate.services, storeId);
+  const serviceOptions = (availableServices.length ? availableServices : [selectedService])
+    .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
+    .join('');
   return `<dialog id="appointment-create-dialog" class="appointment-create-dialog" aria-labelledby="appointment-create-title">
     <div class="appointment-create-header">
       <div><span>CADASTRO</span><h2 id="appointment-create-title">Novo agendamento</h2><p>${escapeHtml(formatAppointmentDate(state.appointments.selectedDate))}</p></div>
@@ -1184,9 +1231,11 @@ function appointmentCreateDialog(allowedStores) {
     <form id="appointment-create-form" novalidate>
       <input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" />
       <input name="schedulingMode" type="hidden" value="${escapeHtml(schedule.schedulingMode)}" />
-      <input name="appointmentDurationMinutes" type="hidden" value="${schedule.appointmentDurationMinutes}" />
+      <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
+      <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
       <div class="appointment-create-grid">
         <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Servico</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
         ${appointmentCreateTimeField()}
         <div class="field appointment-create-wide" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field appointment-create-wide" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" required /><small class="field-error"></small></div>
@@ -1212,17 +1261,59 @@ function settingsView() {
   }
 
   const { records, selectedStoreId, loading, saving, error, section } = state.settings;
-  const content = section === 'roles' ? roleProfilesSettingsView() : scheduleSettingsView();
+  const content = section === 'roles'
+    ? roleProfilesSettingsView()
+    : section === 'services'
+      ? serviceCatalogSettingsView()
+      : scheduleSettingsView();
 
   return `<section class="page-toolbar settings-toolbar">
       <div class="settings-tabs" role="tablist" aria-label="Categorias de configuracao">
         <button class="settings-tab ${section === 'schedule' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'schedule'}" data-settings-section="schedule"><i data-lucide="calendar-days"></i><span>Agenda</span></button>
+        <button class="settings-tab ${section === 'services' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'services'}" data-settings-section="services"><i data-lucide="stethoscope"></i><span>Servicos</span></button>
         <button class="settings-tab ${section === 'roles' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'roles'}" data-settings-section="roles"><i data-lucide="shield-check"></i><span>Perfis e permissoes</span></button>
       </div>
       <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <div aria-busy="${loading || saving}">${content}</div>`;
+}
+
+function serviceCatalogSettingsView() {
+  const { services, saving, serviceEditorOpen, editingServiceId } = state.settings;
+  const editing = services.find((service) => service.id === editingServiceId) || null;
+  const rows = services.map((service) => `<article class="service-catalog-row ${service.active ? '' : 'is-inactive'}">
+    <span class="service-catalog-icon"><i data-lucide="stethoscope"></i></span>
+    <div class="service-catalog-name"><strong>${escapeHtml(service.name)}</strong><span>${escapeHtml(service.storeIds.map(storeLabel).join(' · '))}</span></div>
+    <div class="service-catalog-duration"><span>Duracao</span><strong>${service.durationMinutes} min</strong></div>
+    <span class="status-badge status-${service.active ? 'success' : 'neutral'}">${service.active ? 'Ativo' : 'Inativo'}</span>
+    <div class="service-catalog-actions">
+      <button class="icon-button" type="button" data-service-edit="${escapeHtml(service.id)}" title="Editar servico" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
+      <button class="button button-secondary" type="button" data-service-toggle="${escapeHtml(service.id)}" ${saving ? 'disabled' : ''}><i data-lucide="${service.active ? 'circle-x' : 'circle-check'}"></i><span>${service.active ? 'Desativar' : 'Ativar'}</span></button>
+    </div>
+  </article>`).join('');
+  const selectedStoreIds = editing?.storeIds || [state.settings.selectedStoreId || STORES[0].id];
+  const storeOptions = STORES.map((store) => `<label class="service-store-option">
+    <input type="checkbox" name="storeIds" value="${store.id}" ${selectedStoreIds.includes(store.id) ? 'checked' : ''} />
+    <span>${store.label}</span>
+  </label>`).join('');
+
+  return `<section class="service-catalog-panel">
+    <div class="service-catalog-heading"><div><span class="eyebrow">AGENDA</span><h2>Servicos cadastrados</h2><p>Defina a duracao dos atendimentos oferecidos em cada unidade.</p></div><button class="button button-primary" type="button" data-service-new><i data-lucide="circle-plus"></i><span>Novo servico</span></button></div>
+    ${rows ? `<div class="service-catalog-list">${rows}</div>` : '<div class="empty-state"><i data-lucide="stethoscope"></i><strong>Nenhum servico cadastrado</strong><p>Crie o primeiro servico da agenda.</p></div>'}
+  </section>
+  ${serviceEditorOpen ? `<dialog id="service-editor-dialog" class="access-editor-dialog service-editor-dialog" aria-labelledby="service-editor-title">
+    <form id="service-form" class="access-form" novalidate>
+      <header><div><span class="eyebrow">SERVICO DA AGENDA</span><h2 id="service-editor-title">${editing ? 'Editar servico' : 'Novo servico'}</h2><p>A duracao sera usada para calcular os horarios disponiveis.</p></div><button class="icon-button" type="button" data-service-editor-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <div class="access-form-body">
+        <div class="field access-field-wide" data-field="name"><label for="service-name">Nome do servico</label><input id="service-name" name="name" maxlength="80" value="${escapeHtml(editing?.name || '')}" placeholder="Ex.: Exame de vista" required /><small class="field-error"></small></div>
+        <div class="field" data-field="durationMinutes"><label for="service-duration">Duracao</label><div class="number-with-unit"><input id="service-duration" name="durationMinutes" type="number" min="5" max="180" step="5" value="${editing?.durationMinutes || 30}" required /><span>min</span></div><small class="field-error"></small></div>
+        <fieldset class="field access-field-wide service-store-field" data-field="storeIds"><legend>Lojas atendidas</legend><small>Marque todas as unidades que oferecem este servico.</small><div class="service-store-options">${storeOptions}</div><small class="field-error"></small></fieldset>
+        <input name="active" type="hidden" value="${editing?.active === false ? 'false' : 'true'}" />
+      </div>
+      <footer><button class="button button-secondary" type="button" data-service-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar servico'}</span></button></footer>
+    </form>
+  </dialog>` : ''}`;
 }
 
 function scheduleSettingsView() {
@@ -1238,7 +1329,6 @@ function scheduleSettingsView() {
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
         <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
         <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
-          <div class="field" data-field="appointmentDurationMinutes"><label for="settings-duration">Duracao da consulta</label><div class="number-with-unit"><input id="settings-duration" name="appointmentDurationMinutes" type="number" min="5" max="180" step="5" value="${selected.appointmentDurationMinutes}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><span>min</span></div><small class="field-error"></small></div>
           <div class="field-row schedule-hours">
             <div class="field" data-field="openingTime"><label for="settings-opening">Inicio</label><input id="settings-opening" name="openingTime" type="time" value="${selected.openingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
             <div class="field" data-field="closingTime"><label for="settings-closing">Fim</label><input id="settings-closing" name="closingTime" type="time" value="${selected.closingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
@@ -1257,7 +1347,7 @@ function scheduleSettingsView() {
         <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
         ${selected.schedulingMode === 'free'
           ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
-          : `<div class="schedule-summary-grid"><div><span>Duracao</span><strong>${selected.appointmentDurationMinutes} min</strong></div><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Capacidade diaria</span><strong>${previewSlots.length} consulta(s)</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div></div>
+          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div></div>
             <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
       </aside>
     </section>`;
@@ -1624,6 +1714,13 @@ function bindPageEvents() {
     bindCpfInput(form);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#notes-count').textContent = notesInput.value.length; });
+    form.elements.appointmentServiceId?.addEventListener('change', () => {
+      state.newLeadSchedule.serviceId = form.elements.appointmentServiceId.value;
+      const service = selectedNewLeadService();
+      form.elements.appointmentServiceName.value = service.name;
+      form.elements.appointmentDurationMinutes.value = service.durationMinutes;
+      refreshAppointmentTimeControl();
+    });
     appointmentDateInput.addEventListener('input', () => {
       state.newLeadSchedule.appointmentDate = appointmentDateInput.value;
       startDayAppointmentsSubscription();
@@ -1635,7 +1732,10 @@ function bindPageEvents() {
       const values = leadFormValues(form);
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
-        const selectedSlot = buildAppointmentSlots(state.newLeadSchedule.settings, state.newLeadSchedule.appointments)
+        const selectedSlot = buildAppointmentSlots({
+          ...state.newLeadSchedule.settings,
+          appointmentDurationMinutes: Number(values.appointmentDurationMinutes)
+        }, state.newLeadSchedule.appointments)
           .find((slot) => slot.time === values.appointmentTime);
         if (!selectedSlot?.available) {
           setFieldErrors(form, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
@@ -1845,8 +1945,21 @@ function bindPageEvents() {
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
     appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {
       state.appointmentCreate.storeId = event.target.value;
+      const schedule = appointmentCreateSchedule();
+      if (!servicesForStore(state.appointmentCreate.services, event.target.value).length) {
+        state.appointmentCreate.services.push(defaultAppointmentService(event.target.value, schedule.appointmentDurationMinutes));
+      }
+      state.appointmentCreate.serviceId = servicesForStore(state.appointmentCreate.services, event.target.value)[0]?.id || '';
       render();
       document.querySelector('#appointment-create-dialog')?.showModal();
+    });
+    appointmentCreateForm.elements.appointmentServiceId?.addEventListener('change', () => {
+      state.appointmentCreate.serviceId = appointmentCreateForm.elements.appointmentServiceId.value;
+      const service = appointmentCreateService();
+      appointmentCreateForm.elements.appointmentServiceName.value = service.name;
+      appointmentCreateForm.elements.appointmentDurationMinutes.value = service.durationMinutes;
+      const timeField = document.querySelector('#appointment-create-time-field');
+      if (timeField) timeField.outerHTML = appointmentCreateTimeField();
     });
     appointmentCreateForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -2028,6 +2141,53 @@ function bindPageEvents() {
     render();
   });
 
+  const serviceForm = document.querySelector('#service-form');
+  if (serviceForm) {
+    serviceForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (state.settings.saving) return;
+      const formData = new FormData(serviceForm);
+      const values = { ...Object.fromEntries(formData), storeIds: formData.getAll('storeIds') };
+      const editingId = state.settings.editingServiceId;
+      state.settings.saving = true;
+      setFieldErrors(serviceForm, {});
+      try {
+        const result = state.demoMode
+          ? { ...validateAppointmentService(values), id: editingId || crypto.randomUUID() }
+          : await saveAppointmentService(state.profile, values, editingId);
+        if (!result.isValid) {
+          state.settings.saving = false;
+          setFieldErrors(serviceForm, result.errors);
+          return;
+        }
+        if (state.demoMode) {
+          const saved = { id: result.id, ...result.data };
+          state.settings.services = editingId
+            ? state.settings.services.map((item) => item.id === editingId ? saved : item)
+            : [...state.settings.services, saved];
+          state.settings.saving = false;
+        }
+        state.settings.serviceEditorOpen = false;
+        state.settings.editingServiceId = '';
+        if (!state.demoMode) await loadServiceCatalogData();
+        else render();
+        showToast('Servico salvo com sucesso.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode gerenciar servicos.'
+          : 'Nao foi possivel salvar o servico.';
+        render();
+      }
+    });
+  }
+  document.querySelector('#service-editor-dialog')?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    state.settings.serviceEditorOpen = false;
+    state.settings.editingServiceId = '';
+    render();
+  });
+
   const scheduleSettingsForm = document.querySelector('#schedule-settings-form');
   if (scheduleSettingsForm) {
     scheduleSettingsForm.elements.storeId.addEventListener('change', () => {
@@ -2039,11 +2199,11 @@ function bindPageEvents() {
       if (record) record.schedulingMode = scheduleSettingsForm.elements.schedulingMode.value;
       render();
     });
-    ['appointmentDurationMinutes', 'noShowGraceMinutes', 'openingTime', 'closingTime'].forEach((name) => {
+    ['noShowGraceMinutes', 'openingTime', 'closingTime'].forEach((name) => {
       scheduleSettingsForm.elements[name]?.addEventListener('change', () => {
         const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
         if (!record) return;
-        record[name] = ['appointmentDurationMinutes', 'noShowGraceMinutes'].includes(name)
+        record[name] = name === 'noShowGraceMinutes'
           ? Number(scheduleSettingsForm.elements[name].value)
           : scheduleSettingsForm.elements[name].value;
       });
@@ -2058,9 +2218,9 @@ function bindPageEvents() {
       if (state.settings.saving) return;
       const values = Object.fromEntries(new FormData(scheduleSettingsForm));
       values.automaticPendingFollowUp = values.automaticPendingFollowUp === 'true';
+      const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
+      values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       if (values.schedulingMode === 'free') {
-        const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
-        values.appointmentDurationMinutes = current.appointmentDurationMinutes;
         values.openingTime = current.openingTime;
         values.closingTime = current.closingTime;
       }
@@ -2365,14 +2525,29 @@ async function openAppointmentCreateDialog() {
     saving: false,
     error: '',
     schedules: [],
-    storeId: preferredStoreId
+    storeId: preferredStoreId,
+    services: [],
+    serviceId: ''
   };
   render();
   document.querySelector('#appointment-create-dialog')?.showModal();
   try {
-    state.appointmentCreate.schedules = state.demoMode
-      ? allowedStores.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }))
-      : await loadStoreSchedules(state.profile);
+    if (state.demoMode) {
+      state.appointmentCreate.schedules = allowedStores.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }));
+      state.appointmentCreate.services = state.settings.services.length
+        ? state.settings.services.filter((service) => service.active)
+        : [defaultAppointmentService(allowedStores.map((store) => store.id))];
+    } else {
+      [state.appointmentCreate.schedules, state.appointmentCreate.services] = await Promise.all([
+        loadStoreSchedules(state.profile),
+        loadAppointmentServices(state.profile)
+      ]);
+    }
+    const schedule = state.appointmentCreate.schedules.find((item) => item.id === preferredStoreId) || DEFAULT_STORE_SCHEDULE;
+    if (!servicesForStore(state.appointmentCreate.services, preferredStoreId).length) {
+      state.appointmentCreate.services.push(defaultAppointmentService(preferredStoreId, schedule.appointmentDurationMinutes));
+    }
+    state.appointmentCreate.serviceId = servicesForStore(state.appointmentCreate.services, preferredStoreId)[0]?.id || '';
   } catch {
     state.appointmentCreate.error = 'Nao foi possivel carregar os horarios das lojas.';
   } finally {
@@ -2453,16 +2628,31 @@ function startDayAppointmentsSubscription() {
   }
 }
 
-function ensureNewLeadSchedule() {
-  if (state.route !== 'new' || !state.profile || state.newLeadSchedule.loaded) return;
+async function ensureNewLeadSchedule() {
+  if (state.route !== 'new' || !state.profile || state.newLeadSchedule.loaded || state.newLeadSchedule.loading) return;
   state.newLeadSchedule.loading = true;
   if (state.demoMode) {
     const configured = state.settings.records.find((item) => item.id === state.profile.storeId);
     state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...(configured || {}) };
+    state.newLeadSchedule.services = servicesForStore(state.settings.services, state.profile.storeId);
+    if (!state.newLeadSchedule.services.length) {
+      state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
+    }
+    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0].id;
     state.newLeadSchedule.loaded = true;
     state.newLeadSchedule.loading = false;
     render();
     return;
+  }
+  try {
+    state.newLeadSchedule.services = await loadAppointmentServices(state.profile);
+    if (!servicesForStore(state.newLeadSchedule.services, state.profile.storeId).length) {
+      state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
+    }
+    state.newLeadSchedule.serviceId = servicesForStore(state.newLeadSchedule.services, state.profile.storeId)[0]?.id || '';
+  } catch {
+    state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
+    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0].id;
   }
   try {
     state.unsubscribeStoreSchedule = subscribeToStoreSchedule(
@@ -2495,11 +2685,22 @@ async function loadSettingsData() {
   state.settings.error = '';
   render();
   try {
-    const [records, roleProfiles] = state.demoMode
-      ? [STORES.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE })), SYSTEM_ROLE_PROFILES]
-      : await Promise.all([loadStoreSchedules(state.profile), loadRoleProfiles(state.profile)]);
+    const [records, roleProfiles, loadedServices] = state.demoMode
+      ? [
+          STORES.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE })),
+          SYSTEM_ROLE_PROFILES,
+          [defaultAppointmentService(STORES.map((store) => store.id), DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)]
+        ]
+      : await Promise.all([
+          loadStoreSchedules(state.profile),
+          loadRoleProfiles(state.profile),
+          loadAppointmentServices(state.profile, { includeInactive: true })
+        ]);
     state.settings.records = records;
     state.settings.roleProfiles = roleProfiles.map((item) => ({ ...item, permissions: [...item.permissions] }));
+    state.settings.services = state.demoMode
+      ? loadedServices
+      : await ensureDefaultAppointmentServices(state.profile, records, loadedServices);
     state.settings.loaded = true;
   } catch (error) {
     state.settings.error = error?.code === 'permission-denied'
@@ -2523,6 +2724,23 @@ async function loadRoleProfilesData() {
     state.settings.error = error?.code === 'permission-denied'
       ? 'Seu perfil nao pode consultar os perfis de acesso.'
       : 'Nao foi possivel carregar os perfis de acesso.';
+    render();
+  }
+}
+
+async function loadServiceCatalogData() {
+  if (!isAdmin()) return;
+  try {
+    state.settings.services = state.demoMode
+      ? state.settings.services
+      : await loadAppointmentServices(state.profile, { includeInactive: true });
+    state.settings.saving = false;
+    render();
+  } catch (error) {
+    state.settings.saving = false;
+    state.settings.error = error?.code === 'permission-denied'
+      ? 'Seu perfil nao pode consultar os servicos.'
+      : 'Nao foi possivel carregar os servicos.';
     render();
   }
 }
@@ -2709,7 +2927,9 @@ async function handleAction(action) {
       saving: false,
       error: '',
       schedules: [],
-      storeId: ''
+      storeId: '',
+      services: [],
+      serviceId: ''
     };
     state.newLeadSchedule = {
       loaded: false,
@@ -2717,7 +2937,9 @@ async function handleAction(action) {
       error: '',
       settings: { ...DEFAULT_STORE_SCHEDULE },
       appointmentDate: '',
-      appointments: []
+      appointments: [],
+      services: [],
+      serviceId: ''
     };
     state.followUps = {
       loaded: false,
@@ -2737,6 +2959,9 @@ async function handleAction(action) {
       records: [],
       section: 'schedule',
       roleProfiles: SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] })),
+      services: [],
+      serviceEditorOpen: false,
+      editingServiceId: '',
       roleDraft: createDefaultRoleDraft(),
       editingRoleId: '',
       pendingDeleteRoleId: '',
@@ -2833,6 +3058,68 @@ export async function startApp() {
     if (settingsSectionButton) {
       state.settings.section = settingsSectionButton.dataset.settingsSection;
       render();
+    }
+    const newServiceButton = event.target.closest('[data-service-new]');
+    if (newServiceButton) {
+      state.settings.editingServiceId = '';
+      state.settings.serviceEditorOpen = true;
+      render();
+      document.querySelector('#service-editor-dialog')?.showModal();
+      document.querySelector('#service-name')?.focus();
+      return;
+    }
+    const editServiceButton = event.target.closest('[data-service-edit]');
+    if (editServiceButton) {
+      state.settings.editingServiceId = editServiceButton.dataset.serviceEdit;
+      state.settings.serviceEditorOpen = true;
+      render();
+      document.querySelector('#service-editor-dialog')?.showModal();
+      document.querySelector('#service-name')?.focus();
+      return;
+    }
+    const closeServiceEditorButton = event.target.closest('[data-service-editor-close]');
+    if (closeServiceEditorButton) {
+      document.querySelector('#service-editor-dialog')?.close();
+      state.settings.serviceEditorOpen = false;
+      state.settings.editingServiceId = '';
+      render();
+      return;
+    }
+    const toggleServiceButton = event.target.closest('[data-service-toggle]');
+    if (toggleServiceButton && !toggleServiceButton.disabled) {
+      const service = state.settings.services.find((item) => item.id === toggleServiceButton.dataset.serviceToggle);
+      if (!service) return;
+      const uncoveredStoreIds = service.storeIds.filter((storeId) => !servicesForStore(
+        state.settings.services.filter((item) => item.id !== service.id), storeId
+      ).length);
+      if (service.active && uncoveredStoreIds.length) {
+        showToast('Mantenha pelo menos um servico ativo em cada unidade atendida.', 'warning', 'circle-alert');
+        return;
+      }
+      state.settings.saving = true;
+      toggleServiceButton.disabled = true;
+      try {
+        if (state.demoMode) {
+          state.settings.services = state.settings.services.map((item) => item.id === service.id
+            ? { ...item, active: !item.active }
+            : item);
+          state.settings.saving = false;
+          render();
+        } else {
+          await setAppointmentServiceActive(state.profile, service, !service.active);
+          await loadServiceCatalogData();
+        }
+        showToast(service.active ? 'Servico desativado.' : 'Servico ativado.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode alterar este servico.'
+          : error?.code === 'last-active-service'
+            ? error.message
+            : 'Nao foi possivel alterar o servico.';
+        render();
+      }
+      return;
     }
     const editRoleButton = event.target.closest('[data-role-edit]');
     if (editRoleButton) {

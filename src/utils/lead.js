@@ -92,6 +92,9 @@ export function validateLeadInput(input) {
   if (appointmentTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(appointmentTime)) {
     errors.appointmentTime = 'Informe um horario valido.';
   }
+  if (input.appointmentServiceId && String(input.appointmentServiceId).length > 120) {
+    errors.appointmentServiceId = 'Selecione um servico valido.';
+  }
 
   return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf };
 }
@@ -123,7 +126,11 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       ...(input.appointmentDate?.trim() ? {
         appointmentAttendance: 'pending',
         appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
+        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
+        ...(input.appointmentServiceId ? {
+          appointmentServiceId: String(input.appointmentServiceId),
+          appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
+        } : {})
       } : {}),
       notes: input.notes?.trim() || '',
       source: 'street',
@@ -163,7 +170,11 @@ export function createLeadUpdate(input) {
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() && input.schedulingMode ? {
         appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
+        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
+        ...(input.appointmentServiceId ? {
+          appointmentServiceId: String(input.appointmentServiceId),
+          appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
+        } : {})
       } : {}),
       notes: input.notes?.trim() || ''
     }
