@@ -73,6 +73,20 @@ describe('access validation', () => {
     expect(result.errors.password).toBeTruthy();
   });
 
+  it('validates an optional replacement password when editing an access', () => {
+    const base = {
+      displayName: 'Pessoa de Teste',
+      email: 'pessoa@exemplo.com',
+      phone: '81999999999',
+      role: 'captor',
+      storeId: 'loja-06'
+    };
+
+    expect(validateAccess({ ...base, password: '' }).isValid).toBe(true);
+    expect(validateAccess({ ...base, password: '123' }).errors.password).toBeTruthy();
+    expect(validateAccess({ ...base, password: 'novaSenha123' }).isValid).toBe(true);
+  });
+
   it('keeps leading zeros in the optional SavWin code', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',

@@ -47,8 +47,10 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
     errors.email = 'Informe um e-mail valido.';
   }
 
-  if (options.requirePassword && password.length < 6) {
-    errors.password = 'Crie uma senha inicial com pelo menos 6 caracteres.';
+  if ((options.requirePassword || password) && (password.length < 6 || password.length > 72)) {
+    errors.password = options.requirePassword
+      ? 'Crie uma senha inicial entre 6 e 72 caracteres.'
+      : 'A nova senha deve ter entre 6 e 72 caracteres.';
   }
 
   if (phone.length < 10 || phone.length > 11) {

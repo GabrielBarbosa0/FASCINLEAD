@@ -16,7 +16,8 @@ import {
   setPersistence
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, authPersistenceReady, db, isFirebaseConfigured } from './client.js';
+import { httpsCallable } from 'firebase/functions';
+import { auth, authPersistenceReady, db, functions, isFirebaseConfigured } from './client.js';
 import { systemRoleProfileForRole } from '../utils/role-profile.js';
 
 const provider = new GoogleAuthProvider();
@@ -114,6 +115,14 @@ export async function createTeamPasswordAccount(emailInput, password) {
   } finally {
     await deleteApp(secondaryApp);
   }
+}
+
+export async function updateTeamMemberPassword(emailInput, password) {
+  if (!isFirebaseConfigured || !functions) throw new Error('Firebase ainda nao foi configurado.');
+  const email = normalizeEmail(emailInput);
+  assertEmailPassword(email, password);
+  const updatePassword = httpsCallable(functions, 'updateTeamMemberPassword');
+  return updatePassword({ email, password });
 }
 
 export async function requestPasswordReset(emailInput) {

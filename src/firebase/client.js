@@ -1,5 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -22,12 +23,14 @@ export const isFirebaseConfigured = requiredConfig.every((key) => Boolean(fireba
 
 let auth = null;
 let db = null;
+let functions = null;
 let authPersistenceReady = Promise.resolve();
 
 if (isFirebaseConfigured) {
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
   auth = getAuth(app);
+  functions = getFunctions(app, 'southamerica-east1');
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
@@ -39,8 +42,9 @@ if (isFirebaseConfigured) {
   if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true' && !globalThis.__FASCINLEAD_EMULATORS__) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8180));
+    connectFunctionsEmulator(functions, '127.0.0.1', Number(import.meta.env.VITE_FUNCTIONS_EMULATOR_PORT || 5001));
     globalThis.__FASCINLEAD_EMULATORS__ = true;
   }
 }
 
-export { auth, authPersistenceReady, db };
+export { auth, authPersistenceReady, db, functions };
