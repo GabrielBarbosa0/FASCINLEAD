@@ -156,6 +156,57 @@ svg {
   margin: 0 0 16px;
 }
 
+.email-login-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.email-login-form .field {
+  margin: 0;
+}
+
+.login-secondary-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.login-secondary-actions button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 4px 0;
+}
+
+.login-secondary-actions button:hover {
+  text-decoration: underline;
+}
+
+.login-divider {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 12px;
+  margin: 16px 0;
+  text-transform: uppercase;
+}
+
+.login-divider::before,
+.login-divider::after {
+  background: var(--border);
+  content: '';
+  flex: 1;
+  height: 1px;
+}
+
 .privacy-note {
   display: flex;
   align-items: center;

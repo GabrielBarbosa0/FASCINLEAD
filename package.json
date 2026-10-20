@@ -13,6 +13,7 @@
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.js\"",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "migrate:captar": "node scripts/migrate-captar-schedule.js",
     "emulators": "firebase emulators:start",
     "deploy": "npm run build && firebase deploy"
   },

@@ -10,5 +10,6 @@ firestore-debug.log
 ui-debug.log
 playwright-report/
 test-results/
+.codex_tmp/
 .DS_Store
 Thumbs.db

@@ -1,7 +1,11 @@
 import {
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
   getRedirectResult,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
   signOut
@@ -12,6 +16,15 @@ import { systemRoleProfileForRole } from '../utils/role-profile.js';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function assertEmailPassword(email, password) {
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Informe um e-mail valido.');
+  if (String(password || '').length < 6) throw new Error('A senha deve ter pelo menos 6 caracteres.');
+}
 
 export async function completeRedirectSignIn() {
   if (!isFirebaseConfigured) return null;
@@ -47,6 +60,40 @@ export async function signInWithGoogle() {
 
     throw error;
   }
+}
+
+export async function signInWithEmail(emailInput, password) {
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  const email = normalizeEmail(emailInput);
+  assertEmailPassword(email, password);
+  await authPersistenceReady;
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  if (!credential.user.emailVerified) {
+    await signOut(auth);
+    throw new Error('Confirme o e-mail enviado para sua caixa de entrada antes de acessar.');
+  }
+  return credential;
+}
+
+export async function createEmailPasswordAccess(emailInput, password) {
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  const email = normalizeEmail(emailInput);
+  assertEmailPassword(email, password);
+  await authPersistenceReady;
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+
+  try {
+    await sendEmailVerification(credential.user);
+  } finally {
+    await signOut(auth);
+  }
+}
+
+export async function requestPasswordReset(emailInput) {
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  const email = normalizeEmail(emailInput);
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Informe o e-mail para recuperar a senha.');
+  await sendPasswordResetEmail(auth, email);
 }
 
 export function observeAuth(callback) {

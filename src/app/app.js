@@ -42,7 +42,7 @@ import {
   X,
   createIcons
 } from 'lucide';
-import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
+import { completeRedirectSignIn, createEmailPasswordAccess, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
@@ -121,6 +121,7 @@ const state = {
   demoMode: false,
   leads: [],
   authError: '',
+  authMessage: '',
   dataError: '',
   toast: null,
   search: '',
@@ -400,7 +401,7 @@ function syncLabel(lead) {
 
 function loginView() {
   const configNotice = isFirebaseConfigured
-    ? '<p class="login-note">Use a conta Google autorizada pela sua loja.</p>'
+    ? '<p class="login-note">Entre com seu e-mail autorizado ou continue com Google.</p>'
     : '<div class="notice notice-warning"><i data-lucide="wrench"></i><div><strong>Firebase ainda nao configurado</strong><span>Use o modo de desenvolvimento sem dados reais.</span></div></div>';
 
   return `
@@ -412,6 +413,19 @@ function loginView() {
         <p class="login-copy">Cadastro rapido para quem encontra clientes onde eles estao.</p>
         ${configNotice}
         ${state.authError ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.authError)}</span></div>` : ''}
+        ${state.authMessage ? `<div class="notice notice-success" role="status"><i data-lucide="circle-check"></i><span>${escapeHtml(state.authMessage)}</span></div>` : ''}
+        <form id="email-login-form" class="email-login-form" novalidate>
+          <div class="field"><label for="login-email">E-mail</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="nome@exemplo.com" required /></div>
+          <div class="field"><label for="login-password">Senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="Sua senha" required /></div>
+          <button class="button button-primary button-block" type="submit" ${!isFirebaseConfigured ? 'disabled' : ''}>
+            <i data-lucide="log-in"></i><span>Entrar</span>
+          </button>
+          <div class="login-secondary-actions">
+            <button type="button" data-action="email-register">Criar primeiro acesso</button>
+            <button type="button" data-action="password-reset">Esqueci minha senha</button>
+          </div>
+        </form>
+        <div class="login-divider"><span>ou</span></div>
         <button class="button button-primary button-block" type="button" data-action="google-login" ${!isFirebaseConfigured ? 'disabled' : ''}>
           <i data-lucide="log-in"></i><span>Entrar com Google</span>
         </button>
@@ -1351,9 +1365,9 @@ function accessView() {
     </section>
     <section class="access-layout">
       <form id="access-form" class="access-form" novalidate>
-        <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador entrara usando esta conta Google.</span></div></div>
+        <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador podera entrar com Google ou criar uma senha.</span></div></div>
         <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
-        <div class="field" data-field="email"><label for="access-email">E-mail Google</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@gmail.com" required /><small class="field-error"></small></div>
+        <div class="field" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@exemplo.com" required /><small class="field-error"></small></div>
         <div class="field" data-field="role"><label for="access-role-profile">Perfil</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
         <div class="field" data-field="storeId"><label for="access-store">Loja</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
         <fieldset id="access-stores-field" class="field access-store-picker" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
@@ -1734,6 +1748,24 @@ function bindPageEvents() {
       nextSearch?.setSelectionRange(selectionStart, selectionEnd);
     });
   }
+
+  const emailLoginForm = document.querySelector('#email-login-form');
+  emailLoginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(emailLoginForm));
+    state.authError = '';
+    state.authMessage = '';
+    const submitButton = emailLoginForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    try {
+      await signInWithEmail(values.email, values.password);
+    } catch (error) {
+      state.authError = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(error?.code)
+        ? 'E-mail ou senha incorretos.'
+        : error.message || 'Nao foi possivel entrar.';
+      render();
+    }
+  });
 
   const managementForm = document.querySelector('#management-filters');
   if (managementForm) {
@@ -2537,6 +2569,7 @@ async function handleAction(action) {
     state.demoMode = true;
     state.profile = createDemoProfile();
     state.authError = '';
+    state.authMessage = '';
     subscribeProfileLeads();
     startFollowUpScheduleSubscription();
     navigate('home');
@@ -2545,6 +2578,7 @@ async function handleAction(action) {
 
   if (action === 'google-login') {
     state.authError = '';
+    state.authMessage = '';
     state.loading = true;
     render();
     try {
@@ -2554,6 +2588,42 @@ async function handleAction(action) {
       state.authError = error.message || 'Nao foi possivel entrar com o Google.';
       render();
     }
+  }
+
+  if (action === 'email-register') {
+    const form = document.querySelector('#email-login-form');
+    const values = form ? Object.fromEntries(new FormData(form)) : {};
+    state.authError = '';
+    state.authMessage = '';
+    try {
+      await createEmailPasswordAccess(values.email, values.password);
+      state.authMessage = 'Primeiro acesso criado. Confirme o link enviado ao seu e-mail e depois entre com sua senha.';
+    } catch (error) {
+      if (error?.code === 'auth/email-already-in-use') {
+        try {
+          await requestPasswordReset(values.email);
+          state.authMessage = 'Este acesso ja estava preparado. Enviamos um link para voce definir sua senha.';
+        } catch (resetError) {
+          state.authError = resetError.message || 'Nao foi possivel enviar a definicao de senha.';
+        }
+      } else {
+        state.authError = error.message || 'Nao foi possivel criar o primeiro acesso.';
+      }
+    }
+    render();
+  }
+
+  if (action === 'password-reset') {
+    const email = document.querySelector('#login-email')?.value || '';
+    state.authError = '';
+    state.authMessage = '';
+    try {
+      await requestPasswordReset(email);
+      state.authMessage = 'Enviamos as instrucoes de recuperacao para o e-mail informado.';
+    } catch (error) {
+      state.authError = error.message || 'Nao foi possivel enviar a recuperacao de senha.';
+    }
+    render();
   }
 
   if (action === 'logout') {
@@ -3026,6 +3096,10 @@ export async function startApp() {
   window.addEventListener('hashchange', () => {
     const previousRoute = state.route;
     state.route = currentRoute();
+    const managementRoutes = ['management', 'management-lead', 'dashboard', 'reports'];
+    if (managementRoutes.includes(state.route) && !managementRoutes.includes(previousRoute)) {
+      state.management.loaded = false;
+    }
     if (state.route !== 'appointments') stopAppointmentsSubscription();
     if (state.route !== 'new') {
       stopNewLeadScheduleSubscriptions();

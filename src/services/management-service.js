@@ -64,6 +64,14 @@ function assertCanUpdate(profile, lead) {
   }
 }
 
+function assertAdmin(profile) {
+  if (!isFirebaseConfigured || profile?.role !== 'admin') {
+    const error = new Error('Perfil sem permissao para excluir leads.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+}
+
 export async function updateManagementLead(profile, lead, input) {
   assertCanUpdate(profile, lead);
   const validation = createLeadUpdate(input);
