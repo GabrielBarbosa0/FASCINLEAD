@@ -26,9 +26,12 @@ export function formatAccessStoreSummary(access = {}) {
   };
 }
 
-export function validateAccess(values, roleProfiles = []) {
+export function validateAccess(values, roleProfiles = [], options = {}) {
   const displayName = String(values.displayName || '').trim();
   const email = normalizeAccessEmail(values.email);
+  const password = String(values.password || '');
+  const phone = String(values.phone || '').replace(/\D/g, '');
+  const savwinCode = String(values.savwinCode || '').trim();
   const roleProfileId = String(values.roleProfileId || '');
   const selectedProfile = roleProfiles.find((profile) => profile.id === roleProfileId && profile.active !== false);
   const role = selectedProfile?.baseRole || String(values.role || '');
@@ -42,6 +45,18 @@ export function validateAccess(values, roleProfiles = []) {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     errors.email = 'Informe um e-mail valido.';
+  }
+
+  if (options.requirePassword && password.length < 6) {
+    errors.password = 'Crie uma senha inicial com pelo menos 6 caracteres.';
+  }
+
+  if (phone.length < 10 || phone.length > 11) {
+    errors.phone = 'Informe um telefone com DDD.';
+  }
+
+  if (savwinCode.length > 30) {
+    errors.savwinCode = 'Use no maximo 30 caracteres.';
   }
 
   if (!VALID_ROLES.has(role) || (roleProfileId && !selectedProfile)) {
@@ -62,6 +77,6 @@ export function validateAccess(values, roleProfiles = []) {
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
-    data: { displayName, email, role, roleProfileId: selectedProfile?.id || '', storeId, storeIds }
+    data: { displayName, email, password, phone, savwinCode, role, roleProfileId: selectedProfile?.id || '', storeId, storeIds }
   };
 }

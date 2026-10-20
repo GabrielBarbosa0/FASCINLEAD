@@ -10,6 +10,7 @@ describe('access validation', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',
       email: 'pessoa@exemplo.com',
+      phone: '(81) 99999-9999',
       role: 'captor',
       storeId: 'Loja-06'
     });
@@ -19,12 +20,13 @@ describe('access validation', () => {
   });
 
   it('rejects invalid email, role and unavailable store', () => {
-    const result = validateAccess({ displayName: 'A', email: 'invalido', role: 'owner', storeId: 'loja-03' });
+    const result = validateAccess({ displayName: 'A', email: 'invalido', phone: '12', role: 'owner', storeId: 'loja-03' });
 
     expect(result.isValid).toBe(false);
     expect(result.errors).toEqual(expect.objectContaining({
       displayName: expect.any(String),
       email: expect.any(String),
+      phone: expect.any(String),
       role: expect.any(String),
       storeId: expect.any(String)
     }));
@@ -34,6 +36,7 @@ describe('access validation', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',
       email: 'pessoa@exemplo.com',
+      phone: '81999999999',
       role: 'captor',
       storeId
     });
@@ -46,6 +49,7 @@ describe('access validation', () => {
     const result = validateAccess({
       displayName: 'Gestora Regional',
       email: 'gestora@example.com',
+      phone: '81999999999',
       role: 'manager',
       storeId: 'loja-06',
       storeIds: ['loja-02', 'loja-06']
@@ -53,6 +57,33 @@ describe('access validation', () => {
 
     expect(result.isValid).toBe(true);
     expect(result.data.storeIds).toEqual(['loja-06', 'loja-02']);
+  });
+
+  it('requires an initial password only when requested', () => {
+    const result = validateAccess({
+      displayName: 'Pessoa de Teste',
+      email: 'pessoa@exemplo.com',
+      phone: '81999999999',
+      role: 'captor',
+      storeId: 'loja-06',
+      password: '123'
+    }, [], { requirePassword: true });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.password).toBeTruthy();
+  });
+
+  it('keeps leading zeros in the optional SavWin code', () => {
+    const result = validateAccess({
+      displayName: 'Pessoa de Teste',
+      email: 'pessoa@exemplo.com',
+      phone: '81999999999',
+      role: 'captor',
+      storeId: 'loja-06',
+      savwinCode: '0095'
+    });
+
+    expect(result.data.savwinCode).toBe('0095');
   });
 
   it('summarizes permitted stores without repeating the store name', () => {

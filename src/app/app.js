@@ -42,11 +42,11 @@ import {
   X,
   createIcons
 } from 'lucide';
-import { completeRedirectSignIn, createEmailPasswordAccess, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
+import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
-import { loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
+import { deleteAccess, loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteRoleProfile, loadRoleProfiles, saveRoleProfile } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
@@ -199,7 +199,10 @@ const state = {
     saving: false,
     error: '',
     accesses: [],
-    storeIds: []
+    storeIds: [],
+    editorOpen: false,
+    editingEmail: '',
+    pendingDeleteEmail: ''
   },
   goals: {
     loading: false,
@@ -401,7 +404,7 @@ function syncLabel(lead) {
 
 function loginView() {
   const configNotice = isFirebaseConfigured
-    ? '<p class="login-note">Entre com seu e-mail autorizado ou continue com Google.</p>'
+    ? ''
     : '<div class="notice notice-warning"><i data-lucide="wrench"></i><div><strong>Firebase ainda nao configurado</strong><span>Use o modo de desenvolvimento sem dados reais.</span></div></div>';
 
   return `
@@ -425,16 +428,11 @@ function loginView() {
             <button type="button" data-action="password-reset">Esqueci minha senha</button>
           </div>
         </form>
-        <div class="login-divider"><span>ou</span></div>
-        <button class="button button-primary button-block" type="button" data-action="google-login" ${!isFirebaseConfigured ? 'disabled' : ''}>
-          <i data-lucide="log-in"></i><span>Entrar com Google</span>
-        </button>
         ${import.meta.env.DEV ? `
           <button class="button button-secondary button-block" type="button" data-action="demo-login">
             <i data-lucide="flask-conical"></i><span>Abrir modo de desenvolvimento</span>
           </button>
         ` : ''}
-        <p class="privacy-note"><i data-lucide="shield-check"></i> Acesso restrito a colaboradores autorizados.</p>
       </section>
     </main>`;
 }
@@ -1336,25 +1334,32 @@ function accessView() {
   }
 
   const { accesses, loading, saving, error } = state.access;
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${state.profile.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
-  const storeChecks = STORES.map((store) => `<label class="access-store-option checkbox-label"><input type="checkbox" name="storeIds" value="${store.id}" /><span>${store.label}</span></label>`).join('');
-  const roleProfileOptions = state.settings.roleProfiles.map((profile) => `<option value="${escapeHtml(profile.id)}" data-base-role="${escapeHtml(profile.baseRole)}">${escapeHtml(profile.name)}</option>`).join('');
+  const editingAccess = accesses.find((item) => item.email === state.access.editingEmail) || null;
+  const deletingAccess = accesses.find((item) => item.email === state.access.pendingDeleteEmail) || null;
+  const selectedStoreId = editingAccess?.storeId || state.profile.storeId || STORES[0]?.id;
+  const selectedRoleProfileId = editingAccess?.roleProfileId || systemRoleProfileForRole(editingAccess?.role || 'captor').id;
+  const selectedStoreIds = editingAccess?.storeIds || [selectedStoreId];
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${selectedStoreId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeChecks = STORES.map((store) => `<label class="access-store-option checkbox-label"><input type="checkbox" name="storeIds" value="${store.id}" ${selectedStoreIds.includes(store.id) ? 'checked' : ''} /><span>${store.label}</span></label>`).join('');
+  const roleProfileOptions = state.settings.roleProfiles.map((profile) => `<option value="${escapeHtml(profile.id)}" data-base-role="${escapeHtml(profile.baseRole)}" ${selectedRoleProfileId === profile.id ? 'selected' : ''}>${escapeHtml(profile.name)}</option>`).join('');
   const rows = accesses.map((access) => {
     const isCurrentUser = access.email === state.profile.email?.toLowerCase();
     const storeSummary = formatAccessStoreSummary(access);
     return `<article class="access-row ${access.active ? '' : 'is-inactive'}">
       <div class="access-identity">
         <span class="avatar access-avatar">${escapeHtml(profileInitials(access.displayName))}</span>
-        <div class="access-identity-copy"><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span></div>
+        <div class="access-identity-copy"><strong>${escapeHtml(access.displayName)}</strong><span>${escapeHtml(access.email)}</span>${access.phone ? `<small>${escapeHtml(formatBrazilianPhone(access.phone))}</small>` : ''}</div>
       </div>
-      <div class="access-detail access-permissions"><span>Perfil e unidades</span><strong>${escapeHtml(roleProfileLabel(access))}</strong><small title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</small></div>
-      <div class="access-detail"><span>Primeiro acesso</span><strong>${access.hasLoggedIn ? 'Realizado' : 'Pendente'}</strong></div>
-      <span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span>
+      <div class="access-detail"><span>Perfil</span><strong>${escapeHtml(roleProfileLabel(access))}</strong></div>
+      <div class="access-detail access-permissions"><span>Unidades</span><strong title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</strong></div>
+      <div class="access-detail"><span>Codigo SavWin</span><strong>${escapeHtml(access.savwinCode || 'Nao informado')}</strong></div>
+      <div class="access-status"><span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span><small>Primeiro acesso: ${access.hasLoggedIn ? 'realizado' : 'pendente'}</small></div>
       <div class="access-actions">
         <button class="icon-button" type="button" data-access-edit="${escapeHtml(access.email)}" title="Editar acesso" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
         <button class="button button-secondary access-toggle" type="button" data-access-email="${escapeHtml(access.email)}" data-access-active="${access.active}" ${isCurrentUser || saving ? 'disabled' : ''}>
           <i data-lucide="${access.active ? 'log-out' : 'circle-check'}"></i><span>${access.active ? 'Bloquear' : 'Reativar'}</span>
         </button>
+        <button class="icon-button access-delete" type="button" data-access-delete="${escapeHtml(access.email)}" title="Excluir acesso" aria-label="Excluir acesso de ${escapeHtml(access.displayName)}" ${isCurrentUser || saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>
       </div>
     </article>`;
   }).join('');
@@ -1362,24 +1367,31 @@ function accessView() {
   return `
     <section class="page-toolbar">
       <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+      <button class="button button-primary" type="button" data-access-new><i data-lucide="user-plus"></i><span>Novo acesso</span></button>
     </section>
-    <section class="access-layout">
+    <section class="access-list-panel" aria-busy="${loading}">
+      <div class="access-list-heading"><div><strong>Acessos cadastrados</strong><span>${accesses.length} pessoa(s)</span></div><button class="icon-button" type="button" data-action="reload-accesses" title="Atualizar acessos" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i></button></div>
+      ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
+      ${loading && !accesses.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando acessos...</strong></div>' : ''}
+      ${!loading && !accesses.length ? '<div class="empty-state"><i data-lucide="users"></i><strong>Nenhum acesso cadastrado</strong><p>Crie o primeiro acesso da equipe.</p></div>' : `<div class="access-list">${rows}</div>`}
+    </section>
+    ${state.access.editorOpen ? `<dialog id="access-editor-dialog" class="access-editor-dialog" aria-labelledby="access-editor-title">
       <form id="access-form" class="access-form" novalidate>
-        <div class="filter-title"><i data-lucide="key-round"></i><div><strong>Novo acesso</strong><span>O colaborador podera entrar com Google ou criar uma senha.</span></div></div>
-        <div class="field" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
-        <div class="field" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="nome@exemplo.com" required /><small class="field-error"></small></div>
-        <div class="field" data-field="role"><label for="access-role-profile">Perfil</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
-        <div class="field" data-field="storeId"><label for="access-store">Loja</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
-        <fieldset id="access-stores-field" class="field access-store-picker" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
-        <button class="button button-primary button-block" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="user-plus"></i><span>${saving ? 'Salvando...' : 'Salvar acesso'}</span></button>
+        <header><div><span class="eyebrow">ACESSO DA EQUIPE</span><h2 id="access-editor-title">${editingAccess ? 'Editar acesso' : 'Novo acesso'}</h2><p>${editingAccess ? 'Atualize os dados e permissoes desta pessoa.' : 'Cadastre os dados usados para entrar no FascinLead.'}</p></div><button class="icon-button" type="button" data-access-editor-close title="Fechar" aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+        <div class="access-form-body">
+          <div class="field access-field-wide" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" value="${escapeHtml(editingAccess?.displayName || '')}" required /><small class="field-error"></small></div>
+          <div class="field access-field-wide" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(editingAccess?.email || '')}" placeholder="nome@exemplo.com" ${editingAccess ? 'readonly' : ''} required /><small class="field-error"></small></div>
+          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" required /><small>A pessoa recebera um e-mail para confirmar a conta.</small><small class="field-error"></small></div>`}
+          <div class="field" data-field="role"><label for="access-role-profile">Perfil / cargo</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
+          <div class="field" data-field="phone"><label for="access-phone">Telefone</label><input id="access-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" value="${escapeHtml(formatBrazilianPhone(editingAccess?.phone || ''))}" placeholder="(81) 99999-9999" required /><small class="field-error"></small></div>
+          <div class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
+          <div class="field" data-field="savwinCode"><label for="access-savwin-code">Codigo SavWin</label><input id="access-savwin-code" name="savwinCode" maxlength="30" value="${escapeHtml(editingAccess?.savwinCode || '')}" placeholder="Opcional" /><small class="field-error"></small></div>
+          <fieldset id="access-stores-field" class="field access-store-picker access-field-wide" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
+        </div>
+        <footer><button class="button button-secondary" type="button" data-access-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingAccess ? 'Salvar alteracoes' : 'Criar acesso'}</span></button></footer>
       </form>
-      <section class="access-list-panel" aria-busy="${loading}">
-        <div class="access-list-heading"><div><strong>Acessos cadastrados</strong><span>${accesses.length} pessoa(s)</span></div><button class="icon-button" type="button" data-action="reload-accesses" title="Atualizar acessos" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i></button></div>
-        ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-        ${loading && !accesses.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando acessos...</strong></div>' : ''}
-        ${!loading && !accesses.length ? '<div class="empty-state"><i data-lucide="users"></i><strong>Nenhum acesso cadastrado</strong><p>Use o formulario para liberar a primeira pessoa.</p></div>' : `<div class="access-list">${rows}</div>`}
-      </section>
-    </section>`;
+    </dialog>` : ''}
+    ${deletingAccess ? `<dialog id="delete-access-dialog" class="confirmation-dialog" aria-labelledby="delete-access-title"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-access-title">Excluir acesso?</h2><p>O acesso de <strong>${escapeHtml(deletingAccess.displayName)}</strong> sera removido. O historico de leads e atividades sera preservado.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-access-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-access-delete-confirm="${escapeHtml(deletingAccess.email)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir acesso</span></button></div></dialog>` : ''}`;
 }
 
 function goalStatus(goal) {
@@ -1885,27 +1897,43 @@ function bindPageEvents() {
     };
     accessForm.elements.roleProfileId.addEventListener('change', syncStorePicker);
     accessForm.elements.storeId.addEventListener('change', syncStorePicker);
+    accessForm.elements.phone.addEventListener('input', () => {
+      accessForm.elements.phone.value = formatBrazilianPhone(accessForm.elements.phone.value);
+    });
     syncStorePicker();
     accessForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.access.saving) return;
+      const creating = !state.access.editingEmail;
       state.access.saving = true;
       setFieldErrors(accessForm, {});
       const formData = new FormData(accessForm);
       const values = { ...Object.fromEntries(formData), storeIds: formData.getAll('storeIds') };
+      const submitButton = accessForm.querySelector('[type="submit"]');
+      submitButton.disabled = true;
 
       try {
-        const result = await saveAccess(state.profile, values, state.settings.roleProfiles);
+        const result = await saveAccess(state.profile, values, state.settings.roleProfiles, { requirePassword: creating });
         if (!result.isValid) {
           state.access.saving = false;
+          submitButton.disabled = false;
           setFieldErrors(accessForm, result.errors);
           return;
         }
-        accessForm.reset();
-        accessForm.elements.storeId.value = state.profile.storeId;
-        syncStorePicker();
+        let credentialWarning = '';
+        if (creating) {
+          try {
+            await createTeamPasswordAccount(result.data.email, result.data.password);
+          } catch (error) {
+            credentialWarning = error?.code === 'auth/email-already-in-use'
+              ? ' O e-mail ja possuia uma conta; a senha nao foi alterada.'
+              : ' A autorizacao foi salva, mas nao foi possivel criar a senha inicial.';
+          }
+        }
+        state.access.editorOpen = false;
+        state.access.editingEmail = '';
         await loadAccessData();
-        showToast('Acesso salvo. A pessoa ja pode entrar com o Google.');
+        showToast(`${creating ? 'Acesso criado.' : 'Acesso atualizado.'}${credentialWarning}`, credentialWarning ? 'warning' : 'success', credentialWarning ? 'circle-alert' : 'circle-check');
       } catch (error) {
         state.access.saving = false;
         state.access.error = error?.code === 'permission-denied'
@@ -1915,6 +1943,21 @@ function bindPageEvents() {
       }
     });
   }
+
+  const accessEditorDialog = document.querySelector('#access-editor-dialog');
+  accessEditorDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    state.access.editorOpen = false;
+    state.access.editingEmail = '';
+    render();
+  });
+
+  const deleteAccessDialog = document.querySelector('#delete-access-dialog');
+  deleteAccessDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    state.access.pendingDeleteEmail = '';
+    render();
+  });
 
   const roleProfileForm = document.querySelector('#role-profile-form');
   if (roleProfileForm) {
@@ -2989,6 +3032,23 @@ export async function startApp() {
       render();
       document.querySelector('.management-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    const newAccessButton = event.target.closest('[data-access-new]');
+    if (newAccessButton) {
+      state.access.editingEmail = '';
+      state.access.editorOpen = true;
+      render();
+      requestAnimationFrame(() => {
+        document.querySelector('#access-editor-dialog')?.showModal();
+        document.querySelector('#access-name')?.focus();
+      });
+    }
+    const closeAccessEditorButton = event.target.closest('[data-access-editor-close]');
+    if (closeAccessEditorButton) {
+      document.querySelector('#access-editor-dialog')?.close();
+      state.access.editorOpen = false;
+      state.access.editingEmail = '';
+      render();
+    }
     const accessButton = event.target.closest('[data-access-email]');
     if (accessButton && !accessButton.disabled) {
       const access = state.access.accesses.find((item) => item.email === accessButton.dataset.accessEmail);
@@ -3006,18 +3066,43 @@ export async function startApp() {
     const editAccessButton = event.target.closest('[data-access-edit]');
     if (editAccessButton && !editAccessButton.disabled) {
       const access = state.access.accesses.find((item) => item.email === editAccessButton.dataset.accessEdit);
-      const form = document.querySelector('#access-form');
-      if (!access || !form) return;
-      form.elements.displayName.value = access.displayName;
-      form.elements.email.value = access.email;
-      form.elements.roleProfileId.value = access.roleProfileId || systemRoleProfileForRole(access.role).id;
-      form.elements.storeId.value = access.storeId;
-      form.querySelectorAll('[name="storeIds"]').forEach((input) => {
-        input.checked = access.storeIds.includes(input.value);
+      if (!access) return;
+      state.access.editingEmail = access.email;
+      state.access.editorOpen = true;
+      render();
+      requestAnimationFrame(() => {
+        document.querySelector('#access-editor-dialog')?.showModal();
+        document.querySelector('#access-name')?.focus();
       });
-      form.elements.roleProfileId.dispatchEvent(new Event('change'));
-      form.elements.displayName.focus();
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    const deleteAccessButton = event.target.closest('[data-access-delete]');
+    if (deleteAccessButton && !deleteAccessButton.disabled) {
+      state.access.pendingDeleteEmail = deleteAccessButton.dataset.accessDelete;
+      render();
+      requestAnimationFrame(() => document.querySelector('#delete-access-dialog')?.showModal());
+    }
+    const cancelDeleteAccessButton = event.target.closest('[data-access-delete-cancel]');
+    if (cancelDeleteAccessButton) {
+      document.querySelector('#delete-access-dialog')?.close();
+      state.access.pendingDeleteEmail = '';
+      render();
+    }
+    const confirmDeleteAccessButton = event.target.closest('[data-access-delete-confirm]');
+    if (confirmDeleteAccessButton && !confirmDeleteAccessButton.disabled) {
+      const access = state.access.accesses.find((item) => item.email === confirmDeleteAccessButton.dataset.accessDeleteConfirm);
+      if (!access) return;
+      confirmDeleteAccessButton.disabled = true;
+      state.access.saving = true;
+      try {
+        await deleteAccess(state.profile, access);
+        state.access.pendingDeleteEmail = '';
+        await loadAccessData();
+        showToast('Acesso excluido. O historico da pessoa foi preservado.');
+      } catch (error) {
+        state.access.saving = false;
+        confirmDeleteAccessButton.disabled = false;
+        showToast(error?.message || 'Nao foi possivel excluir o acesso.', 'danger', 'circle-alert');
+      }
     }
     const editGoalButton = event.target.closest('[data-edit-goal]');
     if (editGoalButton && !editGoalButton.disabled) {

@@ -44,6 +44,8 @@ export async function loadAccesses(profile) {
       roleProfileId: permission.roleProfileId || user?.roleProfileId || '',
       storeId: permission.storeId || user?.storeId || '',
       storeIds: permission.storeIds || user?.storeIds || [permission.storeId || user?.storeId].filter(Boolean),
+      phone: permission.phone || user?.phone || '',
+      savwinCode: permission.savwinCode || user?.savwinCode || '',
       active: permission.active === true && user?.active !== false,
       hasLoggedIn: Boolean(user)
     };
@@ -58,12 +60,12 @@ export async function loadAccesses(profile) {
   return { accesses, storeIds: [...storeIds].sort() };
 }
 
-export async function saveAccess(profile, values, roleProfiles = []) {
+export async function saveAccess(profile, values, roleProfiles = [], options = {}) {
   assertAdmin(profile);
-  const validation = validateAccess(values, roleProfiles);
+  const validation = validateAccess(values, roleProfiles, options);
   if (!validation.isValid) return validation;
 
-  const { email, displayName, role, roleProfileId, storeId, storeIds } = validation.data;
+  const { email, displayName, phone, savwinCode, role, roleProfileId, storeId, storeIds } = validation.data;
   const selectedRoleProfile = roleProfiles.find((item) => item.id === roleProfileId) || { role };
   const permissions = permissionsForProfile({ role, permissions: selectedRoleProfile.permissions });
   if (email === normalizeAccessEmail(profile.email) && role !== 'admin') {
@@ -79,6 +81,8 @@ export async function saveAccess(profile, values, roleProfiles = []) {
   const permissionData = {
     email,
     displayName,
+    phone,
+    savwinCode,
     role,
     roleProfileId,
     permissions,
@@ -96,10 +100,28 @@ export async function saveAccess(profile, values, roleProfiles = []) {
 
   batch.set(permissionRef, permissionData, { merge: true });
   usersSnapshot.docs.forEach((item) => {
-    batch.update(item.ref, { displayName, role, roleProfileId, permissions, storeId, storeIds, active: true });
+    batch.update(item.ref, { displayName, phone, savwinCode, role, roleProfileId, permissions, storeId, storeIds, active: true });
   });
   await batch.commit();
   return validation;
+}
+
+export async function deleteAccess(profile, access) {
+  assertAdmin(profile);
+  const email = normalizeAccessEmail(access.email);
+  if (email === normalizeAccessEmail(profile.email)) {
+    throw new Error('Voce nao pode excluir seu proprio acesso.');
+  }
+
+  const usersSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'allowedEmails', email));
+  usersSnapshot.docs.forEach((item) => batch.update(item.ref, {
+    active: false,
+    accessRemovedAt: serverTimestamp(),
+    accessRemovedBy: profile.uid
+  }));
+  await batch.commit();
 }
 
 export async function setAccessActive(profile, access, active) {

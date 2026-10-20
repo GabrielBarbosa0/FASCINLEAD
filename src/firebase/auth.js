@@ -1,14 +1,19 @@
+import { deleteApp, initializeApp } from 'firebase/app';
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
+  getAuth,
   GoogleAuthProvider,
   getRedirectResult,
+  inMemoryPersistence,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  signOut
+  signOut,
+  setPersistence
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, authPersistenceReady, db, isFirebaseConfigured } from './client.js';
@@ -89,6 +94,28 @@ export async function createEmailPasswordAccess(emailInput, password) {
   }
 }
 
+export async function createTeamPasswordAccount(emailInput, password) {
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  const email = normalizeEmail(emailInput);
+  assertEmailPassword(email, password);
+
+  const secondaryApp = initializeApp(auth.app.options, `team-access-${crypto.randomUUID()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  await setPersistence(secondaryAuth, inMemoryPersistence);
+  if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
+    connectAuthEmulator(secondaryAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  }
+
+  try {
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await sendEmailVerification(credential.user);
+    await signOut(secondaryAuth);
+    return credential.user.uid;
+  } finally {
+    await deleteApp(secondaryApp);
+  }
+}
+
 export async function requestPasswordReset(emailInput) {
   if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
   const email = normalizeEmail(emailInput);
@@ -134,6 +161,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
       permissions: assignedPermissions,
       storeId: permission.storeId,
       storeIds: permission.storeIds || [permission.storeId],
+      phone: permission.phone || '',
+      savwinCode: permission.savwinCode || '',
       active: true,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp()
@@ -151,6 +180,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
         permissions: assignedPermissions,
         storeId: permission.storeId,
         storeIds: permission.storeIds || [permission.storeId],
+        phone: permission.phone || '',
+        savwinCode: permission.savwinCode || '',
         active: true
       };
 

@@ -115,7 +115,14 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Acessos da equipe/ }).click();
 
-  await page.getByLabel('Perfil').selectOption('system-manager');
+  await page.getByRole('button', { name: 'Novo acesso' }).click();
+  await expect(page.getByRole('dialog', { name: 'Novo acesso' })).toBeVisible();
+  await expect(page.getByLabel('Nome')).toBeVisible();
+  await expect(page.getByLabel('E-mail')).toBeVisible();
+  await expect(page.getByLabel('Senha inicial')).toBeVisible();
+  await expect(page.getByLabel('Telefone')).toBeVisible();
+  await expect(page.getByLabel('Codigo SavWin')).toBeVisible();
+  await page.getByLabel('Perfil / cargo').selectOption('system-manager');
   await expect(page.getByText('Unidades permitidas', { exact: true })).toBeVisible();
   await page.getByLabel('Loja 02').check();
   await page.getByLabel('Loja 06').check();
