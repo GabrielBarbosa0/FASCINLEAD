@@ -4,7 +4,7 @@
 
 Estimativa elaborada em **20/10/2026** para manter o FascinLead em producao com dominio proprio, banco de dados, autenticacao, hospedagem e copias de seguranca.
 
-Este documento trata de infraestrutura. Horas de desenvolvimento, suporte ao usuario e novas funcionalidades devem ser orcadas separadamente.
+Este documento apresenta os custos de infraestrutura e a manutencao mensal do sistema. Funcionalidades maiores devem ser combinadas separadamente.
 
 ## Resumo executivo
 
@@ -23,9 +23,11 @@ Para a operacao atual, a previsao realista e:
 | Cloud Functions | R$ 0,00 a R$ 5,00 | R$ 0,00 a R$ 60,00 |
 | Backups do Firestore | R$ 0,00 a R$ 5,00 | R$ 0,00 a R$ 60,00 |
 | **Total tecnico esperado** | **R$ 3,33 a R$ 28,33** | **R$ 40,00 a R$ 340,00** |
-| **Reserva recomendada** | **R$ 50,00** | **R$ 600,00** |
+| **Reserva recomendada** | **R$ 100,00** | **R$ 1.200,00** |
 
-A reserva de R$ 50,00 mensais nao significa que esse valor sera cobrado. Ela e um teto de planejamento conservador para a fase atual.
+A reserva de R$ 100,00 mensais nao significa que todo esse valor sera consumido. O custo tecnico atual tende a ser menor, mas a margem evita surpresas com crescimento de uso, backups e variacao cambial.
+
+O valor mensal apresentado para manter o sistema sera de **R$ 350,00**, formado por **R$ 100,00 de reserva para infraestrutura** e **R$ 250,00 de manutencao do sistema**.
 
 ## Arquitetura atual
 
@@ -110,11 +112,60 @@ As faixas abaixo sao reservas de planejamento, nao mensalidades contratadas. Foi
 
 | Cenario | Premissa aproximada | Gasto tecnico esperado | Reserva mensal sugerida |
 | --- | --- | ---: | ---: |
-| Operacao atual | Ate 30 usuarios internos, 4 unidades e poucos milhares de cadastros | R$ 3 a R$ 30 | **R$ 50** |
+| Operacao atual | Ate 30 usuarios internos, 4 unidades e poucos milhares de cadastros | R$ 3 a R$ 30 | **R$ 100** |
 | Crescimento regional | Ate 100 usuarios, 20 unidades e uso diario constante | R$ 20 a R$ 100 | **R$ 150** |
 | Operacao maior | Centenas de usuarios, API de CRM e alto volume de consultas | R$ 100 a R$ 400 | **R$ 600** |
 
 O custo nao cresce diretamente pelo numero total de leads. Ele cresce principalmente pela quantidade de documentos lidos repetidamente, trafego, chamadas de backend e arquivos armazenados.
+
+## Dimensionamento para 60 colaboradores
+
+Uma operacao com **60 funcionarios** esta confortavelmente dentro da capacidade dos servicos usados pelo FascinLead. Os clientes cadastrados nao contam como usuarios do Firebase Authentication enquanto nao tiverem login proprio; eles sao documentos no Firestore. Portanto, nessa situacao haveria aproximadamente 60 usuarios autenticados, muito abaixo da franquia de 50.000 usuarios ativos mensais.
+
+### Estimativa de uso
+
+Um exemplo conservador para os 60 colaboradores:
+
+- 60 pessoas usando o sistema todos os dias.
+- 5 aberturas ou atualizacoes relevantes por pessoa por dia.
+- Cerca de 100 documentos lidos em cada abertura.
+- Aproximadamente 30.000 leituras por dia.
+
+Esse exemplo ainda ficaria dentro das 50.000 leituras diarias gratuitas do Firestore. Uma operacao mais intensa, com gestores abrindo repetidamente agenda, retornos e dashboard, pode ultrapassar a franquia, mas o excedente continua barato:
+
+| Consumo de leitura | Excedente aproximado | Custo mensal estimado em dolar | Conversao de seguranca a R$ 6,00 |
+| --- | ---: | ---: | ---: |
+| 50 mil leituras/dia | Nenhum | US$ 0,00 | R$ 0,00 |
+| 200 mil leituras/dia | 150 mil/dia | US$ 1,35 | R$ 8,10 |
+| 1 milhao de leituras/dia | 950 mil/dia | US$ 8,55 | R$ 51,30 |
+
+Os valores consideram a franquia diaria e o preco publicado de US$ 0,03 por 100 mil leituras excedentes. Trafego, armazenamento e outros produtos sao cobrados separadamente, se ultrapassarem suas proprias franquias.
+
+### Quantidade de clientes
+
+Dezenas ou centenas de milhares de clientes podem ser armazenados no Firestore. O volume total armazenado tende a custar pouco porque cada cadastro e pequeno. O que exige atencao e evitar que uma tela leia todos esses registros de uma vez.
+
+O FascinLead ja aplica os seguintes limites de interface:
+
+- 100 cadastros na lista pessoal do captador.
+- 300 registros por consulta na gestao, relatorios e dashboard.
+- 500 agendamentos por mes na agenda consultada.
+- 500 retornos de equipe por consulta.
+
+Esses limites protegem desempenho e custo, mas representam o primeiro ponto de evolucao para uma operacao grande. Se uma loja ultrapassar 500 exames mensais ou a gestao precisar analisar periodos com mais de 300 registros de uma vez, sera necessario adicionar paginacao e agregacoes no backend. Os dados nao seriam perdidos; apenas a tela atual pediria filtros menores.
+
+### Orcamento recomendado para esse porte
+
+Para **60 colaboradores, 4 unidades e muitos clientes**, a previsao recomendada e:
+
+| Categoria | Faixa mensal esperada |
+| --- | ---: |
+| Dominio proprio | R$ 3,33 |
+| Hosting, banco, login, funcoes e backups | R$ 10,00 a R$ 60,00 |
+| **Gasto tecnico esperado** | **R$ 13,33 a R$ 63,33** |
+| **Reserva mensal recomendada** | **R$ 100,00** |
+
+Essa reserva cobre uma operacao interna intensa sem contratar servidor separado. Caso sejam adicionados portal para clientes, anexos, imagens de exames, WhatsApp oficial ou integracao constante com CRM, o calculo deve ser revisto.
 
 ## Custos que nao sao necessarios agora
 
@@ -139,13 +190,37 @@ Nao estao incluidos no total porque ainda nao fazem parte da operacao atual:
 - Observabilidade avancada e suporte com SLA.
 - Horas de manutencao, desenvolvimento e atendimento aos usuarios.
 
+## Manutencao do sistema
+
+A manutencao do FascinLead tera o valor de **R$ 250,00 por mes**. Essa taxa existe para manter uma pessoa responsavel pela ferramenta quando surgir algum problema, inclusive fora do horario normal de trabalho quando o sistema ficar indisponivel.
+
+A manutencao mensal inclui:
+
+- Verificacao do funcionamento do sistema.
+- Diagnostico e correcao de erros.
+- Suporte em caso de indisponibilidade.
+- Atualizacoes de seguranca e dependencias.
+- Pequenos ajustes e melhorias na ferramenta.
+
+Funcionalidades maiores, integracoes novas ou mudancas que exigirem muitas horas de desenvolvimento devem ser avaliadas e combinadas separadamente.
+
+### Valor mensal apresentado
+
+| Item | Valor mensal |
+| --- | ---: |
+| Reserva para infraestrutura | R$ 100,00 |
+| Manutencao do sistema | R$ 250,00 |
+| **Total mensal** | **R$ 350,00** |
+
+O custo anual previsto e de **R$ 4.200,00**. A reserva de infraestrutura cobre dominio, Firebase e uma margem de seguranca, mesmo que o consumo real seja menor em alguns meses.
+
 ## Recomendacao de contratacao
 
 1. Manter Firebase Hosting, Firestore e Authentication.
 2. Migrar o projeto para o plano Blaze para liberar Cloud Functions e backups.
 3. Registrar um dominio `.com.br` diretamente no Registro.br.
 4. Apontar o dominio para o Firebase Hosting e usar o SSL incluido.
-5. Criar um orcamento de alerta de **R$ 50,00 por mes**, com avisos em 50%, 80% e 100%.
+5. Criar um orcamento de alerta de **R$ 100,00 por mes**, com avisos em 50%, 80% e 100%.
 6. Revisar consumo e faturamento todos os meses durante os tres primeiros meses.
 7. Rever este documento quando houver mais unidades, API externa, anexos ou WhatsApp oficial.
 
@@ -155,6 +230,6 @@ Fonte: [Firebase - alertas de orcamento](https://firebase.google.com/docs/projec
 
 ## Decisao recomendada
 
-Para a fase atual, reservar **R$ 600,00 por ano**, incluindo dominio e uma margem confortavel para Firebase, e suficiente. A cobranca real provavelmente ficara bem abaixo desse valor enquanto o FascinLead atender apenas a operacao atual e nao armazenar arquivos pesados.
+Para a fase atual, o valor apresentado sera de **R$ 350,00 por mes**: R$ 100,00 reservados para infraestrutura e R$ 250,00 para manutencao do sistema. Isso representa **R$ 4.200,00 por ano**.
 
 Nao recomendo migrar para outro provedor nem criar um servidor proprio agora. O melhor investimento e ativar faturamento controlado, backups e alertas, mantendo a arquitetura simples que ja esta funcionando.
