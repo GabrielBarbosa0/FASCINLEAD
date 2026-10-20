@@ -42,7 +42,7 @@ import {
   X,
   createIcons
 } from 'lucide';
-import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser, updateTeamMemberPassword } from '../firebase/auth.js';
+import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
@@ -1381,7 +1381,7 @@ function accessView() {
         <div class="access-form-body">
           <div class="field access-field-wide" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" value="${escapeHtml(editingAccess?.displayName || '')}" required /><small class="field-error"></small></div>
           <div class="field access-field-wide" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(editingAccess?.email || '')}" placeholder="nome@exemplo.com" ${editingAccess ? 'readonly' : ''} required /><small class="field-error"></small></div>
-          <div class="field access-field-wide" data-field="password"><label for="access-password">${editingAccess ? 'Nova senha (opcional)' : 'Senha inicial'}</label><input id="access-password" name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" ${editingAccess ? '' : 'required'} />${editingAccess ? '<small>Deixe em branco para manter a senha atual. A nova senha sera exigida nos proximos acessos.</small>' : '<small>A pessoa recebera um e-mail para confirmar a conta.</small>'}<small class="field-error"></small></div>
+          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" required /><small>A pessoa recebera um e-mail para confirmar a conta.</small><small class="field-error"></small></div>`}
           <div class="field" data-field="role"><label for="access-role-profile">Perfil / cargo</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
           <div class="field" data-field="phone"><label for="access-phone">Telefone</label><input id="access-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" value="${escapeHtml(formatBrazilianPhone(editingAccess?.phone || ''))}" placeholder="(81) 99999-9999" required /><small class="field-error"></small></div>
           <div class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
@@ -1928,20 +1928,6 @@ function bindPageEvents() {
             credentialWarning = error?.code === 'auth/email-already-in-use'
               ? ' O e-mail ja possuia uma conta; a senha nao foi alterada.'
               : ' A autorizacao foi salva, mas nao foi possivel criar a senha inicial.';
-          }
-        } else if (result.data.password) {
-          try {
-            await updateTeamMemberPassword(result.data.email, result.data.password);
-          } catch (error) {
-            state.access.saving = false;
-            submitButton.disabled = false;
-            const message = error?.code === 'functions/permission-denied'
-              ? 'Somente administradores podem alterar senhas.'
-              : error?.code === 'functions/not-found'
-                ? 'A conta de login deste colaborador nao foi encontrada.'
-                : 'Os dados foram salvos, mas nao foi possivel alterar a senha. Tente novamente.';
-            setFieldErrors(accessForm, { password: message });
-            return;
           }
         }
         state.access.editorOpen = false;
