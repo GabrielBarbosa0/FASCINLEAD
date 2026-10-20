@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "migrate:captar": "node scripts/migrate-captar-schedule.js",
+    "sync:captar-team": "node scripts/sync-captar-team.js",
     "emulators": "firebase emulators:start",
     "deploy": "npm run build && firebase deploy"
   },
