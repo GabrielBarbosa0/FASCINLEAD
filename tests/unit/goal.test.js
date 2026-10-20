@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateGoalProgress, validateGoal } from '../../src/utils/goal.js';
+import { calculateGoalProgress, duplicateGoalDraft, validateGoal } from '../../src/utils/goal.js';
 
 describe('goal validation', () => {
   it('accepts an individual goal assigned to multiple captors', () => {
@@ -65,5 +65,42 @@ describe('goal progress', () => {
     expect(progress.completed).toBe(2);
     expect(progress.remaining).toBe(0);
     expect(progress.percentage).toBe(100);
+  });
+});
+
+describe('goal duplication', () => {
+  it('copies the configuration and every unique assignee into a new draft', () => {
+    const draft = duplicateGoalDraft({
+      title: 'Meta de Natal',
+      targetPerPerson: 20,
+      startDate: '2026-12-01',
+      endDate: '2026-12-24',
+      storeId: 'loja-02',
+      goals: [
+        { assigneeUid: 'captor-1' },
+        { assigneeUid: 'captor-2' },
+        { assigneeUid: 'captor-1' }
+      ]
+    });
+
+    expect(draft).toEqual({
+      title: 'Meta de Natal - copia',
+      targetCount: 20,
+      startDate: '2026-12-01',
+      endDate: '2026-12-24',
+      storeId: 'loja-02',
+      assigneeUids: ['captor-1', 'captor-2']
+    });
+  });
+
+  it('preserves the copy suffix inside the title limit', () => {
+    const draft = duplicateGoalDraft({
+      title: 'A'.repeat(80),
+      targetPerPerson: 10,
+      goals: []
+    });
+
+    expect(draft.title).toHaveLength(80);
+    expect(draft.title.endsWith(' - copia')).toBe(true);
   });
 });

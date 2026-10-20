@@ -3637,6 +3637,11 @@ svg {
   box-shadow: var(--shadow);
 }
 
+.goal-form.is-duplicating {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-soft), var(--shadow);
+}
+
 .goal-form-heading,
 .goal-card-actions {
   display: flex;

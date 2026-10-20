@@ -1,5 +1,18 @@
 export const GOAL_METRIC = 'leads_captured';
 
+export function duplicateGoalDraft(group) {
+  const suffix = ' - copia';
+  const title = String(group?.title || '').slice(0, 80 - suffix.length).trimEnd();
+  return {
+    title: `${title}${suffix}`,
+    targetCount: Number(group?.targetPerPerson || 0),
+    startDate: String(group?.startDate || ''),
+    endDate: String(group?.endDate || ''),
+    storeId: String(group?.storeId || ''),
+    assigneeUids: [...new Set((group?.goals || []).map((goal) => goal.assigneeUid).filter(Boolean))]
+  };
+}
+
 export function validateGoal(values) {
   const title = String(values.title || '').trim();
   const targetCount = Number(values.targetCount);

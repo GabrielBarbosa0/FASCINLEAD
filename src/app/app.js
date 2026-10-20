@@ -14,6 +14,7 @@ import {
   ClipboardX,
   Clock3,
   CloudCheck,
+  Copy,
   Download,
   FileDown,
   Filter,
@@ -38,6 +39,7 @@ import {
   Wifi,
   WifiOff,
   Wrench,
+  X,
   createIcons
 } from 'lucide';
 import { completeRedirectSignIn, loadAuthorizedProfile, observeAuth, signInWithGoogle, signOutUser } from '../firebase/auth.js';
@@ -62,6 +64,7 @@ import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
 import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, permissionsForScope, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
+import { duplicateGoalDraft } from '../utils/goal.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
 const DEMO_SESSION_KEY = 'fascinlead:demo-session';
@@ -83,6 +86,7 @@ const appIcons = {
   ClipboardX,
   Clock3,
   CloudCheck,
+  Copy,
   Download,
   FileDown,
   Filter,
@@ -106,7 +110,8 @@ const appIcons = {
   Users,
   Wifi,
   WifiOff,
-  Wrench
+  Wrench,
+  X
 };
 
 const state = {
@@ -204,6 +209,7 @@ const state = {
     members: [],
     truncated: false,
     editingGroupId: '',
+    duplicatingGroupId: '',
     pendingDeleteGroupId: '',
     draft: createDefaultGoalDraft()
   },
@@ -1398,7 +1404,7 @@ function groupGoalRecords(records) {
 }
 
 function goalsView() {
-  const { records, members, loading, saving, error, truncated, draft, editingGroupId, pendingDeleteGroupId } = state.goals;
+  const { records, members, loading, saving, error, truncated, draft, editingGroupId, duplicatingGroupId, pendingDeleteGroupId } = state.goals;
   const groups = groupGoalRecords(records);
   const goalManagerView = canManageGoals();
   const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
@@ -1443,8 +1449,8 @@ function goalsView() {
       }).join('')
     : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
 
-  const creator = goalManagerView ? `<form id="goal-form" class="goal-form" novalidate>
-      <div class="goal-form-heading"><div class="filter-title"><i data-lucide="${editingGroupId ? 'pencil' : 'target'}"></i><div><strong>${editingGroupId ? 'Editar meta' : 'Nova meta'}</strong><span>Quantidade de leads por colaborador no periodo.</span></div></div>${editingGroupId ? '<button class="icon-button" type="button" data-cancel-goal-edit title="Cancelar edicao" aria-label="Cancelar edicao"><i data-lucide="x"></i></button>' : ''}</div>
+  const creator = goalManagerView ? `<form id="goal-form" class="goal-form ${duplicatingGroupId ? 'is-duplicating' : ''}" novalidate>
+      <div class="goal-form-heading"><div class="filter-title"><i data-lucide="${editingGroupId ? 'pencil' : duplicatingGroupId ? 'copy' : 'target'}"></i><div><strong>${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</strong><span>${duplicatingGroupId ? 'Revise os dados da copia antes de criar.' : 'Quantidade de leads por colaborador no periodo.'}</span></div></div>${editingGroupId || duplicatingGroupId ? '<button class="icon-button" type="button" data-cancel-goal-edit title="Cancelar" aria-label="Cancelar"><i data-lucide="x"></i></button>' : ''}</div>
       <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
       <div class="goal-form-grid">
         <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
@@ -1455,7 +1461,7 @@ function goalsView() {
         ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
         : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
       <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
-      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : 'Criar metas'}</span></button>
+      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : duplicatingGroupId ? 'Criar copia' : 'Criar metas'}</span></button>
     </form>` : '';
   const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
       <div><span>Metas</span><strong>${groups.length}</strong></div>
@@ -2065,6 +2071,7 @@ function bindPageEvents() {
         const createdCount = state.goals.draft.assigneeUids.length;
         state.goals.draft = createDefaultGoalDraft(state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId);
         state.goals.editingGroupId = '';
+        state.goals.duplicatingGroupId = '';
         state.goals.loaded = false;
         await loadGoalsData();
         showToast(editingGroup ? 'Meta atualizada.' : `${createdCount} meta(s) criada(s).`);
@@ -2639,6 +2646,7 @@ async function handleAction(action) {
       members: [],
       truncated: false,
       editingGroupId: '',
+      duplicatingGroupId: '',
       pendingDeleteGroupId: '',
       draft: createDefaultGoalDraft()
     };
@@ -2946,6 +2954,7 @@ export async function startApp() {
       const group = groupGoalRecords(state.goals.records).find((item) => item.id === editGoalButton.dataset.editGoal);
       if (!group) return;
       state.goals.editingGroupId = group.id;
+      state.goals.duplicatingGroupId = '';
       state.goals.draft = {
         title: group.title,
         targetCount: group.targetPerPerson,
@@ -2963,23 +2972,22 @@ export async function startApp() {
       const group = groupGoalRecords(state.goals.records).find((item) => item.id === duplicateGoalButton.dataset.duplicateGoal);
       if (!group) return;
       state.goals.editingGroupId = '';
-      state.goals.draft = {
-        title: `${group.title} - copia`.slice(0, 80),
-        targetCount: group.targetPerPerson,
-        startDate: group.startDate,
-        endDate: group.endDate,
-        storeId: group.storeId,
-        assigneeUids: group.goals.map((goal) => goal.assigneeUid)
-      };
-      render();
-      document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.querySelector('#goal-title')?.focus();
+      state.goals.duplicatingGroupId = group.id;
+      state.goals.draft = duplicateGoalDraft(group);
       showToast('Meta duplicada no formulario. Revise e salve.');
+      requestAnimationFrame(() => {
+        document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const titleInput = document.querySelector('#goal-title');
+        titleInput?.focus({ preventScroll: true });
+        titleInput?.select();
+      });
+      return;
     }
     const cancelGoalEditButton = event.target.closest('[data-cancel-goal-edit]');
     if (cancelGoalEditButton) {
       const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
       state.goals.editingGroupId = '';
+      state.goals.duplicatingGroupId = '';
       state.goals.draft = createDefaultGoalDraft(storeId);
       render();
     }
