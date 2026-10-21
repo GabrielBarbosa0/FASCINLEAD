@@ -1134,6 +1134,7 @@ function appointmentsView() {
   }
 
   const { loading, error, truncated, month, storeId, selectedDate, updatingId } = state.appointments;
+  const backRoute = canManage() ? 'management' : 'home';
   const records = state.demoMode
     ? state.leads.filter((lead) => String(lead.appointmentDate || '').startsWith(`${month}-`))
     : state.appointments.records;
@@ -1184,7 +1185,7 @@ function appointmentsView() {
   const createDialog = appointmentCreateDialog(allowedStores);
 
   return `<section class="management-heading page-actions-only agenda-heading">
-      <button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+      <button class="button button-secondary" type="button" data-route="${backRoute}"><i data-lucide="arrow-left"></i><span>${backRoute === 'management' ? 'Voltar para gestao' : 'Voltar ao inicio'}</span></button>
       <button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}

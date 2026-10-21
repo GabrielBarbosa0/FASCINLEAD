@@ -502,6 +502,7 @@ service cloud.firestore {
       allow get, list: if activeUser() && (
         (resource.data.capturedByUid == request.auth.uid && hasPermission('leads.view_own'))
         || (managerHasStore(resource.data.storeId) && hasPermission('management.view'))
+        || (managerHasStore(resource.data.storeId) && hasPermission('appointments.view'))
         || isAdmin()
       );
 

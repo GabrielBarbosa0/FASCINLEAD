@@ -43,6 +43,7 @@ O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao
 | Perfil | Responsabilidade | Permissoes iniciais |
 | --- | --- | --- |
 | Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios cadastros; acompanhar as proprias metas |
+| Atendente de balcao | Acompanhar a agenda da unidade | Criar agendamentos, consultar a agenda, corrigir os proprios cadastros e registrar comparecimento ou falta |
 | Gestor | Acompanhar a captacao de uma loja | Consultar e exportar os registros, criar metas e acompanhar apenas a propria equipe |
 | Administrador | Administrar o FascinLead | Gerenciar usuarios, lojas, metas e consultar todos os registros |
 

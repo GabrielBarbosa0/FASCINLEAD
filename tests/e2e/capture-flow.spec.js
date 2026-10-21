@@ -761,8 +761,14 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(page.getByText('Novo perfil', { exact: true })).toBeVisible();
   await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
   await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
+  await expect(page.getByText('Atendente de balcao', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
-  await expect(page.getByText('Perfil protegido do sistema')).toHaveCount(3);
+  await expect(page.getByText('Perfil protegido do sistema')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
+  const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcao' });
+  await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
+  await expect(receptionistDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
+  await receptionistDialog.getByRole('button', { name: 'Concluir' }).click();
   await page.getByRole('button', { name: 'Visualizar permissoes do perfil Colaborador' }).click();
   const detailsDialog = page.getByRole('dialog', { name: 'Colaborador' });
   await expect(detailsDialog).toBeVisible();
