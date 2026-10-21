@@ -52,7 +52,7 @@ import { deleteRoleProfile, loadRoleProfiles, saveRoleProfile } from '../service
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
-import { backfillAppointmentSlots, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
+import { backfillAppointmentSlots, loadStoreSchedule, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
@@ -179,6 +179,11 @@ const state = {
     appointments: [],
     services: [],
     serviceId: ''
+  },
+  leadDetailSchedule: {
+    loading: false,
+    storeId: '',
+    settings: { ...DEFAULT_STORE_SCHEDULE }
   },
   followUps: {
     loaded: false,
@@ -916,6 +921,8 @@ function leadDetailView() {
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
   const managerReschedule = managementMode && state.profile?.role === 'manager';
   const locked = managerReschedule ? 'disabled' : '';
+  const showAmetropiaFields = state.leadDetailSchedule.storeId === lead.storeId
+    && state.leadDetailSchedule.settings.showAmetropiaFields;
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
   return `
     <section class="page-toolbar detail-toolbar">
@@ -943,11 +950,11 @@ function leadDetailView() {
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
       </div>
       <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
-      <fieldset class="field ametropia-field" ${locked}>
+      ${showAmetropiaFields ? `<fieldset class="field ametropia-field" ${locked}>
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions(lead.ametropiaIds || [])}</div>
-      </fieldset>
+      </fieldset>` : ''}
       <fieldset class="field ametropia-field" ${locked}>
         <legend>Patologias e condicoes de saude</legend>
         <small>Marque todas que se aplicam.</small>
@@ -1895,6 +1902,9 @@ function bindPageEvents() {
         ? state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId)
         : state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
       let values = leadFormValues(editLeadForm);
+      if (existingLead && !editLeadForm.querySelector('[name="ametropiaIds"]')) {
+        values.ametropiaIds = existingLead.ametropiaIds || [];
+      }
       if (managementEdit && state.profile?.role === 'manager' && existingLead) {
         values = {
           ...existingLead,
@@ -2451,6 +2461,7 @@ function subscribeProfileLeads() {
         state.newLeadSchedule.appointments = leads.filter((lead) => lead.appointmentDate === state.newLeadSchedule.appointmentDate);
       }
       render();
+      ensureLeadDetailSchedule();
     },
     () => {
       state.dataError = 'Nao foi possivel carregar os cadastros. Verifique sua conexao ou permissao.';
@@ -2559,6 +2570,7 @@ async function loadManagementData() {
     state.management.truncated = false;
     state.management.page = 1;
     render();
+    ensureLeadDetailSchedule();
     return;
   }
 
@@ -2579,12 +2591,37 @@ async function loadManagementData() {
   } finally {
     state.management.loading = false;
     render();
+    ensureLeadDetailSchedule();
   }
 }
 
 function ensureManagementData() {
   if (['management', 'management-lead', 'dashboard', 'reports'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
+  }
+}
+
+async function ensureLeadDetailSchedule() {
+  if (!['lead', 'management-lead'].includes(state.route) || !state.profile || state.leadDetailSchedule.loading) return;
+  const source = state.route === 'management-lead'
+    ? [...state.management.records, ...state.appointments.records]
+    : state.leads;
+  const lead = source.find((item) => item.id === currentRouteParam());
+  if (!lead?.storeId || state.leadDetailSchedule.storeId === lead.storeId) return;
+
+  state.leadDetailSchedule.loading = true;
+  try {
+    const settings = state.demoMode
+      ? state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId }
+      : await loadStoreSchedule(state.profile, lead.storeId);
+    state.leadDetailSchedule.storeId = lead.storeId;
+    state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...settings };
+  } catch {
+    state.leadDetailSchedule.storeId = lead.storeId;
+    state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+  } finally {
+    state.leadDetailSchedule.loading = false;
+    render();
   }
 }
 
@@ -3061,6 +3098,11 @@ async function handleAction(action) {
       appointments: [],
       services: [],
       serviceId: ''
+    };
+    state.leadDetailSchedule = {
+      loading: false,
+      storeId: '',
+      settings: { ...DEFAULT_STORE_SCHEDULE }
     };
     state.followUps = {
       loaded: false,
@@ -3607,6 +3649,7 @@ export async function startApp() {
     ensureManagementData();
     ensureAppointmentsData();
     ensureNewLeadSchedule();
+    ensureLeadDetailSchedule();
     ensureAccessData();
     ensureGoalsData();
     ensureSettingsData();
@@ -3673,6 +3716,7 @@ export async function startApp() {
         ensureManagementData();
         ensureAppointmentsData();
         ensureNewLeadSchedule();
+        ensureLeadDetailSchedule();
         ensureAccessData();
         ensureGoalsData();
         ensureSettingsData();
@@ -3689,6 +3733,7 @@ export async function startApp() {
       ensureManagementData();
       ensureAppointmentsData();
       ensureNewLeadSchedule();
+      ensureLeadDetailSchedule();
       ensureAccessData();
       ensureGoalsData();
       ensureSettingsData();

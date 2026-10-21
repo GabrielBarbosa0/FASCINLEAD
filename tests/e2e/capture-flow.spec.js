@@ -105,14 +105,9 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByLabel('Sexo')).toHaveValue('female');
   await expect(page.getByLabel('Rua', { exact: true })).toHaveValue('Rua das Flores');
   await expect(page.getByLabel('Numero', { exact: true })).toHaveValue('S/N');
-  await expect(page.getByLabel('Miopia')).not.toBeChecked();
-  await expect(page.getByLabel('Astigmatismo')).not.toBeChecked();
+  await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   await expect(page.getByLabel('Glaucoma')).toBeChecked();
   await expect(page.getByLabel('Diabetes')).toBeChecked();
-  const ametropias = page.getByRole('group', { name: 'Ametropias' });
-  await ametropias.getByLabel('Nao possui').check();
-  await expect(page.getByLabel('Miopia')).not.toBeChecked();
-  await expect(page.getByLabel('Astigmatismo')).not.toBeChecked();
   const pathologies = page.getByRole('group', { name: 'Patologias e condicoes de saude' });
   await pathologies.getByLabel('Nao possui').check();
   await expect(page.getByLabel('Glaucoma')).not.toBeChecked();
@@ -245,6 +240,56 @@ test('keeps management actions and filters organized at intermediate widths', as
     expect(Math.abs(metric.iconCenter - metric.contentCenter)).toBeLessThanOrEqual(2);
   }
   await page.screenshot({ path: testInfo.outputPath('management-responsive.png'), fullPage: true });
+});
+
+test('hides disabled ametropias in management details without erasing saved values', async ({ page }) => {
+  await page.evaluate(() => {
+    sessionStorage.setItem('fascinlead:demo-role', 'admin');
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([{
+      id: 'management-hidden-ametropia',
+      fullName: 'Cliente com ametropia oculta',
+      preferredName: '',
+      phone: '+5581999993333',
+      phoneSearch: '81999993333',
+      customerCpf: '',
+      birthDate: '',
+      sex: '',
+      street: '',
+      streetNumber: '',
+      neighborhood: '',
+      city: '',
+      state: 'PE',
+      interestId: '',
+      interestLabel: '',
+      ametropiaIds: ['myopia'],
+      ametropiaLabels: ['Miopia'],
+      pathologyIds: [],
+      pathologyLabels: [],
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentSchedulingMode: 'free',
+      appointmentDurationMinutes: 20,
+      notes: '',
+      capturedAtClient: new Date().toISOString(),
+      capturedByUid: 'demo-admin',
+      capturedByName: 'Administrador',
+      storeId: 'loja-06',
+      syncState: 'demo'
+    }]));
+  });
+
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Painel de gestao/ }).click();
+  await page.getByRole('button', { name: /Cliente com ametropia oculta/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Cliente com ametropia oculta', level: 2 })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Patologias e condicoes de saude' })).toBeVisible();
+  await page.getByLabel('Observacao rapida').fill('Cadastro revisado pela gestao');
+  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+
+  const savedAmetropias = await page.evaluate(() => JSON.parse(localStorage.getItem('fascinlead:demo-leads'))[0].ametropiaIds);
+  expect(savedAmetropias).toEqual(['myopia']);
 });
 
 test('shows management reports and dashboard grouped by store and captor', async ({ page }, testInfo) => {

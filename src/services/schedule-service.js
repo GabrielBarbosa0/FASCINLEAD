@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { DEFAULT_STORE_SCHEDULE, normalizeStoreSchedule, validateStoreSchedule } from '../utils/schedule.js';
 import { STORES } from '../utils/stores.js';
@@ -40,6 +40,17 @@ export async function loadStoreSchedules(profile) {
     ...store,
     ...normalizeStoreSchedule(byId.get(store.id) || DEFAULT_STORE_SCHEDULE)
   }));
+}
+
+export async function loadStoreSchedule(profile, storeId) {
+  if (!isFirebaseConfigured || !profile?.uid || !profileStoreIds(profile).includes(storeId)) {
+    throw permissionError('Configuracao de agenda indisponivel.');
+  }
+  const snapshot = await getDoc(doc(db, 'stores', storeId));
+  return {
+    id: storeId,
+    ...normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE)
+  };
 }
 
 export async function saveStoreSchedule(profile, storeId, values) {
