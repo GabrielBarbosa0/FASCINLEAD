@@ -376,6 +376,52 @@ describe('appointment calendar queries', () => {
     }));
   });
 
+  it('lets a store-scoped profile register only its own follow-up', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, 'users', 'manager-uid'), {
+        roleProfileId: 'system-receptionist',
+        permissions: [
+          'leads.create', 'leads.view_own', 'leads.edit_own',
+          'appointments.view', 'appointments.attendance'
+        ]
+      });
+      await setDoc(doc(db, 'leads', 'receptionist-lead'), {
+        fullName: 'Cliente do Balcao',
+        phone: '+5581999995678',
+        phoneSearch: '81999995678',
+        notes: '',
+        appointmentDate: '2026-10-16',
+        appointmentTime: '10:00',
+        consentGiven: true,
+        source: 'store',
+        schemaVersion: 1,
+        capturedByUid: 'manager-uid',
+        capturedByName: 'Gestor Teste',
+        storeId: 'loja-06',
+        capturedAtClient: '2026-09-28T12:00:00.000Z',
+        createdAtServer: Timestamp.now(),
+        updatedAtServer: Timestamp.now()
+      });
+    });
+
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'receptionist-lead'), {
+      followUpContactedAt: Timestamp.now(),
+      followUpContactedByUid: 'manager-uid',
+      followUpContactedByName: 'Gestor Teste',
+      followUpContactedAppointmentKey: '2026-10-16|10:00',
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      followUpContactedAt: Timestamp.now(),
+      followUpContactedByUid: 'manager-uid',
+      followUpContactedByName: 'Gestor Teste',
+      followUpContactedAppointmentKey: '2026-10-15|09:30',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets a manager register contact for a captor in an authorized store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {

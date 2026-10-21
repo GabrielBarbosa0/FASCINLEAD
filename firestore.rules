@@ -384,9 +384,11 @@ service cloud.firestore {
 
     function isCaptorFollowUpContactUpdate() {
       return activeUser()
-        && hasPermission('followups.own')
-        && userProfile().role == 'captor'
         && resource.data.capturedByUid == request.auth.uid
+        && (
+          userProfile().roleProfileId == 'system-receptionist'
+          || hasPermission('followups.own')
+        )
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'followUpContactedAt', 'followUpContactedByUid',
           'followUpContactedByName', 'followUpContactedAppointmentKey',

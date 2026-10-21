@@ -15,10 +15,10 @@ import {
   signOut,
   setPersistence
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, authPersistenceReady, db, functions, isFirebaseConfigured } from './client.js';
-import { systemRoleProfileForRole } from '../utils/role-profile.js';
+import { systemRoleProfileForId, systemRoleProfileForRole } from '../utils/role-profile.js';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
@@ -155,7 +155,8 @@ export async function loadAuthorizedProfile(firebaseUser) {
   }
 
   const permission = permissionSnapshot.data();
-  const initialRoleProfile = systemRoleProfileForRole(permission.role);
+  const initialRoleProfile = systemRoleProfileForId(permission.roleProfileId)
+    || systemRoleProfileForRole(permission.role);
   const assignedPermissions = Array.isArray(permission.permissions) ? permission.permissions : initialRoleProfile.permissions;
   const profileRef = doc(db, 'users', firebaseUser.uid);
   const profileSnapshot = await getDoc(profileRef);
@@ -198,7 +199,11 @@ export async function loadAuthorizedProfile(firebaseUser) {
     throw new Error('Este acesso esta inativo. Procure o administrador.');
   }
 
-  let roleProfile = systemRoleProfileForRole(profile.role);
+  let roleProfile = systemRoleProfileForId(profile.roleProfileId)
+    || systemRoleProfileForRole(profile.role);
+  if (profile.roleProfileId?.startsWith('system-') && !systemRoleProfileForId(profile.roleProfileId)) {
+    throw new Error('O perfil de acesso desta conta nao esta disponivel. Procure o administrador.');
+  }
   if (profile.roleProfileId && !profile.roleProfileId.startsWith('system-')) {
     const roleSnapshot = await getDoc(doc(db, 'roleProfiles', profile.roleProfileId));
     if (!roleSnapshot.exists() || roleSnapshot.data().active === false) {
@@ -208,6 +213,20 @@ export async function loadAuthorizedProfile(firebaseUser) {
   }
 
   return { uid: firebaseUser.uid, ...profile, roleProfileName: roleProfile.name, permissions: roleProfile.permissions };
+}
+
+export function observeAuthorizedProfile(firebaseUser, callback, errorCallback = () => {}) {
+  if (!isFirebaseConfigured || !firebaseUser?.uid) return () => {};
+  let revision = 0;
+  return onSnapshot(doc(db, 'users', firebaseUser.uid), async () => {
+    const currentRevision = ++revision;
+    try {
+      const profile = await loadAuthorizedProfile(firebaseUser);
+      if (currentRevision === revision) callback(profile);
+    } catch (error) {
+      if (currentRevision === revision) errorCallback(error);
+    }
+  }, errorCallback);
 }
 
 export async function signOutUser() {

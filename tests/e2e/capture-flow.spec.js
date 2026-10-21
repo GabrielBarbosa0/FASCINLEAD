@@ -13,16 +13,19 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.locator('.profile-card').getByText('Atendente de balcao', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Agenda de exames/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Retornos da equipe/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Retornos pendentes/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Painel de gestao/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Metas/ })).toHaveCount(0);
 
   const navigation = page.getByRole('navigation', { name: 'Navegacao principal' });
   await expect(navigation.getByRole('button', { name: 'Gestao' })).toHaveCount(0);
-  await expect(navigation.getByRole('button', { name: 'Retornos' })).toHaveCount(0);
+  await expect(navigation.getByRole('button', { name: 'Retornos' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('receptionist-home-menus.png'), fullPage: true });
 
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   await expect(page.getByRole('heading', { name: 'Agenda de exames' })).toBeVisible();
@@ -845,8 +848,8 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(page.getByText('Perfil protegido do sistema')).toHaveCount(4);
   await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
   const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcao' });
-  await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
-  await expect(receptionistDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
+  await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
+  await expect(receptionistDialog.getByText('6 de 18 permissoes ativadas')).toBeVisible();
   await receptionistDialog.getByRole('button', { name: 'Concluir' }).click();
   await page.getByRole('button', { name: 'Visualizar permissoes do perfil Colaborador' }).click();
   const detailsDialog = page.getByRole('dialog', { name: 'Colaborador' });

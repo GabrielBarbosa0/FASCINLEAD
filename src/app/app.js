@@ -43,7 +43,7 @@ import {
   X,
   createIcons
 } from 'lucide';
-import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
+import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, observeAuthorizedProfile, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
@@ -129,6 +129,7 @@ const state = {
   dataError: '',
   toast: null,
   search: '',
+  unsubscribeProfile: null,
   unsubscribeLeads: null,
   unsubscribeAppointments: null,
   unsubscribeStoreSchedule: null,
@@ -329,6 +330,20 @@ function profileInitials(displayName = '') {
     .toUpperCase() || '?';
 }
 
+function profileAccessSignature(profile) {
+  if (!profile) return '';
+  return JSON.stringify({
+    displayName: profile.displayName,
+    role: profile.role,
+    roleProfileId: profile.roleProfileId,
+    roleProfileName: profile.roleProfileName,
+    permissions: profile.permissions,
+    storeId: profile.storeId,
+    storeIds: profile.storeIds,
+    active: profile.active
+  });
+}
+
 function canManage() {
   return hasAccess('management.view');
 }
@@ -366,9 +381,9 @@ function canManageGoals() {
 }
 
 function pendingFollowUps() {
-  const source = state.demoMode || state.profile?.role === 'captor'
-    ? state.leads
-    : state.followUps.records;
+  const source = !state.demoMode && hasAccess('followups.team')
+    ? state.followUps.records
+    : state.leads;
   return appointmentFollowUps(source, state.profile, {
     ...state.followUps.settings,
     byStore: state.followUps.settingsByStore
@@ -531,7 +546,7 @@ function profileCard() {
       <div class="avatar">${escapeHtml(initials)}</div>
       <div>
         <strong>${escapeHtml(state.profile.displayName)}</strong>
-        <span>${roleLabel(state.profile.role)}</span>
+        <span>${escapeHtml(state.profile.roleProfileName || roleLabel(state.profile.role))}</span>
       </div>
       <i data-lucide="shield-check" class="profile-status"></i>
     </section>`;
@@ -2990,6 +3005,8 @@ async function handleAction(action) {
   }
 
   if (action === 'logout') {
+    state.unsubscribeProfile?.();
+    state.unsubscribeProfile = null;
     state.unsubscribeLeads?.();
     state.unsubscribeLeads = null;
     stopAppointmentsSubscription();
@@ -3622,6 +3639,8 @@ export async function startApp() {
   }
 
   observeAuth(async (firebaseUser) => {
+    state.unsubscribeProfile?.();
+    state.unsubscribeProfile = null;
     state.loading = true;
     render();
     if (!firebaseUser) {
@@ -3637,6 +3656,28 @@ export async function startApp() {
       state.authError = '';
       subscribeProfileLeads();
       startFollowUpScheduleSubscription();
+      state.unsubscribeProfile = observeAuthorizedProfile(firebaseUser, (profile) => {
+        if (profileAccessSignature(profile) === profileAccessSignature(state.profile)) return;
+        state.profile = profile;
+        state.management.loaded = false;
+        state.management.records = [];
+        state.access.loaded = false;
+        state.goals.loaded = false;
+        state.settings.loaded = false;
+        if (!hasAccess('appointments.view')) stopAppointmentsSubscription();
+        subscribeProfileLeads();
+        startFollowUpScheduleSubscription();
+        render();
+        ensureManagementData();
+        ensureAppointmentsData();
+        ensureNewLeadSchedule();
+        ensureAccessData();
+        ensureGoalsData();
+        ensureSettingsData();
+      }, (error) => {
+        state.dataError = error?.message || 'Nao foi possivel atualizar as permissoes deste acesso.';
+        render();
+      });
     } catch (error) {
       state.profile = null;
       state.authError = error.message || 'Acesso nao autorizado.';

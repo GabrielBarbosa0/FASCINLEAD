@@ -3,6 +3,7 @@ import {
   ALL_PERMISSION_IDS,
   SYSTEM_ROLE_PROFILES,
   hasPermission,
+  systemRoleProfileForId,
   validateRoleProfile
 } from '../../src/utils/role-profile.js';
 
@@ -26,11 +27,14 @@ describe('role profiles', () => {
       'leads.create',
       'leads.view_own',
       'leads.edit_own',
+      'followups.own',
       'appointments.view',
       'appointments.attendance'
     ]);
     expect(receptionist.permissions).not.toContain('management.view');
     expect(receptionist.permissions).not.toContain('reports.view');
+    expect(systemRoleProfileForId('system-receptionist')).toBe(receptionist);
+    expect(systemRoleProfileForId('missing-profile')).toBeNull();
   });
 
   it('creates an own-data profile without team permissions', () => {

@@ -65,6 +65,7 @@ const RECEPTIONIST_PERMISSIONS = [
   'leads.create',
   'leads.view_own',
   'leads.edit_own',
+  'followups.own',
   'appointments.view',
   'appointments.attendance'
 ];
@@ -78,6 +79,10 @@ export const SYSTEM_ROLE_PROFILES = [
 
 export function systemRoleProfileForRole(role) {
   return SYSTEM_ROLE_PROFILES.find((profile) => profile.baseRole === role) || SYSTEM_ROLE_PROFILES[0];
+}
+
+export function systemRoleProfileForId(profileId) {
+  return SYSTEM_ROLE_PROFILES.find((profile) => profile.id === profileId) || null;
 }
 
 export function permissionsForProfile(profile) {
