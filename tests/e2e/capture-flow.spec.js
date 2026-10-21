@@ -407,6 +407,7 @@ test('keeps a long appointment list inside the calendar height', async ({ page }
 });
 
 test('keeps new registration beside the management return action', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1024, height: 720 });
   const now = new Date();
   const appointmentDate = now.toISOString().slice(0, 10);
   await page.evaluate(({ date }) => {
@@ -438,7 +439,30 @@ test('keeps new registration beside the management return action', async ({ page
   await expect(page.getByRole('button', { name: /Informar CPF|Atualizar CPF/ })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('appointment-header-actions.png'), fullPage: true });
   await heading.getByRole('button', { name: 'Novo agendamento' }).click();
-  await expect(page.getByRole('dialog', { name: 'Novo agendamento' })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'Novo agendamento' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Salvar cadastro' })).toBeVisible();
+  const modalLayout = await dialog.evaluate((element) => {
+    const dialogRect = element.getBoundingClientRect();
+    const actionsRect = element.querySelector('.appointment-create-actions').getBoundingClientRect();
+    const saveRect = element.querySelector('button[type="submit"]').getBoundingClientRect();
+    const content = element.querySelector('.appointment-create-content');
+    return {
+      dialogBottom: dialogRect.bottom,
+      actionsBottom: actionsRect.bottom,
+      saveBottom: saveRect.bottom,
+      saveHeight: saveRect.height,
+      contentClientHeight: content.clientHeight,
+      contentScrollHeight: content.scrollHeight,
+      contentOverflowY: getComputedStyle(content).overflowY
+    };
+  });
+  expect(modalLayout.actionsBottom).toBeLessThanOrEqual(modalLayout.dialogBottom + 1);
+  expect(modalLayout.saveBottom).toBeLessThanOrEqual(modalLayout.dialogBottom + 1);
+  expect(modalLayout.saveHeight).toBeGreaterThanOrEqual(40);
+  expect(modalLayout.contentOverflowY).toBe('auto');
+  expect(modalLayout.contentScrollHeight).toBeGreaterThan(modalLayout.contentClientHeight);
+  await dialog.screenshot({ path: testInfo.outputPath('appointment-create-dialog.png') });
 });
 
 test('alerts the captor about a missed appointment and prepares WhatsApp follow-up', async ({ page }, testInfo) => {

@@ -1229,6 +1229,7 @@ function appointmentCreateDialog(allowedStores) {
     </div>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <form id="appointment-create-form" novalidate>
+      <div class="appointment-create-content">
       <input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" />
       <input name="schedulingMode" type="hidden" value="${escapeHtml(schedule.schedulingMode)}" />
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
@@ -1250,6 +1251,7 @@ function appointmentCreateDialog(allowedStores) {
         <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
         <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3"></textarea><small class="field-error"></small></div>
       </details>
+      </div>
       <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-close-appointment-create>Cancelar</button><button class="button button-primary" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar cadastro'}</span></button></div>
     </form>
   </dialog>`;
