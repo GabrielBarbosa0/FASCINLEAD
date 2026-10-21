@@ -822,6 +822,10 @@ svg {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.interest-service-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .ametropia-field {
   padding: 0;
   border: 0;
@@ -3455,10 +3459,6 @@ svg {
   grid-column: 1 / -1;
 }
 
-.appointment-config-fields {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .appointment-create-actions {
   flex: 0 0 auto;
   display: flex;
@@ -4414,11 +4414,11 @@ svg {
     grid-column: auto;
   }
 
-  .appointment-config-fields {
+  .interest-service-fields {
     grid-template-columns: 1fr;
   }
 
-  .appointment-config-fields .field:first-child {
+  .interest-service-fields .field:first-child {
     grid-column: 1;
   }
 

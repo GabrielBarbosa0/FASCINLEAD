@@ -757,14 +757,16 @@ function newLeadView() {
         <div class="field address-city"><label for="city">Cidade</label><input id="city" name="city" maxlength="80" /></div>
         <div class="field field-state"><label for="state">UF</label><input id="state" name="state" maxlength="2" value="PE" /></div>
       </div>
-      <div class="field">
-        <label for="interestId">Interesse principal</label>
-        <select id="interestId" name="interestId">${interests}</select>
-      </div>
-      <div class="field" data-field="appointmentServiceId">
-        <label for="appointmentServiceId">Servico do agendamento</label>
-        <select id="appointmentServiceId" name="appointmentServiceId">${serviceOptions}</select>
-        <small class="field-error"></small>
+      <div class="field-row interest-service-fields">
+        <div class="field">
+          <label for="interestId">Interesse principal</label>
+          <select id="interestId" name="interestId">${interests}</select>
+        </div>
+        <div class="field" data-field="appointmentServiceId">
+          <label for="appointmentServiceId">Servico do agendamento</label>
+          <select id="appointmentServiceId" name="appointmentServiceId">${serviceOptions}</select>
+          <small class="field-error"></small>
+        </div>
       </div>
       ${state.newLeadSchedule.settings.showAmetropiaFields ? `<fieldset class="field ametropia-field">
         <legend>Ametropias</legend>
@@ -1330,9 +1332,9 @@ function appointmentCreateDialog(allowedStores) {
         </div>
         <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" value="${escapeHtml(draft.preferredName || '')}" /></div>
         <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(draft.street || '')}" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" value="${escapeHtml(draft.streetNumber || '')}" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(draft.neighborhood || '')}" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" value="${escapeHtml(draft.city || '')}" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="${escapeHtml(draft.state || 'PE')}" /></div></div>
-        <div class="field"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
-        <div class="field-row appointment-config-fields">
-          <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
+        <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
+        <div class="field-row interest-service-fields">
+          <div class="field"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
           <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Servico do agendamento</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
         </div>
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}

@@ -50,6 +50,24 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Cadastro' })).toBeVisible();
+  const standardPairLayout = await page.locator('#lead-form').evaluate((form) => {
+    const interest = form.elements.interestId.getBoundingClientRect();
+    const service = form.elements.appointmentServiceId.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      interestTop: interest.top,
+      interestBottom: interest.bottom,
+      interestRight: interest.right,
+      serviceTop: service.top,
+      serviceLeft: service.left
+    };
+  });
+  if (standardPairLayout.viewportWidth > 760) {
+    expect(Math.abs(standardPairLayout.interestTop - standardPairLayout.serviceTop)).toBeLessThanOrEqual(2);
+    expect(standardPairLayout.serviceLeft).toBeGreaterThanOrEqual(standardPairLayout.interestRight);
+  } else {
+    expect(standardPairLayout.serviceTop).toBeGreaterThanOrEqual(standardPairLayout.interestBottom);
+  }
 
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
@@ -506,10 +524,28 @@ test('keeps new registration beside the management return action', async ({ page
   });
   expect(fieldOrder).toEqual([
     'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
-    'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId',
-    'storeId', 'appointmentServiceId', 'pathologyIds', 'appointmentDate',
+    'street', 'streetNumber', 'neighborhood', 'city', 'state', 'storeId',
+    'interestId', 'appointmentServiceId', 'pathologyIds', 'appointmentDate',
     'appointmentTime', 'notes'
   ]);
+  const modalPairLayout = await dialog.evaluate((element) => {
+    const interest = element.querySelector('[name="interestId"]').getBoundingClientRect();
+    const service = element.querySelector('[name="appointmentServiceId"]').getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      interestTop: interest.top,
+      interestBottom: interest.bottom,
+      interestRight: interest.right,
+      serviceTop: service.top,
+      serviceLeft: service.left
+    };
+  });
+  if (modalPairLayout.viewportWidth > 760) {
+    expect(Math.abs(modalPairLayout.interestTop - modalPairLayout.serviceTop)).toBeLessThanOrEqual(2);
+    expect(modalPairLayout.serviceLeft).toBeGreaterThanOrEqual(modalPairLayout.interestRight);
+  } else {
+    expect(modalPairLayout.serviceTop).toBeGreaterThanOrEqual(modalPairLayout.interestBottom);
+  }
   await dialog.getByLabel('Nome *').fill('Cliente preservado');
   await dialog.getByLabel('Loja').selectOption('loja-02');
   await expect(dialog.getByLabel('Nome *')).toHaveValue('Cliente preservado');
