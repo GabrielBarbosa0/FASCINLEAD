@@ -2608,6 +2608,63 @@ svg {
   display: grid;
 }
 
+.role-catalog-name {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.role-catalog-name strong,
+.role-catalog-name span {
+  display: block;
+}
+
+.role-catalog-name span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.role-catalog-name:hover strong {
+  color: var(--brand);
+}
+
+.role-catalog-row.is-editing {
+  background: var(--brand-soft);
+}
+
+.role-editor-dialog {
+  width: min(calc(100% - 32px), 780px);
+}
+
+.role-editor-dialog .access-form {
+  max-height: min(90vh, 860px);
+}
+
+.role-editor-body {
+  grid-template-columns: 1fr;
+}
+
+.role-editor-basics,
+.role-editor-permission-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.role-editor-permission-groups .role-permission-group {
+  margin-bottom: 0;
+}
+
+.role-editor-permission-groups > .field-error {
+  grid-column: 1 / -1;
+}
+
 .service-catalog-row {
   min-height: 82px;
   display: grid;
@@ -2744,6 +2801,26 @@ svg {
 
   .service-catalog-actions .button {
     flex: 1;
+  }
+
+  .role-catalog-permissions {
+    grid-column: 2;
+  }
+
+  .role-catalog-actions {
+    min-width: max-content;
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  .role-editor-dialog {
+    width: min(calc(100% - 20px), 780px);
+  }
+
+  .role-editor-basics,
+  .role-editor-permission-groups {
+    grid-template-columns: 1fr;
   }
 
   .service-store-options {

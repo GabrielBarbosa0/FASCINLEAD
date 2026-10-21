@@ -16,6 +16,7 @@ import {
   CloudCheck,
   Copy,
   Download,
+  Eye,
   FileDown,
   Filter,
   FlaskConical,
@@ -91,6 +92,7 @@ const appIcons = {
   CloudCheck,
   Copy,
   Download,
+  Eye,
   FileDown,
   Filter,
   FlaskConical,
@@ -206,6 +208,7 @@ const state = {
     services: [],
     serviceEditorOpen: false,
     editingServiceId: '',
+    roleEditorOpen: false,
     roleDraft: createDefaultRoleDraft(),
     editingRoleId: '',
     pendingDeleteRoleId: '',
@@ -1464,7 +1467,7 @@ function scheduleSettingsView() {
 }
 
 function roleProfilesSettingsView() {
-  const { roleProfiles, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, detailsRolePermissions, saving } = state.settings;
+  const { roleProfiles, roleEditorOpen, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, detailsRolePermissions, saving } = state.settings;
   const compatiblePermissionIds = new Set(permissionsForScope(roleDraft.scope));
   const scopeOptions = ROLE_SCOPES.map((scope) => `<option value="${scope.id}" ${scope.id === roleDraft.scope ? 'selected' : ''}>${scope.label}</option>`).join('');
   const permissionGroups = PERMISSION_GROUPS
@@ -1477,22 +1480,17 @@ function roleProfilesSettingsView() {
         <span class="setting-toggle-control" aria-hidden="true"></span>
       </label>`).join('')}</fieldset>`;
     }).join('');
-  const cards = roleProfiles.map((profile) => {
-    const permissionLabels = PERMISSION_GROUPS.flatMap((group) => group.permissions)
-      .filter((permission) => profile.permissions.includes(permission.id))
-      .map((permission) => permission.label);
-    return `<article class="role-profile-card ${editingRoleId === profile.id ? 'is-editing' : ''}">
-      <button class="role-profile-card-heading" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}">
-        <span class="role-profile-heading-copy"><span class="role-profile-icon"><i data-lucide="shield-check"></i></span><span><strong>${escapeHtml(profile.name)}</strong><small>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</small></span></span>
-        <span class="role-profile-heading-meta"><span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrao ajustado' : 'Padrao' : 'Personalizado'}</span><i data-lucide="chevron-right"></i></span>
-      </button>
-      <p>${permissionLabels.length} permissao(oes) ativa(s)</p>
-      <div class="role-profile-permissions" title="${escapeHtml(permissionLabels.join(', '))}">${permissionLabels.slice(0, 3).map((label) => `<span>${escapeHtml(label)}</span>`).join('')}${permissionLabels.length > 3 ? `<span>+${permissionLabels.length - 3}</span>` : ''}</div>
-      <div class="role-profile-actions">
-        ${profile.system ? `<small>${profile.baseRole === 'admin' ? 'Permissoes sempre ativas' : 'Permissoes ajustaveis'}</small>` : `<button class="button button-secondary" type="button" data-role-edit="${escapeHtml(profile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i><span>Editar</span></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir perfil" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
-      </div>
-    </article>`;
-  }).join('');
+  const rows = roleProfiles.map((profile) => `<article class="service-catalog-row role-catalog-row ${editingRoleId === profile.id ? 'is-editing' : ''}">
+    <span class="service-catalog-icon"><i data-lucide="shield-check"></i></span>
+    <button class="role-catalog-name" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}"><strong>${escapeHtml(profile.name)}</strong><span>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</span></button>
+    <div class="service-catalog-duration role-catalog-permissions"><span>Permissoes</span><strong>${profile.permissions.length} ativa(s)</strong></div>
+    <span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrao ajustado' : 'Padrao' : 'Personalizado'}</span>
+    <div class="service-catalog-actions role-catalog-actions">
+      ${profile.system
+        ? `<button class="icon-button" type="button" data-role-details="${escapeHtml(profile.id)}" title="${profile.baseRole === 'admin' ? 'Visualizar permissoes' : 'Configurar permissoes'}" ${saving ? 'disabled' : ''}><i data-lucide="${profile.baseRole === 'admin' ? 'eye' : 'pencil'}"></i></button>`
+        : `<button class="icon-button" type="button" data-role-edit="${escapeHtml(profile.id)}" title="Editar cargo" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir cargo" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
+    </div>
+  </article>`).join('');
   const deleting = roleProfiles.find((profile) => profile.id === pendingDeleteRoleId);
   const detailsProfile = roleProfiles.find((profile) => profile.id === detailsRoleId);
   const detailsEditable = detailsProfile?.system && detailsProfile.baseRole !== 'admin';
@@ -1509,24 +1507,25 @@ function roleProfilesSettingsView() {
     ? `<div class="role-details-column">${detailGroups[0]}${detailGroups[2]}</div><div class="role-details-column">${detailGroups[1]}</div>`
     : '';
 
-  return `<section class="role-settings-layout">
-    <form id="role-profile-form" class="settings-form role-profile-form ${editingRoleId ? 'is-editing' : ''}" novalidate>
-      <div class="filter-title"><i data-lucide="shield-check"></i><div><strong>${editingRoleId ? 'Editar perfil' : 'Novo perfil'}</strong><span>Defina o alcance e as acoes liberadas para este cargo.</span></div></div>
-      <div class="field" data-field="name"><label for="role-profile-name">Nome do perfil</label><input id="role-profile-name" name="name" maxlength="60" value="${escapeHtml(roleDraft.name)}" placeholder="Ex.: Supervisor de atendimento" required /><small class="field-error"></small></div>
-      <div class="field" data-field="scope"><label for="role-profile-scope">Alcance dos dados</label><select id="role-profile-scope" name="scope">${scopeOptions}</select><small class="field-error"></small></div>
-      <div class="role-permissions-heading"><strong>Permissoes</strong><span>Ative somente o necessario para este perfil.</span></div>
-      <div class="role-permission-groups" data-field="permissions">${permissionGroups}<small class="field-error"></small></div>
-      <div class="role-form-actions">
-        ${editingRoleId ? '<button class="button button-secondary" type="button" data-role-cancel>Cancelar</button>' : ''}
-        <button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar perfil'}</span></button>
-      </div>
-    </form>
-    <section class="role-profile-list-panel">
-      <div class="access-list-heading"><div><strong>Perfis cadastrados</strong><span>${roleProfiles.length} perfil(is)</span></div></div>
-      <div class="role-profile-list">${cards}</div>
-    </section>
+  return `<section class="service-catalog-panel role-catalog-panel">
+    <div class="service-catalog-heading"><div><span class="eyebrow">EQUIPE</span><h2>Cargos cadastrados</h2><p>Defina o alcance e as permissoes de cada cargo da equipe.</p></div><button class="button button-primary" type="button" data-role-new><i data-lucide="circle-plus"></i><span>Adicionar cargo</span></button></div>
+    <div class="service-catalog-list role-catalog-list">${rows}</div>
   </section>
-  ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir perfil?</h2><p id="delete-role-description">O perfil <strong>${escapeHtml(deleting.name)}</strong> sera removido. A exclusao so sera permitida se nenhuma pessoa estiver usando este perfil.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir perfil</button></div></dialog>` : ''}
+  ${roleEditorOpen ? `<dialog id="role-editor-dialog" class="access-editor-dialog role-editor-dialog" aria-labelledby="role-editor-title">
+    <form id="role-profile-form" class="access-form" novalidate>
+      <header><div><span class="eyebrow">CARGO DA EQUIPE</span><h2 id="role-editor-title">${editingRoleId ? 'Editar cargo' : 'Novo cargo'}</h2><p>Configure individualmente o que este cargo podera acessar.</p></div><button class="icon-button" type="button" data-role-cancel aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <div class="access-form-body role-editor-body">
+        <div class="role-editor-basics access-field-wide">
+          <div class="field" data-field="name"><label for="role-profile-name">Nome do cargo</label><input id="role-profile-name" name="name" maxlength="60" value="${escapeHtml(roleDraft.name)}" placeholder="Ex.: Supervisor de atendimento" required /><small class="field-error"></small></div>
+          <div class="field" data-field="scope"><label for="role-profile-scope">Alcance dos dados</label><select id="role-profile-scope" name="scope">${scopeOptions}</select><small class="field-error"></small></div>
+        </div>
+        <div class="role-permissions-heading access-field-wide"><strong>Permissoes</strong><span>Ative somente o necessario para este cargo.</span></div>
+        <div class="role-permission-groups role-editor-permission-groups access-field-wide" data-field="permissions">${permissionGroups}<small class="field-error"></small></div>
+      </div>
+      <footer><button class="button button-secondary" type="button" data-role-cancel>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar cargo'}</span></button></footer>
+    </form>
+  </dialog>` : ''}
+  ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir cargo?</h2><p id="delete-role-description">O cargo <strong>${escapeHtml(deleting.name)}</strong> sera removido. A exclusao so sera permitida se nenhuma pessoa estiver usando este cargo.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir cargo</button></div></dialog>` : ''}
   ${detailsProfile ? `<dialog id="role-details-dialog" class="role-details-dialog" aria-labelledby="role-details-title">
     <header><div><span class="eyebrow">PERFIL DE ACESSO</span><h2 id="role-details-title">${escapeHtml(detailsProfile.name)}</h2><p>${detailsProfile.scope === 'admin' ? 'Acesso completo ao sistema' : detailsProfile.scope === 'stores' ? 'Acesso limitado as unidades permitidas' : 'Acesso aos proprios dados'}</p></div><button class="icon-button" type="button" data-role-details-close title="Fechar" aria-label="Fechar permissoes"><i data-lucide="circle-x"></i></button></header>
     <div class="role-details-body">${detailGroupsLayout}</div>
@@ -2206,6 +2205,7 @@ function bindPageEvents() {
       state.settings.roleDraft.scope = roleProfileForm.elements.scope.value;
       state.settings.roleDraft.permissions = permissionsForScope(state.settings.roleDraft.scope);
       render();
+      document.querySelector('#role-editor-dialog')?.showModal();
     });
     roleProfileForm.querySelectorAll('[name="permissions"]').forEach((input) => {
       input.addEventListener('change', () => {
@@ -2241,17 +2241,37 @@ function bindPageEvents() {
         }
         state.settings.roleDraft = createDefaultRoleDraft();
         state.settings.editingRoleId = '';
+        state.settings.roleEditorOpen = false;
         if (!state.demoMode) await loadRoleProfilesData();
-        showToast('Perfil salvo com sucesso.');
+        showToast('Cargo salvo com sucesso.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
           ? 'Seu perfil nao pode gerenciar perfis e permissoes.'
           : 'Nao foi possivel salvar o perfil.';
         render();
+        document.querySelector('#role-editor-dialog')?.showModal();
       }
     });
   }
+
+  const roleEditorDialog = document.querySelector('#role-editor-dialog');
+  roleEditorDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    roleEditorDialog.close();
+    state.settings.roleEditorOpen = false;
+    state.settings.editingRoleId = '';
+    state.settings.roleDraft = createDefaultRoleDraft();
+    render();
+  });
+  roleEditorDialog?.addEventListener('click', (event) => {
+    if (event.target !== roleEditorDialog) return;
+    roleEditorDialog.close();
+    state.settings.roleEditorOpen = false;
+    state.settings.editingRoleId = '';
+    state.settings.roleDraft = createDefaultRoleDraft();
+    render();
+  });
 
   const roleDetailsDialog = document.querySelector('#role-details-dialog');
   roleDetailsDialog?.querySelectorAll('[data-system-role-permission]').forEach((input) => {
@@ -3162,6 +3182,7 @@ async function handleAction(action) {
       services: [],
       serviceEditorOpen: false,
       editingServiceId: '',
+      roleEditorOpen: false,
       roleDraft: createDefaultRoleDraft(),
       editingRoleId: '',
       pendingDeleteRoleId: '',
@@ -3322,15 +3343,26 @@ export async function startApp() {
       }
       return;
     }
+    const newRoleButton = event.target.closest('[data-role-new]');
+    if (newRoleButton) {
+      state.settings.editingRoleId = '';
+      state.settings.roleDraft = createDefaultRoleDraft();
+      state.settings.roleEditorOpen = true;
+      render();
+      document.querySelector('#role-editor-dialog')?.showModal();
+      document.querySelector('#role-profile-name')?.focus();
+      return;
+    }
     const editRoleButton = event.target.closest('[data-role-edit]');
     if (editRoleButton) {
       const profile = state.settings.roleProfiles.find((item) => item.id === editRoleButton.dataset.roleEdit && !item.system);
       if (profile) {
         state.settings.editingRoleId = profile.id;
         state.settings.roleDraft = { name: profile.name, scope: profile.scope, permissions: [...profile.permissions] };
+        state.settings.roleEditorOpen = true;
         render();
+        document.querySelector('#role-editor-dialog')?.showModal();
         const form = document.querySelector('#role-profile-form');
-        form?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         const nameInput = form?.elements.name;
         nameInput?.focus({ preventScroll: true });
         nameInput?.select();
@@ -3420,6 +3452,8 @@ export async function startApp() {
       render();
     }
     if (event.target.closest('[data-role-cancel]')) {
+      document.querySelector('#role-editor-dialog')?.close();
+      state.settings.roleEditorOpen = false;
       state.settings.editingRoleId = '';
       state.settings.roleDraft = createDefaultRoleDraft();
       render();
@@ -3452,7 +3486,7 @@ export async function startApp() {
           }
           state.settings.pendingDeleteRoleId = '';
           if (!state.demoMode) await loadRoleProfilesData();
-          showToast('Perfil excluido.');
+          showToast('Cargo excluido.');
         } catch (error) {
           state.settings.saving = false;
           state.settings.pendingDeleteRoleId = '';

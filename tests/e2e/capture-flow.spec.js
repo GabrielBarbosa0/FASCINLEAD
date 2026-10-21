@@ -921,13 +921,14 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await page.getByRole('button', { name: /Configuracoes/ }).click();
   await page.getByRole('tab', { name: 'Perfis e permissoes' }).click();
 
-  await expect(page.getByText('Novo perfil', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cargos cadastrados', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Adicionar cargo' })).toBeVisible();
+  await expect(page.locator('#role-profile-form')).toHaveCount(0);
   await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
   await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
   await expect(page.getByText('Atendente de balcao', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
-  await expect(page.getByText('Permissoes ajustaveis')).toHaveCount(3);
-  await expect(page.getByText('Permissoes sempre ativas')).toHaveCount(1);
+  await expect(page.locator('.role-catalog-row')).toHaveCount(4);
   await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
   const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcao' });
   await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
@@ -955,37 +956,41 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await page.screenshot({ path: testInfo.outputPath('role-permissions-details.png') });
   await detailsDialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(detailsDialog).not.toBeVisible();
-  await expect(page.getByLabel('Cadastrar leads')).toBeChecked();
-  await expect(page.getByLabel('Acessar a gestao de leads')).toHaveCount(0);
-  await page.getByLabel('Alcance dos dados').selectOption('stores');
-  await expect(page.getByLabel('Acessar a gestao de leads')).toBeChecked();
-  await page.getByLabel('Nome do perfil').fill('Supervisor de teste');
-  await page.getByRole('button', { name: 'Criar perfil' }).click();
-  const customCard = page.locator('.role-profile-card').filter({ hasText: 'Supervisor de teste' });
+  await page.getByRole('button', { name: 'Adicionar cargo' }).click();
+  const editorDialog = page.getByRole('dialog', { name: 'Novo cargo' });
+  await expect(editorDialog).toBeVisible();
+  await expect(editorDialog.getByLabel('Cadastrar leads')).toBeChecked();
+  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).toHaveCount(0);
+  await editorDialog.getByLabel('Alcance dos dados').selectOption('stores');
+  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).toBeChecked();
+  await editorDialog.getByLabel('Nome do cargo').fill('Supervisor de teste');
+  await editorDialog.getByRole('button', { name: 'Criar cargo' }).click();
+  const customCard = page.locator('.role-catalog-row').filter({ hasText: 'Supervisor de teste' });
   await expect(customCard).toBeVisible();
 
-  await customCard.getByRole('button', { name: 'Editar' }).click();
-  await expect(page.getByText('Editar perfil', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Nome do perfil')).toBeFocused();
-  await page.getByLabel('Nome do perfil').fill('Supervisor atualizado');
-  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
-  const updatedCard = page.locator('.role-profile-card').filter({ hasText: 'Supervisor atualizado' });
+  await customCard.getByTitle('Editar cargo').click();
+  const editDialog = page.getByRole('dialog', { name: 'Editar cargo' });
+  await expect(editDialog).toBeVisible();
+  await expect(editDialog.getByLabel('Nome do cargo')).toBeFocused();
+  await editDialog.getByLabel('Nome do cargo').fill('Supervisor atualizado');
+  await editDialog.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  const updatedCard = page.locator('.role-catalog-row').filter({ hasText: 'Supervisor atualizado' });
   await expect(updatedCard).toBeVisible();
 
-  await updatedCard.getByTitle('Excluir perfil').click();
-  const deleteDialog = page.getByRole('dialog', { name: 'Excluir perfil?' });
+  await updatedCard.getByTitle('Excluir cargo').click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Excluir cargo?' });
   await expect(deleteDialog).toBeVisible();
   await expect(deleteDialog).toHaveJSProperty('open', true);
   await deleteDialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(deleteDialog).not.toBeVisible();
 
-  await updatedCard.getByTitle('Excluir perfil').click();
-  await page.getByRole('dialog', { name: 'Excluir perfil?' }).getByRole('button', { name: 'Excluir perfil' }).click();
+  await updatedCard.getByTitle('Excluir cargo').click();
+  await page.getByRole('dialog', { name: 'Excluir cargo?' }).getByRole('button', { name: 'Excluir cargo' }).click();
   await expect(updatedCard).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('role-profiles-desktop.png'), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator('.role-settings-layout')).toHaveCSS('grid-template-columns', /[0-9.]+px/);
+  await expect(page.locator('.role-catalog-panel')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath('role-profiles-mobile.png'), fullPage: true });
