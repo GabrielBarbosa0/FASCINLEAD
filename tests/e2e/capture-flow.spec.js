@@ -8,6 +8,33 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('shows only menus allowed for the front desk profile', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'receptionist'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Agenda de exames/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Retornos da equipe/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Painel de gestao/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Metas/ })).toHaveCount(0);
+
+  const navigation = page.getByRole('navigation', { name: 'Navegacao principal' });
+  await expect(navigation.getByRole('button', { name: 'Gestao' })).toHaveCount(0);
+  await expect(navigation.getByRole('button', { name: 'Retornos' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  await expect(page.getByRole('heading', { name: 'Agenda de exames' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Voltar ao inicio' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('receptionist-permitted-menus.png'), fullPage: true });
+
+  await page.goto('/#/management');
+  await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByText('Seu perfil nao possui acesso aos dados gerenciais.')).toHaveCount(0);
+});
+
 test('captures and lists a lead in development mode', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'FascinLead' })).toBeVisible();
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();

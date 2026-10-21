@@ -282,6 +282,20 @@ function createDemoProfile() {
   const role = sessionStorage.getItem(DEMO_ROLE_KEY);
   if (role === 'admin') return { ...demoProfile, uid: 'demo-admin', displayName: 'Administrador de Teste', role: 'admin', storeId: 'loja-06', storeIds: STORES.map((store) => store.id) };
   if (role === 'manager') return { ...demoProfile, uid: 'demo-manager', displayName: 'Gestor de Teste', role: 'manager', storeId: 'loja-06', storeIds: ['loja-06', 'loja-02'] };
+  if (role === 'receptionist') {
+    const receptionist = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-receptionist');
+    return {
+      ...demoProfile,
+      uid: 'demo-receptionist',
+      displayName: 'Atendente de Teste',
+      role: receptionist.baseRole,
+      roleProfileId: receptionist.id,
+      roleProfileName: receptionist.name,
+      permissions: [...receptionist.permissions],
+      storeId: 'loja-06',
+      storeIds: ['loja-06']
+    };
+  }
   return demoProfile;
 }
 
@@ -324,6 +338,26 @@ function isAdmin() {
 
 function hasAccess(permission) {
   return profileHasPermission(state.profile, permission);
+}
+
+function canAccessRoute(route) {
+  const accessByRoute = {
+    home: () => true,
+    new: () => hasAccess('leads.create'),
+    leads: () => hasAccess('leads.view_own'),
+    lead: () => hasAccess('leads.view_own'),
+    sync: () => hasAccess('leads.create') || hasAccess('leads.edit_own'),
+    'follow-ups': () => hasAccess('followups.own') || hasAccess('followups.team'),
+    management: () => hasAccess('management.view'),
+    'management-lead': () => hasAccess('management.view'),
+    dashboard: () => hasAccess('dashboard.view'),
+    reports: () => hasAccess('reports.view'),
+    appointments: () => hasAccess('appointments.view'),
+    access: () => isAdmin(),
+    goals: () => hasAccess('goals.view_own') || hasAccess('goals.manage'),
+    settings: () => isAdmin()
+  };
+  return Boolean(accessByRoute[route]?.());
 }
 
 function canManageGoals() {
@@ -511,21 +545,21 @@ function homeView() {
     ${profileCard()}
     ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Nao utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}
     <section class="action-grid" aria-label="Acoes principais">
-      <button class="action-card action-card-primary" type="button" data-route="new">
+      ${hasAccess('leads.create') ? `<button class="action-card action-card-primary" type="button" data-route="new">
         <span class="action-icon"><i data-lucide="user-plus"></i></span>
         <span><strong>Nova abordagem</strong><small>Cadastrar novo contato</small></span>
         <i data-lucide="chevron-right"></i>
-      </button>
-      <button class="action-card" type="button" data-route="leads">
+      </button>` : ''}
+      ${hasAccess('leads.view_own') ? `<button class="action-card" type="button" data-route="leads">
         <span class="action-icon"><i data-lucide="clipboard-list"></i></span>
         <span><strong>Meus cadastros</strong><small>${state.leads.length} registro(s) neste acesso</small></span>
         <i data-lucide="chevron-right"></i>
-      </button>
-      <button class="action-card" type="button" data-route="sync">
+      </button>` : ''}
+      ${canAccessRoute('sync') ? `<button class="action-card" type="button" data-route="sync">
         <span class="action-icon"><i data-lucide="refresh-cw"></i></span>
         <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
-      </button>
+      </button>` : ''}
       ${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups">
         <span class="action-icon"><i data-lucide="bell-ring"></i></span>
         <span><strong>${hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
@@ -759,7 +793,7 @@ function leadsView() {
           <i class="lead-chevron" data-lucide="chevron-right"></i>
         </button>`;
       }).join('')
-    : `<div class="empty-state"><i data-lucide="clipboard-x"></i><strong>Nenhum cadastro encontrado</strong><p>${state.search ? 'Tente outro nome ou telefone.' : 'Os contatos registrados aparecerao aqui.'}</p><button class="button button-primary" type="button" data-route="new"><i data-lucide="user-plus"></i>Novo cadastro</button></div>`;
+    : `<div class="empty-state"><i data-lucide="clipboard-x"></i><strong>Nenhum cadastro encontrado</strong><p>${state.search ? 'Tente outro nome ou telefone.' : 'Os contatos registrados aparecerao aqui.'}</p>${hasAccess('leads.create') ? '<button class="button button-primary" type="button" data-route="new"><i data-lucide="user-plus"></i>Novo cadastro</button>' : ''}</div>`;
 
   return `
     <div class="search-box"><i data-lucide="search"></i><input id="lead-search" type="search" value="${escapeHtml(state.search)}" placeholder="Buscar por nome ou telefone" aria-label="Buscar cadastros" /></div>
@@ -1113,7 +1147,7 @@ function dashboardView() {
     return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos agendamentos</small></div>`;
   }).join('');
 
-  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
+  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button>' : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
     <form id="dashboard-period" class="dashboard-period-filter">
       <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>Defina o intervalo do dashboard</strong></div></div>
       <div class="field"><label for="dashboard-start">Data inicial</label><input id="dashboard-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
@@ -1186,7 +1220,7 @@ function appointmentsView() {
 
   return `<section class="management-heading page-actions-only agenda-heading">
       <button class="button button-secondary" type="button" data-route="${backRoute}"><i data-lucide="arrow-left"></i><span>${backRoute === 'management' ? 'Voltar para gestao' : 'Voltar ao inicio'}</span></button>
-      <button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>
+      ${hasAccess('leads.create') ? `<button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>` : ''}
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A agenda atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} exames neste mes.</span></div>` : ''}
@@ -1215,7 +1249,7 @@ function appointmentsView() {
           <div class="appointment-list">${selectedItems}</div>
         </section>
       </aside>
-    </section>${createDialog}`;
+    </section>${hasAccess('leads.create') ? createDialog : ''}`;
 }
 
 function appointmentCreateSchedule() {
@@ -1668,12 +1702,10 @@ function syncView() {
 }
 
 function bottomNav() {
-  const items = [
-    ['home', 'house', 'Inicio'],
-    ['new', 'circle-plus', 'Novo'],
-    ['leads', 'clipboard-list', 'Cadastros'],
-    ['sync', 'refresh-cw', 'Sync']
-  ];
+  const items = [['home', 'house', 'Inicio']];
+  if (hasAccess('leads.create')) items.push(['new', 'circle-plus', 'Novo']);
+  if (hasAccess('leads.view_own')) items.push(['leads', 'clipboard-list', 'Cadastros']);
+  if (canAccessRoute('sync')) items.push(['sync', 'refresh-cw', 'Sync']);
   if (hasAccess('followups.own') && !hasAccess('followups.team')) items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
@@ -1705,6 +1737,11 @@ function syncAgendaSidebarHeight() {
 
 function render() {
   const root = document.querySelector('#app');
+
+  if (!state.loading && state.profile && !canAccessRoute(state.route)) {
+    state.route = 'home';
+    history.replaceState(null, '', `${location.pathname}${location.search}#/home`);
+  }
 
   if (state.loading) {
     root.innerHTML = '<main class="loading-page"><div class="brand-mark">F</div><span>Preparando o FascinLead...</span></main>';
