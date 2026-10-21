@@ -166,7 +166,8 @@ const state = {
     schedules: [],
     storeId: '',
     services: [],
-    serviceId: ''
+    serviceId: '',
+    draft: {}
   },
   newLeadSchedule: {
     loaded: false,
@@ -1284,9 +1285,10 @@ function appointmentCreateTimeField() {
 
 function appointmentCreateDialog(allowedStores) {
   const { loading, saving, error, storeId } = state.appointmentCreate;
+  const draft = state.appointmentCreate.draft || {};
   const schedule = appointmentCreateSchedule();
   const selectedService = appointmentCreateService();
-  const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
+  const interests = INTERESTS.map((item) => `<option value="${item.id}" ${draft.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
   const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${store.id === storeId ? 'selected' : ''}>${store.label}</option>`).join('');
   const availableServices = servicesForStore(state.appointmentCreate.services, storeId);
   const serviceOptions = (availableServices.length ? availableServices : [selectedService])
@@ -1300,27 +1302,31 @@ function appointmentCreateDialog(allowedStores) {
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <form id="appointment-create-form" novalidate>
       <div class="appointment-create-content">
-      <input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" />
       <input name="schedulingMode" type="hidden" value="${escapeHtml(schedule.schedulingMode)}" />
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
       <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
       <div class="appointment-create-grid">
-        <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
-        <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Servico</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
-        ${appointmentCreateTimeField()}
-        <div class="field appointment-create-wide" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
-        <div class="field appointment-create-wide" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" required /><small class="field-error"></small></div>
-        <div class="field-row identity-fields appointment-create-wide">
-          <div class="field" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" /><small class="field-error"></small></div>
-          <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" /><small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small><small class="field-error"></small></div>
-          <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions()}</select><small class="field-error"></small></div>
+        <div class="field" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" placeholder="Nome do cliente" value="${escapeHtml(draft.fullName || '')}" required /><small class="field-error"></small></div>
+        <div class="field" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" placeholder="(00) 00000-0000" value="${escapeHtml(draft.phone || '')}" required /><small class="field-error"></small></div>
+        <div class="field-row identity-fields">
+          <div class="field" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" value="${escapeHtml(draft.customerCpf || '')}" /><small class="field-error"></small></div>
+          <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" value="${escapeHtml(draft.birthDate || '')}" /><small class="birth-age-hint" data-birth-age>${birthAgeText(draft.birthDate || '')}</small><small class="field-error"></small></div>
+          <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions(draft.sex || '')}</select><small class="field-error"></small></div>
         </div>
-        <div class="field appointment-create-wide"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" /></div>
-        <div class="field-row address-fields appointment-create-wide"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
-        <div class="field appointment-create-wide"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
-        ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field appointment-create-wide"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>` : ''}
-        <fieldset class="field ametropia-field appointment-create-wide"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
-        <div class="field appointment-create-wide" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha"></textarea><small class="field-hint"><span id="agenda-notes-count">0</span>/500</small><small class="field-error"></small></div>
+        <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" value="${escapeHtml(draft.preferredName || '')}" /></div>
+        <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(draft.street || '')}" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" value="${escapeHtml(draft.streetNumber || '')}" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(draft.neighborhood || '')}" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" value="${escapeHtml(draft.city || '')}" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="${escapeHtml(draft.state || 'PE')}" /></div></div>
+        <div class="field"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
+        <div class="field-row appointment-config-fields">
+          <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
+          <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Servico do agendamento</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
+        </div>
+        ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
+        <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
+        <div class="field-row appointment-fields">
+          <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pre-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
+          ${appointmentCreateTimeField()}
+        </div>
+        <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha">${escapeHtml(draft.notes || '')}</textarea><small class="field-hint"><span id="agenda-notes-count">${String(draft.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       </div>
       </div>
       <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-close-appointment-create>Cancelar</button><button class="button button-primary" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar cadastro'}</span></button></div>
@@ -2031,6 +2037,7 @@ function bindPageEvents() {
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
     appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {
+      state.appointmentCreate.draft = leadFormValues(appointmentCreateForm);
       state.appointmentCreate.storeId = event.target.value;
       const schedule = appointmentCreateSchedule();
       if (!servicesForStore(state.appointmentCreate.services, event.target.value).length) {
@@ -2621,7 +2628,8 @@ async function openAppointmentCreateDialog() {
     schedules: [],
     storeId: preferredStoreId,
     services: [],
-    serviceId: ''
+    serviceId: '',
+    draft: {}
   };
   render();
   document.querySelector('#appointment-create-dialog')?.showModal();

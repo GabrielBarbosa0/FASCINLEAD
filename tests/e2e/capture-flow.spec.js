@@ -484,6 +484,32 @@ test('keeps new registration beside the management return action', async ({ page
   await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
   await expect(dialog.getByLabel('Sexo')).toBeVisible();
+  const fieldOrder = await dialog.locator('input, select, textarea').evaluateAll((controls) => {
+    const tracked = new Set([
+      'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
+      'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId',
+      'storeId', 'appointmentServiceId', 'ametropiaIds', 'pathologyIds',
+      'appointmentDate', 'appointmentTime', 'notes'
+    ]);
+    const seen = new Set();
+    return controls.reduce((order, control) => {
+      const name = control.name || (control.id === 'agenda-lead-date' ? 'appointmentDate' : '');
+      if (tracked.has(name) && !seen.has(name)) {
+        seen.add(name);
+        order.push(name);
+      }
+      return order;
+    }, []);
+  });
+  expect(fieldOrder).toEqual([
+    'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
+    'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId',
+    'storeId', 'appointmentServiceId', 'pathologyIds', 'appointmentDate',
+    'appointmentTime', 'notes'
+  ]);
+  await dialog.getByLabel('Nome *').fill('Cliente preservado');
+  await dialog.getByLabel('Loja').selectOption('loja-02');
+  await expect(dialog.getByLabel('Nome *')).toHaveValue('Cliente preservado');
   const identityLayout = await dialog.evaluate((element) => {
     const cpf = element.querySelector('[data-field="customerCpf"]').getBoundingClientRect();
     const birthDate = element.querySelector('[data-field="birthDate"]').getBoundingClientRect();
