@@ -1470,16 +1470,12 @@ function roleProfilesSettingsView() {
   const { roleProfiles, roleEditorOpen, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, detailsRolePermissions, saving } = state.settings;
   const compatiblePermissionIds = new Set(permissionsForScope(roleDraft.scope));
   const scopeOptions = ROLE_SCOPES.map((scope) => `<option value="${scope.id}" ${scope.id === roleDraft.scope ? 'selected' : ''}>${scope.label}</option>`).join('');
-  const permissionGroups = PERMISSION_GROUPS
-    .map((group) => {
-      const permissions = group.permissions.filter((permission) => compatiblePermissionIds.has(permission.id));
-      if (!permissions.length) return '';
-      return `<fieldset class="role-permission-group"><legend>${escapeHtml(group.label)}</legend>${permissions.map((permission) => `<label class="setting-toggle role-permission-toggle" for="role-permission-${escapeHtml(permission.id)}">
-        <span><strong>${escapeHtml(permission.label)}</strong></span>
-        <input id="role-permission-${escapeHtml(permission.id)}" name="permissions" type="checkbox" value="${escapeHtml(permission.id)}" ${roleDraft.permissions.includes(permission.id) ? 'checked' : ''} />
-        <span class="setting-toggle-control" aria-hidden="true"></span>
-      </label>`).join('')}</fieldset>`;
-    }).join('');
+  const editorPermissionGroups = PERMISSION_GROUPS.map((group) => `<fieldset class="role-details-group"><legend>${escapeHtml(group.label)}</legend>${group.permissions.map((permission) => {
+    const active = roleDraft.permissions.includes(permission.id);
+    const canToggle = compatiblePermissionIds.has(permission.id);
+    return `<label class="role-details-permission ${active ? 'is-active' : ''} ${canToggle ? 'is-editable' : 'is-locked'}"><span><strong>${escapeHtml(permission.label)}</strong><small>${active ? 'Ativada' : 'Desativada'}</small></span><input name="permissions" type="checkbox" value="${escapeHtml(permission.id)}" ${active ? 'checked' : ''} ${canToggle && !saving ? '' : 'disabled'} /><span class="setting-toggle-control" aria-hidden="true"></span></label>`;
+  }).join('')}</fieldset>`);
+  const editorPermissionLayout = `<div class="role-details-column">${editorPermissionGroups[0]}${editorPermissionGroups[2]}</div><div class="role-details-column">${editorPermissionGroups[1]}</div>`;
   const rows = roleProfiles.map((profile) => `<article class="service-catalog-row role-catalog-row ${editingRoleId === profile.id ? 'is-editing' : ''}">
     <span class="service-catalog-icon"><i data-lucide="shield-check"></i></span>
     <button class="role-catalog-name" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}"><strong>${escapeHtml(profile.name)}</strong><span>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</span></button>
@@ -1511,18 +1507,18 @@ function roleProfilesSettingsView() {
     <div class="service-catalog-heading"><div><span class="eyebrow">EQUIPE</span><h2>Cargos cadastrados</h2><p>Defina o alcance e as permissoes de cada cargo da equipe.</p></div><button class="button button-primary" type="button" data-role-new><i data-lucide="circle-plus"></i><span>Adicionar cargo</span></button></div>
     <div class="service-catalog-list role-catalog-list">${rows}</div>
   </section>
-  ${roleEditorOpen ? `<dialog id="role-editor-dialog" class="access-editor-dialog role-editor-dialog" aria-labelledby="role-editor-title">
-    <form id="role-profile-form" class="access-form" novalidate>
+  ${roleEditorOpen ? `<dialog id="role-editor-dialog" class="role-details-dialog role-editor-dialog" aria-labelledby="role-editor-title">
+    <form id="role-profile-form" class="role-editor-form" novalidate>
       <header><div><span class="eyebrow">CARGO DA EQUIPE</span><h2 id="role-editor-title">${editingRoleId ? 'Editar cargo' : 'Novo cargo'}</h2><p>Configure individualmente o que este cargo podera acessar.</p></div><button class="icon-button" type="button" data-role-cancel aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
-      <div class="access-form-body role-editor-body">
-        <div class="role-editor-basics access-field-wide">
+      <div class="role-editor-content">
+        <div class="role-editor-basics">
           <div class="field" data-field="name"><label for="role-profile-name">Nome do cargo</label><input id="role-profile-name" name="name" maxlength="60" value="${escapeHtml(roleDraft.name)}" placeholder="Ex.: Supervisor de atendimento" required /><small class="field-error"></small></div>
           <div class="field" data-field="scope"><label for="role-profile-scope">Alcance dos dados</label><select id="role-profile-scope" name="scope">${scopeOptions}</select><small class="field-error"></small></div>
         </div>
-        <div class="role-permissions-heading access-field-wide"><strong>Permissoes</strong><span>Ative somente o necessario para este cargo.</span></div>
-        <div class="role-permission-groups role-editor-permission-groups access-field-wide" data-field="permissions">${permissionGroups}<small class="field-error"></small></div>
+        <div class="role-permissions-heading"><strong>Permissoes</strong><span>As opcoes indisponiveis nao pertencem ao alcance selecionado.</span></div>
+        <div class="role-details-body role-editor-permissions-body" data-field="permissions">${editorPermissionLayout}<small class="field-error"></small></div>
       </div>
-      <footer><button class="button button-secondary" type="button" data-role-cancel>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar cargo'}</span></button></footer>
+      <footer><span><strong data-role-editor-count>${roleDraft.permissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-role-cancel>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar cargo'}</span></button></div></footer>
     </form>
   </dialog>` : ''}
   ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir cargo?</h2><p id="delete-role-description">O cargo <strong>${escapeHtml(deleting.name)}</strong> sera removido. A exclusao so sera permitida se nenhuma pessoa estiver usando este cargo.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir cargo</button></div></dialog>` : ''}
@@ -2203,13 +2199,27 @@ function bindPageEvents() {
   if (roleProfileForm) {
     roleProfileForm.elements.scope.addEventListener('change', () => {
       state.settings.roleDraft.scope = roleProfileForm.elements.scope.value;
-      state.settings.roleDraft.permissions = permissionsForScope(state.settings.roleDraft.scope);
+      state.settings.roleDraft.permissions = normalizeRolePermissions(state.settings.roleDraft.scope, state.settings.roleDraft.permissions);
       render();
       document.querySelector('#role-editor-dialog')?.showModal();
     });
     roleProfileForm.querySelectorAll('[name="permissions"]').forEach((input) => {
       input.addEventListener('change', () => {
-        state.settings.roleDraft.permissions = [...roleProfileForm.querySelectorAll('[name="permissions"]:checked')].map((item) => item.value);
+        const permissions = new Set([...roleProfileForm.querySelectorAll('[name="permissions"]:checked')].map((item) => item.value));
+        const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
+        if (input.checked && managementDependents.includes(input.value)) permissions.add('management.view');
+        if (!input.checked && input.value === 'management.view') managementDependents.forEach((permission) => permissions.delete(permission));
+        state.settings.roleDraft.permissions = [...permissions];
+
+        roleProfileForm.querySelectorAll('[name="permissions"]').forEach((permissionInput) => {
+          const active = permissions.has(permissionInput.value);
+          permissionInput.checked = active;
+          permissionInput.closest('.role-details-permission')?.classList.toggle('is-active', active);
+          const status = permissionInput.closest('.role-details-permission')?.querySelector('small');
+          if (status) status.textContent = active ? 'Ativada' : 'Desativada';
+        });
+        const count = roleProfileForm.querySelector('[data-role-editor-count]');
+        if (count) count.textContent = String(permissions.size);
       });
     });
     roleProfileForm.elements.name.addEventListener('input', () => {

@@ -2639,30 +2639,78 @@ svg {
 }
 
 .role-editor-dialog {
-  width: min(calc(100% - 32px), 780px);
+  width: min(calc(100% - 32px), 760px);
 }
 
-.role-editor-dialog .access-form {
-  max-height: min(90vh, 860px);
+.role-editor-dialog[open] {
+  display: block;
 }
 
-.role-editor-body {
-  grid-template-columns: 1fr;
+.role-editor-form {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(86vh, 820px);
 }
 
-.role-editor-basics,
-.role-editor-permission-groups {
+.role-editor-form > header,
+.role-editor-form > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.role-editor-form > header {
+  border-bottom: 1px solid var(--line);
+}
+
+.role-editor-form > header h2,
+.role-editor-form > header p {
+  margin: 0;
+}
+
+.role-editor-form > header h2 {
+  margin-top: 3px;
+  font-size: 1.15rem;
+}
+
+.role-editor-form > header p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.role-editor-content {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.role-editor-basics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
-.role-editor-permission-groups .role-permission-group {
-  margin-bottom: 0;
+.role-editor-permissions-body {
+  padding: 0;
+  overflow: visible;
 }
 
-.role-editor-permission-groups > .field-error {
+.role-editor-permissions-body > .field-error {
   grid-column: 1 / -1;
+}
+
+.role-editor-form > footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.78rem;
+}
+
+.role-editor-form > footer strong {
+  color: var(--ink);
 }
 
 .service-catalog-row {
@@ -2818,8 +2866,7 @@ svg {
     width: min(calc(100% - 20px), 780px);
   }
 
-  .role-editor-basics,
-  .role-editor-permission-groups {
+  .role-editor-basics {
     grid-template-columns: 1fr;
   }
 
@@ -4694,17 +4741,24 @@ svg {
     max-height: 92vh;
   }
 
+  .role-editor-form {
+    max-height: 92vh;
+  }
+
   .role-details-body {
     grid-template-columns: 1fr;
     padding: 16px;
   }
 
   .role-details-dialog > header,
-  .role-details-dialog > footer {
+  .role-details-dialog > footer,
+  .role-editor-form > header,
+  .role-editor-form > footer {
     padding: 15px 16px;
   }
 
-  .role-details-dialog > footer {
+  .role-details-dialog > footer,
+  .role-editor-form > footer {
     align-items: stretch;
     flex-direction: column;
   }
