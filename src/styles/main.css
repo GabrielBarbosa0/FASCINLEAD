@@ -2660,6 +2660,10 @@ svg {
   width: min(92vw, 600px);
 }
 
+.service-editor-dialog .access-form-body {
+  grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr);
+}
+
 .service-store-field {
   min-width: 0;
   margin: 0;
@@ -4785,6 +4789,10 @@ svg {
   .access-form-body {
     grid-template-columns: 1fr;
     padding: 16px;
+  }
+
+  .service-editor-dialog .access-form-body {
+    grid-template-columns: 1fr;
   }
 
   .access-field-wide {

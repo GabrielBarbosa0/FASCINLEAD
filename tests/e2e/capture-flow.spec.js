@@ -1001,6 +1001,17 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   await expect(page.getByText('Exame de vista')).toHaveCount(1);
   await page.getByRole('button', { name: 'Novo servico' }).click();
   const dialog = page.getByRole('dialog', { name: 'Novo servico' });
+  const serviceFieldsLayout = await dialog.evaluate((element) => {
+    const name = element.querySelector('.service-name-field').getBoundingClientRect();
+    const duration = element.querySelector('.service-duration-field').getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, nameTop: name.top, nameBottom: name.bottom, nameWidth: name.width, durationTop: duration.top, durationWidth: duration.width };
+  });
+  if (serviceFieldsLayout.viewportWidth > 760) {
+    expect(Math.abs(serviceFieldsLayout.nameTop - serviceFieldsLayout.durationTop)).toBeLessThanOrEqual(2);
+    expect(serviceFieldsLayout.nameWidth).toBeGreaterThan(serviceFieldsLayout.durationWidth);
+  } else {
+    expect(serviceFieldsLayout.durationTop).toBeGreaterThanOrEqual(serviceFieldsLayout.nameBottom);
+  }
   await dialog.getByLabel('Nome do servico').fill('Avaliacao especializada');
   await dialog.getByLabel('Duracao').fill('45');
   await expect(dialog.getByText('Loja 02', { exact: true })).toHaveCSS('color', 'rgb(20, 32, 51)');
