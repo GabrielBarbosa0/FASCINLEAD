@@ -1,6 +1,6 @@
 import { collection, deleteDoc, doc, getDocs, limit, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
-import { SYSTEM_ROLE_PROFILES, validateRoleProfile } from '../utils/role-profile.js';
+import { SYSTEM_ROLE_PROFILES, normalizeRolePermissions, systemRoleProfileForId, validateRoleProfile } from '../utils/role-profile.js';
 
 function assertAdmin(profile) {
   if (!isFirebaseConfigured || profile?.role !== 'admin') {
@@ -13,11 +13,85 @@ function assertAdmin(profile) {
 export async function loadRoleProfiles(profile) {
   assertAdmin(profile);
   const snapshot = await getDocs(collection(db, 'roleProfiles'));
-  const custom = snapshot.docs
-    .map((item) => ({ id: item.id, ...item.data(), system: false }))
+  const records = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  const systemIds = new Set(SYSTEM_ROLE_PROFILES.map((item) => item.id));
+  const overrides = new Map(records.filter((item) => systemIds.has(item.id)).map((item) => [item.id, item]));
+  const system = SYSTEM_ROLE_PROFILES.map((item) => {
+    const override = item.baseRole === 'admin' ? null : overrides.get(item.id);
+    if (!override) return { ...item, permissions: [...item.permissions] };
+    return {
+      ...item,
+      permissions: Array.isArray(override.permissions)
+        ? normalizeRolePermissions(item.scope, override.permissions)
+        : [...item.permissions],
+      customized: Array.isArray(override.permissions)
+    };
+  });
+  const custom = records
+    .filter((item) => !systemIds.has(item.id))
+    .map((item) => ({ ...item, system: false }))
     .filter((item) => item.active !== false)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  return [...SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] })), ...custom];
+  return [...system, ...custom];
+}
+
+async function persistSystemRolePermissions(profile, roleProfileId, permissions, reset = false) {
+  assertAdmin(profile);
+  const systemProfile = systemRoleProfileForId(roleProfileId);
+  if (!systemProfile || systemProfile.baseRole === 'admin') {
+    const error = new Error('O perfil Administrador permanece sempre com acesso completo.');
+    error.code = 'protected-role';
+    throw error;
+  }
+  const normalizedPermissions = normalizeRolePermissions(
+    systemProfile.scope,
+    reset ? systemProfile.permissions : permissions
+  );
+  const validation = {
+    isValid: true,
+    errors: {},
+    data: { ...systemProfile, permissions: normalizedPermissions }
+  };
+
+  const [accesses, users] = await Promise.all([
+    getDocs(query(collection(db, 'allowedEmails'), where('roleProfileId', '==', roleProfileId))),
+    getDocs(query(collection(db, 'users'), where('roleProfileId', '==', roleProfileId)))
+  ]);
+  const batch = writeBatch(db);
+  const profileRef = doc(db, 'roleProfiles', roleProfileId);
+  if (reset) {
+    batch.delete(profileRef);
+  } else {
+    batch.set(profileRef, {
+      permissions: validation.data.permissions,
+      system: true,
+      schemaVersion: 1,
+      updatedAt: serverTimestamp(),
+      updatedByUid: profile.uid
+    });
+  }
+  accesses.docs.forEach((item) => batch.update(item.ref, {
+    role: systemProfile.baseRole,
+    permissions: validation.data.permissions,
+    ...(systemProfile.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {}),
+    updatedAt: serverTimestamp(),
+    updatedBy: profile.uid
+  }));
+  users.docs.forEach((item) => batch.update(item.ref, {
+    role: systemProfile.baseRole,
+    permissions: validation.data.permissions,
+    ...(systemProfile.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {})
+  }));
+  await batch.commit();
+  return { ...validation, id: roleProfileId };
+}
+
+export function saveSystemRolePermissions(profile, roleProfileId, permissions) {
+  return persistSystemRolePermissions(profile, roleProfileId, permissions, false);
+}
+
+export function resetSystemRolePermissions(profile, roleProfileId) {
+  return persistSystemRolePermissions(profile, roleProfileId, [], true);
 }
 
 export async function saveRoleProfile(profile, values, existingId = '') {

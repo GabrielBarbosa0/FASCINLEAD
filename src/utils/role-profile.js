@@ -102,16 +102,21 @@ export function permissionsForScope(scope) {
     .map((permission) => permission.id);
 }
 
-export function validateRoleProfile(values) {
-  const name = String(values.name || '').trim();
-  const scope = String(values.scope || 'own');
+export function normalizeRolePermissions(scope, values = []) {
   const allowed = new Set(permissionsForScope(scope));
-  const requested = Array.isArray(values.permissions) ? values.permissions.map(String) : [];
+  const requested = Array.isArray(values) ? values.map(String) : [];
   const permissions = [...new Set(requested.filter((permission) => allowed.has(permission)))];
   const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
   if (permissions.some((permission) => managementDependents.includes(permission)) && allowed.has('management.view') && !permissions.includes('management.view')) {
     permissions.push('management.view');
   }
+  return permissions;
+}
+
+export function validateRoleProfile(values) {
+  const name = String(values.name || '').trim();
+  const scope = String(values.scope || 'own');
+  const permissions = normalizeRolePermissions(scope, values.permissions);
   const errors = {};
 
   if (name.length < 3 || name.length > 60) errors.name = 'Informe um nome entre 3 e 60 caracteres.';

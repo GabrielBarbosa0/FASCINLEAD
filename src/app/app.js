@@ -48,7 +48,7 @@ import { isFirebaseConfigured } from '../firebase/client.js';
 import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { deleteAccess, loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
-import { deleteRoleProfile, loadRoleProfiles, saveRoleProfile } from '../services/role-profile-service.js';
+import { deleteRoleProfile, loadRoleProfiles, resetSystemRolePermissions, saveRoleProfile, saveSystemRolePermissions } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
@@ -64,7 +64,7 @@ import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey,
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
-import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, permissionsForScope, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
+import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, normalizeRolePermissions, permissionsForScope, systemRoleProfileForId, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { duplicateGoalDraft } from '../utils/goal.js';
 import { defaultAppointmentService, servicesForStore, validateAppointmentService } from '../utils/service-catalog.js';
@@ -209,7 +209,8 @@ const state = {
     roleDraft: createDefaultRoleDraft(),
     editingRoleId: '',
     pendingDeleteRoleId: '',
-    detailsRoleId: ''
+    detailsRoleId: '',
+    detailsRolePermissions: []
   },
   access: {
     loading: false,
@@ -1463,7 +1464,7 @@ function scheduleSettingsView() {
 }
 
 function roleProfilesSettingsView() {
-  const { roleProfiles, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, saving } = state.settings;
+  const { roleProfiles, roleDraft, editingRoleId, pendingDeleteRoleId, detailsRoleId, detailsRolePermissions, saving } = state.settings;
   const compatiblePermissionIds = new Set(permissionsForScope(roleDraft.scope));
   const scopeOptions = ROLE_SCOPES.map((scope) => `<option value="${scope.id}" ${scope.id === roleDraft.scope ? 'selected' : ''}>${scope.label}</option>`).join('');
   const permissionGroups = PERMISSION_GROUPS
@@ -1483,20 +1484,26 @@ function roleProfilesSettingsView() {
     return `<article class="role-profile-card ${editingRoleId === profile.id ? 'is-editing' : ''}">
       <button class="role-profile-card-heading" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}">
         <span class="role-profile-heading-copy"><span class="role-profile-icon"><i data-lucide="shield-check"></i></span><span><strong>${escapeHtml(profile.name)}</strong><small>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</small></span></span>
-        <span class="role-profile-heading-meta"><span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? 'Padrao' : 'Personalizado'}</span><i data-lucide="chevron-right"></i></span>
+        <span class="role-profile-heading-meta"><span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrao ajustado' : 'Padrao' : 'Personalizado'}</span><i data-lucide="chevron-right"></i></span>
       </button>
       <p>${permissionLabels.length} permissao(oes) ativa(s)</p>
       <div class="role-profile-permissions" title="${escapeHtml(permissionLabels.join(', '))}">${permissionLabels.slice(0, 3).map((label) => `<span>${escapeHtml(label)}</span>`).join('')}${permissionLabels.length > 3 ? `<span>+${permissionLabels.length - 3}</span>` : ''}</div>
       <div class="role-profile-actions">
-        ${profile.system ? '<small>Perfil protegido do sistema</small>' : `<button class="button button-secondary" type="button" data-role-edit="${escapeHtml(profile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i><span>Editar</span></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir perfil" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
+        ${profile.system ? `<small>${profile.baseRole === 'admin' ? 'Permissoes sempre ativas' : 'Permissoes ajustaveis'}</small>` : `<button class="button button-secondary" type="button" data-role-edit="${escapeHtml(profile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i><span>Editar</span></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir perfil" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
       </div>
     </article>`;
   }).join('');
   const deleting = roleProfiles.find((profile) => profile.id === pendingDeleteRoleId);
   const detailsProfile = roleProfiles.find((profile) => profile.id === detailsRoleId);
+  const detailsEditable = detailsProfile?.system && detailsProfile.baseRole !== 'admin';
+  const activeDetailPermissions = detailsProfile && detailsRoleId === detailsProfile.id
+    ? detailsRolePermissions
+    : detailsProfile?.permissions || [];
+  const compatibleDetailPermissions = new Set(detailsProfile ? permissionsForScope(detailsProfile.scope) : []);
   const detailGroups = detailsProfile ? PERMISSION_GROUPS.map((group) => `<fieldset class="role-details-group"><legend>${escapeHtml(group.label)}</legend>${group.permissions.map((permission) => {
-    const active = detailsProfile.permissions.includes(permission.id);
-    return `<div class="role-details-permission ${active ? 'is-active' : ''}"><span><strong>${escapeHtml(permission.label)}</strong><small>${active ? 'Ativada' : 'Desativada'}</small></span><span class="setting-toggle-control" aria-hidden="true"></span></div>`;
+    const active = activeDetailPermissions.includes(permission.id);
+    const canToggle = detailsEditable && compatibleDetailPermissions.has(permission.id);
+    return `<label class="role-details-permission ${active ? 'is-active' : ''} ${canToggle ? 'is-editable' : 'is-locked'}"><span><strong>${escapeHtml(permission.label)}</strong><small>${active ? 'Ativada' : 'Desativada'}</small></span><input type="checkbox" value="${escapeHtml(permission.id)}" data-system-role-permission ${active ? 'checked' : ''} ${canToggle && !saving ? '' : 'disabled'} /><span class="setting-toggle-control" aria-hidden="true"></span></label>`;
   }).join('')}</fieldset>`) : [];
   const detailGroupsLayout = detailsProfile
     ? `<div class="role-details-column">${detailGroups[0]}${detailGroups[2]}</div><div class="role-details-column">${detailGroups[1]}</div>`
@@ -1523,7 +1530,7 @@ function roleProfilesSettingsView() {
   ${detailsProfile ? `<dialog id="role-details-dialog" class="role-details-dialog" aria-labelledby="role-details-title">
     <header><div><span class="eyebrow">PERFIL DE ACESSO</span><h2 id="role-details-title">${escapeHtml(detailsProfile.name)}</h2><p>${detailsProfile.scope === 'admin' ? 'Acesso completo ao sistema' : detailsProfile.scope === 'stores' ? 'Acesso limitado as unidades permitidas' : 'Acesso aos proprios dados'}</p></div><button class="icon-button" type="button" data-role-details-close title="Fechar" aria-label="Fechar permissoes"><i data-lucide="circle-x"></i></button></header>
     <div class="role-details-body">${detailGroupsLayout}</div>
-    <footer><span><strong>${detailsProfile.permissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><button class="button button-primary" type="button" data-role-details-close>Concluir</button></footer>
+    <footer><span><strong data-role-details-count>${activeDetailPermissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><div class="role-details-actions">${detailsEditable ? `<button class="button button-secondary" type="button" data-system-role-reset="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Restaurar padrao</span></button><button class="button button-secondary" type="button" data-role-details-close>Cancelar</button><button class="button button-primary" type="button" data-system-role-save="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar permissoes'}</span></button>` : '<button class="button button-primary" type="button" data-role-details-close>Concluir</button>'}</div></footer>
   </dialog>` : ''}`;
 }
 
@@ -2247,10 +2254,40 @@ function bindPageEvents() {
   }
 
   const roleDetailsDialog = document.querySelector('#role-details-dialog');
+  roleDetailsDialog?.querySelectorAll('[data-system-role-permission]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const permissions = new Set(state.settings.detailsRolePermissions);
+      if (input.checked) permissions.add(input.value);
+      else permissions.delete(input.value);
+
+      const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
+      if (input.checked && managementDependents.includes(input.value)) permissions.add('management.view');
+      if (!input.checked && input.value === 'management.view') managementDependents.forEach((permission) => permissions.delete(permission));
+      state.settings.detailsRolePermissions = [...permissions];
+
+      roleDetailsDialog.querySelectorAll('[data-system-role-permission]').forEach((permissionInput) => {
+        const active = permissions.has(permissionInput.value);
+        permissionInput.checked = active;
+        permissionInput.closest('.role-details-permission')?.classList.toggle('is-active', active);
+        const status = permissionInput.closest('.role-details-permission')?.querySelector('small');
+        if (status) status.textContent = active ? 'Ativada' : 'Desativada';
+      });
+      const count = roleDetailsDialog.querySelector('[data-role-details-count]');
+      if (count) count.textContent = String(permissions.size);
+    });
+  });
   roleDetailsDialog?.addEventListener('click', (event) => {
     if (event.target !== roleDetailsDialog) return;
     roleDetailsDialog.close();
     state.settings.detailsRoleId = '';
+    state.settings.detailsRolePermissions = [];
+    render();
+  });
+  roleDetailsDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    roleDetailsDialog.close();
+    state.settings.detailsRoleId = '';
+    state.settings.detailsRolePermissions = [];
     render();
   });
 
@@ -3128,7 +3165,8 @@ async function handleAction(action) {
       roleDraft: createDefaultRoleDraft(),
       editingRoleId: '',
       pendingDeleteRoleId: '',
-      detailsRoleId: ''
+      detailsRoleId: '',
+      detailsRolePermissions: []
     };
     state.access = {
       loading: false,
@@ -3302,13 +3340,83 @@ export async function startApp() {
     const roleDetailsButton = event.target.closest('[data-role-details]');
     if (roleDetailsButton) {
       state.settings.detailsRoleId = roleDetailsButton.dataset.roleDetails;
+      const profile = state.settings.roleProfiles.find((item) => item.id === state.settings.detailsRoleId);
+      state.settings.detailsRolePermissions = [...(profile?.permissions || [])];
       render();
       document.querySelector('#role-details-dialog')?.showModal();
+    }
+    const saveSystemRoleButton = event.target.closest('[data-system-role-save]');
+    if (saveSystemRoleButton && !saveSystemRoleButton.disabled) {
+      const roleProfileId = saveSystemRoleButton.dataset.systemRoleSave;
+      const profile = state.settings.roleProfiles.find((item) => item.id === roleProfileId);
+      if (!profile || profile.baseRole === 'admin') return;
+      state.settings.saving = true;
+      saveSystemRoleButton.disabled = true;
+      try {
+        if (state.demoMode) {
+          const permissions = normalizeRolePermissions(profile.scope, state.settings.detailsRolePermissions);
+          state.settings.roleProfiles = state.settings.roleProfiles.map((item) => item.id === roleProfileId
+            ? { ...item, permissions, customized: true }
+            : item);
+          state.settings.saving = false;
+        } else {
+          const result = await saveSystemRolePermissions(state.profile, roleProfileId, state.settings.detailsRolePermissions);
+          if (!result.isValid) {
+            state.settings.saving = false;
+            showToast(result.errors.permissions || 'Escolha permissoes validas.', 'danger', 'circle-alert');
+            render();
+            return;
+          }
+        }
+        state.settings.detailsRoleId = '';
+        state.settings.detailsRolePermissions = [];
+        if (!state.demoMode) await loadRoleProfilesData();
+        else render();
+        showToast('Permissoes do perfil atualizadas.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode alterar estas permissoes.'
+          : error?.message || 'Nao foi possivel salvar as permissoes.';
+        render();
+      }
+      return;
+    }
+    const resetSystemRoleButton = event.target.closest('[data-system-role-reset]');
+    if (resetSystemRoleButton && !resetSystemRoleButton.disabled) {
+      const roleProfileId = resetSystemRoleButton.dataset.systemRoleReset;
+      const defaultProfile = systemRoleProfileForId(roleProfileId);
+      if (!defaultProfile || defaultProfile.baseRole === 'admin') return;
+      state.settings.saving = true;
+      resetSystemRoleButton.disabled = true;
+      try {
+        if (state.demoMode) {
+          state.settings.roleProfiles = state.settings.roleProfiles.map((item) => item.id === roleProfileId
+            ? { ...item, permissions: [...defaultProfile.permissions], customized: false }
+            : item);
+          state.settings.saving = false;
+        } else {
+          await resetSystemRolePermissions(state.profile, roleProfileId);
+        }
+        state.settings.detailsRoleId = '';
+        state.settings.detailsRolePermissions = [];
+        if (!state.demoMode) await loadRoleProfilesData();
+        else render();
+        showToast('Permissoes restauradas para o padrao.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode restaurar estas permissoes.'
+          : error?.message || 'Nao foi possivel restaurar o perfil.';
+        render();
+      }
+      return;
     }
     const closeRoleDetailsButton = event.target.closest('[data-role-details-close]');
     if (closeRoleDetailsButton) {
       document.querySelector('#role-details-dialog')?.close();
       state.settings.detailsRoleId = '';
+      state.settings.detailsRolePermissions = [];
       render();
     }
     if (event.target.closest('[data-role-cancel]')) {

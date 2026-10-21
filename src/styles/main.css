@@ -2292,6 +2292,7 @@ svg {
 }
 
 .role-details-permission {
+  position: relative;
   min-height: 54px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px;
@@ -2301,6 +2302,31 @@ svg {
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface-subtle);
+}
+
+.role-details-permission.is-editable {
+  cursor: pointer;
+}
+
+.role-details-permission.is-editable:hover {
+  border-color: var(--brand);
+}
+
+.role-details-permission > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.role-details-permission > input:disabled {
+  cursor: not-allowed;
+}
+
+.role-details-permission.is-locked .setting-toggle-control {
+  cursor: not-allowed;
 }
 
 .role-details-permission strong,
@@ -2339,6 +2365,13 @@ svg {
 
 .role-details-dialog > footer strong {
   color: var(--ink);
+}
+
+.role-details-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .settings-form,
@@ -4588,6 +4621,20 @@ svg {
   .role-details-dialog > header,
   .role-details-dialog > footer {
     padding: 15px 16px;
+  }
+
+  .role-details-dialog > footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-details-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .role-details-actions [data-system-role-reset] {
+    grid-column: 1 / -1;
   }
 
   .settings-toolbar {

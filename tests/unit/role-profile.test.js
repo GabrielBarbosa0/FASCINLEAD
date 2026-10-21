@@ -3,6 +3,7 @@ import {
   ALL_PERMISSION_IDS,
   SYSTEM_ROLE_PROFILES,
   hasPermission,
+  normalizeRolePermissions,
   systemRoleProfileForId,
   validateRoleProfile
 } from '../../src/utils/role-profile.js';
@@ -58,6 +59,12 @@ describe('role profiles', () => {
 
     expect(result.isValid).toBe(true);
     expect(result.data.permissions).toEqual(['reports.view', 'management.view']);
+  });
+
+  it('normalizes editable system permissions and permits an empty selection', () => {
+    expect(normalizeRolePermissions('stores', [])).toEqual([]);
+    expect(normalizeRolePermissions('stores', ['reports.view'])).toEqual(['reports.view', 'management.view']);
+    expect(normalizeRolePermissions('own', ['leads.create', 'reports.view'])).toEqual(['leads.create']);
   });
 
   it('requires a name and at least one permission', () => {
