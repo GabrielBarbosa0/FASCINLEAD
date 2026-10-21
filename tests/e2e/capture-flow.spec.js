@@ -416,7 +416,9 @@ test('keeps a long appointment list inside the calendar height', async ({ page }
 });
 
 test('keeps new registration beside the management return action', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.setViewportSize(testInfo.project.name === 'desktop-chrome'
+    ? { width: 1024, height: 720 }
+    : { width: 390, height: 844 });
   const now = new Date();
   const appointmentDate = now.toISOString().slice(0, 10);
   await page.evaluate(({ date }) => {
@@ -451,6 +453,28 @@ test('keeps new registration beside the management return action', async ({ page
   const dialog = page.getByRole('dialog', { name: 'Novo agendamento' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Salvar cadastro' })).toBeVisible();
+  await expect(dialog.getByText('Informacoes adicionais')).toHaveCount(0);
+  await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
+  await expect(dialog.getByLabel('Sexo')).toBeVisible();
+  const identityLayout = await dialog.evaluate((element) => {
+    const cpf = element.querySelector('[data-field="customerCpf"]').getBoundingClientRect();
+    const birthDate = element.querySelector('[data-field="birthDate"]').getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      cpfTop: cpf.top,
+      cpfBottom: cpf.bottom,
+      cpfRight: cpf.right,
+      birthTop: birthDate.top,
+      birthLeft: birthDate.left
+    };
+  });
+  if (identityLayout.viewportWidth > 640) {
+    expect(Math.abs(identityLayout.cpfTop - identityLayout.birthTop)).toBeLessThanOrEqual(2);
+    expect(identityLayout.birthLeft).toBeGreaterThanOrEqual(identityLayout.cpfRight);
+  } else {
+    expect(identityLayout.birthTop).toBeGreaterThanOrEqual(identityLayout.cpfBottom);
+  }
   const modalLayout = await dialog.evaluate((element) => {
     const dialogRect = element.getBoundingClientRect();
     const actionsRect = element.querySelector('.appointment-create-actions').getBoundingClientRect();
@@ -472,6 +496,8 @@ test('keeps new registration beside the management return action', async ({ page
   expect(modalLayout.contentOverflowY).toBe('auto');
   expect(modalLayout.contentScrollHeight).toBeGreaterThan(modalLayout.contentClientHeight);
   await dialog.screenshot({ path: testInfo.outputPath('appointment-create-dialog.png') });
+  await dialog.getByLabel('CPF', { exact: true }).scrollIntoViewIfNeeded();
+  await dialog.screenshot({ path: testInfo.outputPath('appointment-create-identity.png') });
 });
 
 test('alerts the captor about a missed appointment and prepares WhatsApp follow-up', async ({ page }, testInfo) => {

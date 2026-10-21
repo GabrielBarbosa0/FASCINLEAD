@@ -1276,19 +1276,18 @@ function appointmentCreateDialog(allowedStores) {
         ${appointmentCreateTimeField()}
         <div class="field appointment-create-wide" data-field="fullName"><label for="agenda-lead-name">Nome <span aria-hidden="true">*</span></label><input id="agenda-lead-name" name="fullName" maxlength="120" autocomplete="name" required /><small class="field-error"></small></div>
         <div class="field appointment-create-wide" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" required /><small class="field-error"></small></div>
-        <div class="field appointment-create-wide" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" /><small class="field-error"></small></div>
+        <div class="field-row identity-fields appointment-create-wide">
+          <div class="field" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" /><small class="field-error"></small></div>
+          <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" /><small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small><small class="field-error"></small></div>
+          <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions()}</select><small class="field-error"></small></div>
+        </div>
+        <div class="field appointment-create-wide"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" /></div>
+        <div class="field-row address-fields appointment-create-wide"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
         <div class="field appointment-create-wide"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
+        ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field appointment-create-wide"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>` : ''}
+        <fieldset class="field ametropia-field appointment-create-wide"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
+        <div class="field appointment-create-wide" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha"></textarea><small class="field-hint"><span id="agenda-notes-count">0</span>/500</small><small class="field-error"></small></div>
       </div>
-      <details class="appointment-create-more">
-        <summary>Informacoes adicionais</summary>
-        <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" /></div>
-        <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" /><small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small><small class="field-error"></small></div>
-        <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions()}</select><small class="field-error"></small></div>
-        <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
-        ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>` : ''}
-        <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
-        <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3"></textarea><small class="field-error"></small></div>
-      </details>
       </div>
       <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-close-appointment-create>Cancelar</button><button class="button button-primary" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar cadastro'}</span></button></div>
     </form>
@@ -1987,7 +1986,9 @@ function bindPageEvents() {
   const appointmentCreateForm = document.querySelector('#appointment-create-form');
   if (appointmentCreateForm) {
     const phoneInput = appointmentCreateForm.elements.phone;
+    const notesInput = appointmentCreateForm.elements.notes;
     phoneInput?.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
+    notesInput?.addEventListener('input', () => { document.querySelector('#agenda-notes-count').textContent = notesInput.value.length; });
     bindCpfInput(appointmentCreateForm);
     bindBirthDateInput(appointmentCreateForm);
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');

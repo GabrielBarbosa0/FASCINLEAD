@@ -3457,19 +3457,6 @@ svg {
   grid-column: 1 / -1;
 }
 
-.appointment-create-more {
-  margin-top: 2px;
-  border-top: 1px solid var(--line);
-}
-
-.appointment-create-more summary {
-  padding: 16px 0;
-  color: var(--brand);
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 .appointment-create-actions {
   flex: 0 0 auto;
   display: flex;
