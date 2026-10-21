@@ -58,7 +58,7 @@ import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwi
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { AMETROPIAS, INTERESTS, PATHOLOGIES } from '../utils/lead.js';
+import { AMETROPIAS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge } from '../utils/lead.js';
 import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
@@ -609,6 +609,10 @@ function pathologyOptions(selectedIds = []) {
   </label>`).join('');
 }
 
+function sexOptions(selectedId = '') {
+  return SEX_OPTIONS.map((item) => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.label}</option>`).join('');
+}
+
 function leadFormValues(form) {
   const formData = new FormData(form);
   return {
@@ -633,6 +637,20 @@ function bindExclusiveOptions(form, fieldName) {
 function bindCpfInput(form) {
   const input = form.elements.customerCpf || form.elements.cpf;
   input?.addEventListener('input', () => { input.value = formatBrazilianCpf(input.value); });
+}
+
+function birthAgeText(value) {
+  const age = calculateAge(value);
+  return age === null ? 'A idade sera calculada automaticamente.' : `${age} ano${age === 1 ? '' : 's'}`;
+}
+
+function bindBirthDateInput(form) {
+  const input = form.elements.birthDate;
+  const output = form.querySelector('[data-birth-age]');
+  if (!input || !output) return;
+  const refresh = () => { output.textContent = birthAgeText(input.value); };
+  input.addEventListener('input', refresh);
+  refresh();
 }
 
 function newLeadView() {
@@ -660,18 +678,33 @@ function newLeadView() {
         <input id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" placeholder="(00) 00000-0000" required />
         <small class="field-error"></small>
       </div>
-      <div class="field" data-field="customerCpf">
-        <label for="customerCpf">CPF</label>
-        <input id="customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" />
-        <small class="field-error"></small>
+      <div class="field-row identity-fields">
+        <div class="field" data-field="customerCpf">
+          <label for="customerCpf">CPF</label>
+          <input id="customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" />
+          <small class="field-error"></small>
+        </div>
+        <div class="field" data-field="birthDate">
+          <label for="birthDate">Data de nascimento</label>
+          <input id="birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" />
+          <small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small>
+          <small class="field-error"></small>
+        </div>
+        <div class="field" data-field="sex">
+          <label for="sex">Sexo</label>
+          <select id="sex" name="sex">${sexOptions()}</select>
+          <small class="field-error"></small>
+        </div>
       </div>
       <div class="field">
         <label for="preferredName">Como prefere ser chamado</label>
         <input id="preferredName" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" />
       </div>
-      <div class="field-row">
-        <div class="field"><label for="neighborhood">Bairro</label><input id="neighborhood" name="neighborhood" maxlength="80" /></div>
-        <div class="field"><label for="city">Cidade</label><input id="city" name="city" maxlength="80" /></div>
+      <div class="field-row address-fields">
+        <div class="field address-street" data-field="street"><label for="street">Rua</label><input id="street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div>
+        <div class="field address-number" data-field="streetNumber"><label for="streetNumber">Numero</label><input id="streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div>
+        <div class="field address-neighborhood"><label for="neighborhood">Bairro</label><input id="neighborhood" name="neighborhood" maxlength="80" /></div>
+        <div class="field address-city"><label for="city">Cidade</label><input id="city" name="city" maxlength="80" /></div>
         <div class="field field-state"><label for="state">UF</label><input id="state" name="state" maxlength="2" value="PE" /></div>
       </div>
       <div class="field">
@@ -683,11 +716,11 @@ function newLeadView() {
         <select id="appointmentServiceId" name="appointmentServiceId">${serviceOptions}</select>
         <small class="field-error"></small>
       </div>
-      <fieldset class="field ametropia-field">
+      ${state.newLeadSchedule.settings.showAmetropiaFields ? `<fieldset class="field ametropia-field">
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions()}</div>
-      </fieldset>
+      </fieldset>` : ''}
       <fieldset class="field ametropia-field">
         <legend>Patologias e condicoes de saude</legend>
         <small>Marque todas que se aplicam.</small>
@@ -848,11 +881,13 @@ function leadDetailView() {
       ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required ${locked} /><small class="field-error"></small></div>
       <div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required ${locked} /><small class="field-error"></small></div>
-      <div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" ${locked} /><small class="field-error"></small></div>
+      <div class="field-row identity-fields"><div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" ${locked} /><small class="field-error"></small></div><div class="field" data-field="birthDate"><label for="edit-birthDate">Data de nascimento</label><input id="edit-birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" value="${escapeHtml(lead.birthDate)}" ${locked} /><small class="birth-age-hint" data-birth-age>${escapeHtml(birthAgeText(lead.birthDate))}</small><small class="field-error"></small></div><div class="field" data-field="sex"><label for="edit-sex">Sexo</label><select id="edit-sex" name="sex" ${locked}>${sexOptions(lead.sex)}</select><small class="field-error"></small></div></div>
       <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" ${locked} /></div>
-      <div class="field-row">
-        <div class="field"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" ${locked} /></div>
-        <div class="field"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
+      <div class="field-row address-fields">
+        <div class="field address-street" data-field="street"><label for="edit-street">Rua</label><input id="edit-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(lead.street)}" ${locked} /><small class="field-error"></small></div>
+        <div class="field address-number" data-field="streetNumber"><label for="edit-streetNumber">Numero</label><input id="edit-streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" value="${escapeHtml(lead.streetNumber)}" placeholder="S/N" ${locked} /><small class="field-error"></small></div>
+        <div class="field address-neighborhood"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" ${locked} /></div>
+        <div class="field address-city"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
       </div>
       <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
@@ -1246,8 +1281,10 @@ function appointmentCreateDialog(allowedStores) {
       <details class="appointment-create-more">
         <summary>Informacoes adicionais</summary>
         <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" /></div>
-        <div class="field-row"><div class="field"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
-        <fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>
+        <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" /><small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small><small class="field-error"></small></div>
+        <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions()}</select><small class="field-error"></small></div>
+        <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="PE" /></div></div>
+        ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions()}</div></fieldset>` : ''}
         <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions()}</div></fieldset>
         <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3"></textarea><small class="field-error"></small></div>
       </details>
@@ -1343,13 +1380,19 @@ function scheduleSettingsView() {
           <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
           <span class="setting-toggle-control" aria-hidden="true"></span>
         </label>
+        <input name="showAmetropiaFields" type="hidden" value="false" />
+        <label class="setting-toggle checkbox-label" for="settings-show-ametropias">
+          <span><strong>Exibir ametropias no cadastro</strong><small>Mostra estas opcoes nos novos cadastros e agendamentos.</small></span>
+          <input id="settings-show-ametropias" name="showAmetropiaFields" type="checkbox" value="true" ${selected.showAmetropiaFields ? 'checked' : ''} />
+          <span class="setting-toggle-control" aria-hidden="true"></span>
+        </label>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
       <aside class="schedule-preview">
         <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
         ${selected.schedulingMode === 'free'
           ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
-          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div></div>
+          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div><div><span>Ametropias no cadastro</span><strong>${selected.showAmetropiaFields ? 'Ativas' : 'Desativadas'}</strong></div></div>
             <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
       </aside>
     </section>`;
@@ -1714,6 +1757,7 @@ function bindPageEvents() {
     const notesInput = form.elements.notes;
     const appointmentDateInput = form.elements.appointmentDate;
     bindCpfInput(form);
+    bindBirthDateInput(form);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#notes-count').textContent = notesInput.value.length; });
     form.elements.appointmentServiceId?.addEventListener('change', () => {
@@ -1779,6 +1823,7 @@ function bindPageEvents() {
     const phoneInput = editLeadForm.elements.phone;
     const notesInput = editLeadForm.elements.notes;
     bindCpfInput(editLeadForm);
+    bindBirthDateInput(editLeadForm);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
     bindExclusiveOptions(editLeadForm, 'ametropiaIds');
@@ -1943,6 +1988,7 @@ function bindPageEvents() {
     const phoneInput = appointmentCreateForm.elements.phone;
     phoneInput?.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     bindCpfInput(appointmentCreateForm);
+    bindBirthDateInput(appointmentCreateForm);
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
     appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {
@@ -2215,11 +2261,17 @@ function bindPageEvents() {
       if (record) record.automaticPendingFollowUp = event.target.checked;
       render();
     });
+    document.querySelector('#settings-show-ametropias')?.addEventListener('change', (event) => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (record) record.showAmetropiaFields = event.target.checked;
+      render();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
       const values = Object.fromEntries(new FormData(scheduleSettingsForm));
       values.automaticPendingFollowUp = values.automaticPendingFollowUp === 'true';
+      values.showAmetropiaFields = values.showAmetropiaFields === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       if (values.schedulingMode === 'free') {
@@ -2235,7 +2287,8 @@ function bindPageEvents() {
           Object.assign(record, values, {
             appointmentDurationMinutes: Number(values.appointmentDurationMinutes),
             noShowGraceMinutes: Number(values.noShowGraceMinutes),
-            automaticPendingFollowUp: values.automaticPendingFollowUp
+            automaticPendingFollowUp: values.automaticPendingFollowUp,
+            showAmetropiaFields: values.showAmetropiaFields
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };

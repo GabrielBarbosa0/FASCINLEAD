@@ -22,16 +22,25 @@ describe('FascinLead integration API contract', () => {
     const lead = {
       fullName: 'Cliente Exemplo',
       phone: '+5581999991234',
+      street: 'Rua das Flores',
+      streetNumber: 'S/N',
+      birthDate: '1985-04-12',
+      sex: 'female',
       customerCpf: '52998224725',
       ametropiaLabels: ['Miopia'],
       pathologyLabels: ['Glaucoma'],
       updatedAtServer: new Date('2026-10-19T12:00:00.000Z')
     };
 
+    expect(publicLead('lead-1', lead)).toMatchObject({ street: 'Rua das Flores', streetNumber: 'S/N' });
     expect(publicLead('lead-1', lead)).not.toHaveProperty('customerCpf');
+    expect(publicLead('lead-1', lead)).not.toHaveProperty('birthDate');
+    expect(publicLead('lead-1', lead)).not.toHaveProperty('sex');
     expect(publicLead('lead-1', lead)).not.toHaveProperty('health');
     expect(publicLead('lead-1', lead, { includeSensitive: true })).toMatchObject({
       customerCpf: '52998224725',
+      birthDate: '1985-04-12',
+      sex: 'female',
       health: { ametropias: ['Miopia'], conditions: ['Glaucoma'] }
     });
   });

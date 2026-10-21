@@ -1,5 +1,6 @@
 import { formatBrazilianPhone } from './phone.js';
 import { STORES } from './stores.js';
+import { calculateAge } from './lead.js';
 
 function datePart(value) {
   if (!value) return '';
@@ -35,11 +36,18 @@ function attendanceLabel(attendance) {
   return { attended: 'Sim', missed: 'Nao', pending: 'Aguardando' }[attendance] || 'Aguardando';
 }
 
+function sexLabel(sex) {
+  return { female: 'Feminino', male: 'Masculino' }[sex] || 'Nao informado';
+}
+
 const CSV_COLUMNS = [
   ['ID do lead', (lead) => lead.id],
   ['Nome do cliente', (lead) => lead.fullName],
   ['Nome preferido', (lead) => lead.preferredName],
   ['Telefone', (lead) => formatBrazilianPhone(lead.phoneSearch || lead.phone)],
+  ['Data de nascimento', (lead) => inputDatePart(lead.birthDate)],
+  ['Idade atual', (lead) => calculateAge(lead.birthDate) ?? ''],
+  ['Sexo', (lead) => sexLabel(lead.sex)],
   ['Captador responsavel', (lead) => lead.capturedByName],
   ['ID do captador', (lead) => lead.capturedByUid],
   ['Unidade / loja', (lead) => storeName(lead.storeId)],
@@ -51,6 +59,8 @@ const CSV_COLUMNS = [
   ['Interesse principal', (lead) => lead.interestLabel],
   ['Ametropias', (lead) => Array.isArray(lead.ametropiaLabels) ? lead.ametropiaLabels.join(', ') : ''],
   ['Patologias e condicoes de saude', (lead) => Array.isArray(lead.pathologyLabels) ? lead.pathologyLabels.join(', ') : ''],
+  ['Rua', (lead) => lead.street],
+  ['Numero', (lead) => lead.streetNumber],
   ['Bairro', (lead) => lead.neighborhood],
   ['Cidade', (lead) => lead.city],
   ['UF', (lead) => lead.state],

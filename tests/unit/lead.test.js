@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createLeadDocument, createLeadUpdate, validateLeadInput } from '../../src/utils/lead.js';
+import { calculateAge, createLeadDocument, createLeadUpdate, validateLeadInput } from '../../src/utils/lead.js';
 
 const validInput = {
   fullName: 'Cliente Exemplo',
   phone: '(81) 99999-1234',
   customerCpf: '529.982.247-25',
+  birthDate: '1985-04-12',
+  sex: 'female',
   preferredName: '',
+  street: 'Rua das Flores',
+  streetNumber: 'SN',
   neighborhood: '',
   city: '',
   state: 'PE',
@@ -49,6 +53,19 @@ describe('lead validation', () => {
     expect(result.errors.customerCpf).toBeDefined();
   });
 
+  it('calculates age and rejects a future birth date', () => {
+    expect(calculateAge('2000-11-10', new Date(2026, 9, 21))).toBe(25);
+    expect(calculateAge('2000-10-10', new Date(2026, 9, 21))).toBe(26);
+    expect(validateLeadInput({ ...validInput, birthDate: '2999-01-01' }).errors.birthDate).toBeDefined();
+    expect(validateLeadInput({ ...validInput, birthDate: '' }).isValid).toBe(true);
+  });
+
+  it('accepts known sex options and rejects unknown values', () => {
+    expect(validateLeadInput({ ...validInput, sex: 'male' }).isValid).toBe(true);
+    expect(validateLeadInput({ ...validInput, sex: '' }).isValid).toBe(true);
+    expect(validateLeadInput({ ...validInput, sex: 'invalid' }).errors.sex).toBeDefined();
+  });
+
   it('requires date and time together for a pre-appointment', () => {
     const result = validateLeadInput({
       ...validInput,
@@ -70,6 +87,10 @@ describe('lead validation', () => {
       phone: '+5581999991234',
       phoneSearch: '81999991234',
       customerCpf: '52998224725',
+      birthDate: '1985-04-12',
+      sex: 'female',
+      street: 'Rua das Flores',
+      streetNumber: 'S/N',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
       appointmentAttendance: 'pending',
@@ -101,6 +122,10 @@ describe('lead validation', () => {
     expect(result.isValid).toBe(true);
     expect(result.data).toMatchObject({
       fullName: 'Cliente Corrigido',
+      birthDate: '1985-04-12',
+      sex: 'female',
+      street: 'Rua das Flores',
+      streetNumber: 'S/N',
       city: 'Recife',
       phone: '+5581999991234'
     });

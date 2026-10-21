@@ -117,7 +117,19 @@ components:
         customerCpf:
           type: string
           description: Presente apenas quando campos sensiveis estao habilitados e solicitados.
+        birthDate:
+          type: string
+          format: date
+          description: Presente apenas quando campos sensiveis estao habilitados e solicitados.
+        sex:
+          type: string
+          enum: [female, male, '']
+          description: Presente apenas quando campos sensiveis estao habilitados e solicitados.
         storeId: { type: string }
+        street: { type: string }
+        streetNumber:
+          type: string
+          description: Numero do endereco ou S/N quando o imovel nao possuir numeracao.
         neighborhood: { type: string }
         city: { type: string }
         state: { type: string }

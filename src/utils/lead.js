@@ -34,6 +34,12 @@ export const PATHOLOGIES = [
   { id: 'unknown', label: 'Nao sabe informar' }
 ];
 
+export const SEX_OPTIONS = [
+  { id: '', label: 'Nao informado' },
+  { id: 'female', label: 'Feminino' },
+  { id: 'male', label: 'Masculino' }
+];
+
 function normalizeAmetropias(values) {
   const requested = Array.isArray(values) ? values : [values].filter(Boolean);
   const validIds = new Set(AMETROPIAS.map((item) => item.id));
@@ -68,16 +74,49 @@ function pathologyData(input) {
   };
 }
 
+function normalizeStreetNumber(value) {
+  const number = String(value || '').trim();
+  return /^s\/?n$/i.test(number) ? 'S/N' : number;
+}
+
+function parseBirthDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return null;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return { year, month, day };
+}
+
+export function calculateAge(birthDate, referenceDate = new Date()) {
+  const birth = parseBirthDate(birthDate);
+  if (!birth || Number.isNaN(referenceDate.getTime())) return null;
+  let age = referenceDate.getFullYear() - birth.year;
+  const beforeBirthday = referenceDate.getMonth() + 1 < birth.month
+    || (referenceDate.getMonth() + 1 === birth.month && referenceDate.getDate() < birth.day);
+  if (beforeBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
 export function validateLeadInput(input) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
   const phone = normalizeBrazilianPhone(input.phone);
   const customerCpf = normalizeCpf(input.customerCpf);
+  const birthDate = String(input.birthDate || '').trim();
+  const sex = String(input.sex || '').trim();
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
   if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF valido.';
+  if (birthDate && calculateAge(birthDate) === null) errors.birthDate = 'Informe uma data de nascimento valida.';
+  if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opcao valida.';
+  if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no maximo 120 caracteres.';
+  if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no maximo 12 caracteres.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no maximo 500 caracteres.';
 
   const appointmentDate = input.appointmentDate?.trim() || '';
@@ -96,7 +135,7 @@ export function validateLeadInput(input) {
     errors.appointmentServiceId = 'Selecione um servico valido.';
   }
 
-  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf };
+  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, birthDate, sex };
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
@@ -114,6 +153,10 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
       customerCpf: validation.customerCpf,
+      birthDate: validation.birthDate,
+      sex: validation.sex,
+      street: input.street?.trim() || '',
+      streetNumber: normalizeStreetNumber(input.streetNumber),
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
@@ -159,6 +202,10 @@ export function createLeadUpdate(input) {
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
       customerCpf: validation.customerCpf,
+      birthDate: validation.birthDate,
+      sex: validation.sex,
+      street: input.street?.trim() || '',
+      streetNumber: normalizeStreetNumber(input.streetNumber),
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),

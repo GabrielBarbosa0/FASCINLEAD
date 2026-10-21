@@ -25,9 +25,13 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('CPF', { exact: true }).fill('52998224725');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
+  await page.getByLabel('Data de nascimento').fill('1985-04-12');
+  await expect(page.locator('[data-birth-age]')).toHaveText(/\d+ anos/);
+  await page.getByLabel('Sexo').selectOption('female');
+  await page.getByLabel('Rua', { exact: true }).fill('Rua das Flores');
+  await page.getByLabel('Numero', { exact: true }).fill('SN');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
-  await page.getByLabel('Miopia').check();
-  await page.getByLabel('Astigmatismo').check();
+  await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   await page.getByLabel('Glaucoma').check();
   await page.getByLabel('Diabetes').check();
   await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
@@ -48,8 +52,13 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
   await expect(page.getByLabel('Horario')).toHaveValue('14:20');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
-  await expect(page.getByLabel('Miopia')).toBeChecked();
-  await expect(page.getByLabel('Astigmatismo')).toBeChecked();
+  await expect(page.getByLabel('Data de nascimento')).toHaveValue('1985-04-12');
+  await expect(page.locator('[data-birth-age]')).toHaveText(/\d+ anos/);
+  await expect(page.getByLabel('Sexo')).toHaveValue('female');
+  await expect(page.getByLabel('Rua', { exact: true })).toHaveValue('Rua das Flores');
+  await expect(page.getByLabel('Numero', { exact: true })).toHaveValue('S/N');
+  await expect(page.getByLabel('Miopia')).not.toBeChecked();
+  await expect(page.getByLabel('Astigmatismo')).not.toBeChecked();
   await expect(page.getByLabel('Glaucoma')).toBeChecked();
   await expect(page.getByLabel('Diabetes')).toBeChecked();
   const ametropias = page.getByRole('group', { name: 'Ametropias' });
@@ -701,6 +710,9 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('Configuracoes da agenda', { exact: true })).toBeVisible();
 
   await page.getByLabel('Loja').selectOption('loja-06');
+  await expect(page.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
+  await page.getByLabel('Exibir ametropias no cadastro').check();
+  await expect(page.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
   const graceInput = page.getByLabel('Tolerancia apos o horario');
   await graceInput.fill('45');
   const graceLayout = await page.evaluate(() => {
@@ -720,6 +732,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Ametropias' })).toBeVisible();
   const date = new Date();
   date.setDate(date.getDate() + 1);
   const appointmentDate = date.toISOString().slice(0, 10);

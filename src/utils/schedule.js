@@ -3,6 +3,7 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   appointmentDurationMinutes: 20,
   noShowGraceMinutes: 30,
   automaticPendingFollowUp: false,
+  showAmetropiaFields: false,
   openingTime: '08:00',
   closingTime: '18:00'
 });
@@ -33,6 +34,7 @@ export function normalizeStoreSchedule(value = {}) {
       ? noShowGrace
       : DEFAULT_STORE_SCHEDULE.noShowGraceMinutes,
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
+    showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
     openingTime: opening,
     closingTime: closing
   };

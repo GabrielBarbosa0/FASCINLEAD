@@ -8,6 +8,7 @@ describe('store schedule helpers', () => {
       appointmentDurationMinutes: 20,
       noShowGraceMinutes: 30,
       automaticPendingFollowUp: false,
+      showAmetropiaFields: false,
       openingTime: '08:00',
       closingTime: '18:00'
     });
@@ -89,5 +90,11 @@ describe('store schedule helpers', () => {
   it('normalizes the automatic follow-up switch from form values', () => {
     expect(normalizeStoreSchedule({ automaticPendingFollowUp: 'true' }).automaticPendingFollowUp).toBe(true);
     expect(normalizeStoreSchedule({ automaticPendingFollowUp: 'false' }).automaticPendingFollowUp).toBe(false);
+  });
+
+  it('keeps ametropia fields hidden by default and accepts explicit activation', () => {
+    expect(normalizeStoreSchedule({}).showAmetropiaFields).toBe(false);
+    expect(normalizeStoreSchedule({ showAmetropiaFields: 'true' }).showAmetropiaFields).toBe(true);
+    expect(normalizeStoreSchedule({ showAmetropiaFields: 'false' }).showAmetropiaFields).toBe(false);
   });
 });

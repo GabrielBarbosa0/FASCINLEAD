@@ -810,6 +810,14 @@ svg {
   gap: 12px;
 }
 
+.address-fields {
+  grid-template-columns: minmax(0, 1.5fr) 92px minmax(0, 0.8fr) minmax(0, 0.8fr) 76px;
+}
+
+.identity-fields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 0.65fr);
+}
+
 .appointment-fields {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -973,6 +981,13 @@ svg {
   position: absolute;
   right: 10px;
   bottom: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.birth-age-hint {
+  display: block;
+  margin-top: 6px;
   color: var(--muted);
   font-size: 0.72rem;
 }
@@ -4276,6 +4291,30 @@ svg {
 
   .field-row .field:first-child {
     grid-column: 1 / -1;
+  }
+
+  .address-fields {
+    grid-template-columns: 92px minmax(0, 1fr) 72px;
+  }
+
+  .identity-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-fields .field:first-child {
+    grid-column: 1;
+  }
+
+  .address-fields .address-street {
+    grid-column: 1 / -1;
+  }
+
+  .address-fields .address-neighborhood {
+    grid-column: 2 / -1;
+  }
+
+  .address-fields .address-city {
+    grid-column: 1 / 3;
   }
 
   .appointment-fields {

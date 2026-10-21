@@ -16,6 +16,8 @@ export function publicLead(id, lead, { includeSensitive = false } = {}) {
     preferredName: String(lead.preferredName || ''),
     phone: String(lead.phone || ''),
     storeId: String(lead.storeId || ''),
+    street: String(lead.street || ''),
+    streetNumber: String(lead.streetNumber || ''),
     neighborhood: String(lead.neighborhood || ''),
     city: String(lead.city || ''),
     state: String(lead.state || ''),
@@ -47,6 +49,8 @@ export function publicLead(id, lead, { includeSensitive = false } = {}) {
 
   if (includeSensitive) {
     result.customerCpf = String(lead.customerCpf || '');
+    result.birthDate = String(lead.birthDate || '');
+    result.sex = String(lead.sex || '');
     result.health = {
       ametropias: Array.isArray(lead.ametropiaLabels) ? lead.ametropiaLabels.map(String) : [],
       conditions: Array.isArray(lead.pathologyLabels) ? lead.pathologyLabels.map(String) : []
