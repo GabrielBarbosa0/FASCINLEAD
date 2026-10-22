@@ -7,11 +7,19 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   limitedDaysEnabled: false,
   limitedWeekdays: Object.freeze([3, 6]),
   limitedDayCapacity: 10,
+  limitedDayRules: Object.freeze([
+    Object.freeze({ weekday: 3, capacity: 10 }),
+    Object.freeze({ weekday: 6, capacity: 10 })
+  ]),
   meiDailyQuota: 2,
   meiQuotaEnabled: false,
   meiQuotaWeekdays: Object.freeze([3, 6]),
   meiMorningQuota: 1,
   meiAfternoonQuota: 1,
+  meiQuotaRules: Object.freeze([
+    Object.freeze({ weekday: 3, morningQuota: 1, afternoonQuota: 1 }),
+    Object.freeze({ weekday: 6, morningQuota: 1, afternoonQuota: 1 })
+  ]),
   openingTime: '08:00',
   closingTime: '18:00'
 });
@@ -53,6 +61,38 @@ export function appointmentSlotId(storeId, appointmentDate, blockTime) {
   return `slot-${storeId}-${appointmentDate}-${blockTime}`;
 }
 
+function normalizeLimitedDayRules(value, legacyWeekdays, legacyCapacity) {
+  const source = Array.isArray(value)
+    ? value
+    : legacyWeekdays.map((weekday) => ({ weekday, capacity: legacyCapacity }));
+  const byWeekday = new Map();
+  source.forEach((rule) => {
+    const weekday = Number(rule?.weekday);
+    const capacity = Number(rule?.capacity);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return;
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 100) return;
+    byWeekday.set(weekday, { weekday, capacity });
+  });
+  return [...byWeekday.values()].sort((a, b) => a.weekday - b.weekday);
+}
+
+function normalizeMeiQuotaRules(value, legacyWeekdays, morningQuota, afternoonQuota) {
+  const source = Array.isArray(value)
+    ? value
+    : legacyWeekdays.map((weekday) => ({ weekday, morningQuota, afternoonQuota }));
+  const byWeekday = new Map();
+  source.forEach((rule) => {
+    const weekday = Number(rule?.weekday);
+    const morning = Number(rule?.morningQuota);
+    const afternoon = Number(rule?.afternoonQuota);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return;
+    if (!Number.isInteger(morning) || morning < 0 || morning > 100) return;
+    if (!Number.isInteger(afternoon) || afternoon < 0 || afternoon > 100 || morning + afternoon < 1) return;
+    byWeekday.set(weekday, { weekday, morningQuota: morning, afternoonQuota: afternoon });
+  });
+  return [...byWeekday.values()].sort((a, b) => a.weekday - b.weekday);
+}
+
 export function normalizeStoreSchedule(value = {}) {
   const duration = Number(value.appointmentDurationMinutes);
   const noShowGrace = Number(value.noShowGraceMinutes);
@@ -76,6 +116,18 @@ export function normalizeStoreSchedule(value = {}) {
     ? meiAfternoonQuota
     : Math.floor(legacyMeiQuota / 2);
   const hasPeriodQuotas = Number.isInteger(meiMorningQuota) && Number.isInteger(meiAfternoonQuota);
+  const normalizedLimitedDayCapacity = Number.isInteger(limitedDayCapacity) && limitedDayCapacity >= 1 && limitedDayCapacity <= 100
+    ? limitedDayCapacity
+    : DEFAULT_STORE_SCHEDULE.limitedDayCapacity;
+  const limitedDayRules = normalizeLimitedDayRules(value.limitedDayRules, limitedWeekdays, normalizedLimitedDayCapacity);
+  const meiQuotaRules = normalizeMeiQuotaRules(
+    value.meiQuotaRules,
+    meiQuotaWeekdays,
+    normalizedMeiMorningQuota,
+    normalizedMeiAfternoonQuota
+  );
+  const primaryLimitedRule = limitedDayRules[0];
+  const primaryMeiRule = meiQuotaRules[0];
   const opening = TIME_PATTERN.test(value.openingTime || '') ? value.openingTime : DEFAULT_STORE_SCHEDULE.openingTime;
   const closing = TIME_PATTERN.test(value.closingTime || '') ? value.closingTime : DEFAULT_STORE_SCHEDULE.closingTime;
   return {
@@ -89,19 +141,19 @@ export function normalizeStoreSchedule(value = {}) {
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
     limitedDaysEnabled: value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true',
-    limitedWeekdays,
-    limitedDayCapacity: Number.isInteger(limitedDayCapacity) && limitedDayCapacity >= 1 && limitedDayCapacity <= 100
-      ? limitedDayCapacity
-      : DEFAULT_STORE_SCHEDULE.limitedDayCapacity,
-    meiDailyQuota: hasPeriodQuotas
-      ? normalizedMeiMorningQuota + normalizedMeiAfternoonQuota
-      : legacyMeiQuota,
+    limitedDayRules,
+    limitedWeekdays: limitedDayRules.map((rule) => rule.weekday),
+    limitedDayCapacity: primaryLimitedRule?.capacity || normalizedLimitedDayCapacity,
+    meiDailyQuota: primaryMeiRule
+      ? primaryMeiRule.morningQuota + primaryMeiRule.afternoonQuota
+      : hasPeriodQuotas ? normalizedMeiMorningQuota + normalizedMeiAfternoonQuota : legacyMeiQuota,
     meiQuotaEnabled: value.meiQuotaEnabled === undefined
       ? value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true'
       : value.meiQuotaEnabled === true || value.meiQuotaEnabled === 'true',
-    meiQuotaWeekdays,
-    meiMorningQuota: normalizedMeiMorningQuota,
-    meiAfternoonQuota: normalizedMeiAfternoonQuota,
+    meiQuotaRules,
+    meiQuotaWeekdays: meiQuotaRules.map((rule) => rule.weekday),
+    meiMorningQuota: primaryMeiRule?.morningQuota ?? normalizedMeiMorningQuota,
+    meiAfternoonQuota: primaryMeiRule?.afternoonQuota ?? normalizedMeiAfternoonQuota,
     openingTime: opening,
     closingTime: closing
   };
@@ -115,12 +167,18 @@ export function validateStoreSchedule(value) {
     ? DEFAULT_STORE_SCHEDULE.noShowGraceMinutes
     : Number(value.noShowGraceMinutes);
   const limitedDaysEnabled = value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true';
-  const limitedWeekdays = Array.isArray(value.limitedWeekdays) ? value.limitedWeekdays.map(Number) : [];
-  const limitedDayCapacity = Number(value.limitedDayCapacity);
+  const limitedDayRules = Array.isArray(value.limitedDayRules)
+    ? value.limitedDayRules
+    : normalizeLimitedDayRules(undefined, Array.isArray(value.limitedWeekdays) ? value.limitedWeekdays.map(Number) : [], Number(value.limitedDayCapacity));
   const meiQuotaEnabled = value.meiQuotaEnabled === true || value.meiQuotaEnabled === 'true';
-  const meiQuotaWeekdays = Array.isArray(value.meiQuotaWeekdays) ? value.meiQuotaWeekdays.map(Number) : [];
-  const meiMorningQuota = Number(value.meiMorningQuota);
-  const meiAfternoonQuota = Number(value.meiAfternoonQuota);
+  const meiQuotaRules = Array.isArray(value.meiQuotaRules)
+    ? value.meiQuotaRules
+    : normalizeMeiQuotaRules(
+      undefined,
+      Array.isArray(value.meiQuotaWeekdays) ? value.meiQuotaWeekdays.map(Number) : [],
+      Number(value.meiMorningQuota),
+      Number(value.meiAfternoonQuota)
+    );
   const opening = timeToMinutes(value.openingTime);
   const closing = timeToMinutes(value.closingTime);
 
@@ -138,23 +196,13 @@ export function validateStoreSchedule(value) {
   if (opening !== null && closing !== null && closing - opening < schedule.appointmentDurationMinutes) {
     errors.closingTime = 'O expediente precisa comportar pelo menos uma consulta.';
   }
-  if (limitedDaysEnabled && !limitedWeekdays.length) {
-    errors.limitedWeekdays = 'Escolha pelo menos um dia com vagas limitadas.';
+  const validLimitedRules = normalizeLimitedDayRules(limitedDayRules, [], 0);
+  const validMeiRules = normalizeMeiQuotaRules(meiQuotaRules, [], 0, 0);
+  if (limitedDaysEnabled && (!limitedDayRules.length || validLimitedRules.length !== limitedDayRules.length)) {
+    errors.limitedDayRules = 'Configure ao menos um dia com limite entre 1 e 100 vagas.';
   }
-  if (limitedDaysEnabled && (!Number.isInteger(limitedDayCapacity) || limitedDayCapacity < 1 || limitedDayCapacity > 100)) {
-    errors.limitedDayCapacity = 'Informe um limite entre 1 e 100 vagas.';
-  }
-  if (meiQuotaEnabled && !meiQuotaWeekdays.length) {
-    errors.meiQuotaWeekdays = 'Escolha pelo menos um dia para aplicar as cotas do MEI.';
-  }
-  if (meiQuotaEnabled && (!Number.isInteger(meiMorningQuota) || meiMorningQuota < 0 || meiMorningQuota > 100)) {
-    errors.meiMorningQuota = 'Informe uma cota da manha entre 0 e 100.';
-  }
-  if (meiQuotaEnabled && (!Number.isInteger(meiAfternoonQuota) || meiAfternoonQuota < 0 || meiAfternoonQuota > 100)) {
-    errors.meiAfternoonQuota = 'Informe uma cota da tarde entre 0 e 100.';
-  }
-  if (meiQuotaEnabled && meiMorningQuota + meiAfternoonQuota < 1) {
-    errors.meiMorningQuota = 'Informe pelo menos uma vaga para o MEI.';
+  if (meiQuotaEnabled && (!meiQuotaRules.length || validMeiRules.length !== meiQuotaRules.length)) {
+    errors.meiQuotaRules = 'Configure ao menos um dia com cotas validas para manha e tarde.';
   }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };
@@ -169,8 +217,9 @@ function weekdayFromDate(appointmentDate) {
 export function appointmentQuotaStatus(settings, appointmentDate, appointments = [], profile = null, ignoredLeadId = '', appointmentTime = '') {
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
-  const limited = schedule.limitedDaysEnabled && weekday !== null && schedule.limitedWeekdays.includes(weekday);
-  const meiLimited = schedule.meiQuotaEnabled && weekday !== null && schedule.meiQuotaWeekdays.includes(weekday);
+  const limitedRule = schedule.limitedDayRules.find((rule) => rule.weekday === weekday);
+  const meiRule = schedule.meiQuotaRules.find((rule) => rule.weekday === weekday);
+  const limited = schedule.limitedDaysEnabled && Boolean(limitedRule);
   const uniqueAppointments = new Map();
   appointments.forEach((appointment) => {
     const appointmentKey = appointment.leadId || appointment.id;
@@ -180,6 +229,8 @@ export function appointmentQuotaStatus(settings, appointmentDate, appointments =
   const activeAppointments = [...uniqueAppointments.values()];
   const dailyUsed = activeAppointments.length;
   const isMei = profile?.roleProfileId === 'system-mei';
+  const meiDayAllowed = !isMei || !schedule.meiQuotaEnabled || Boolean(meiRule);
+  const meiLimited = schedule.meiQuotaEnabled && isMei && Boolean(meiRule);
   const meiAppointments = isMei
     ? activeAppointments.filter((appointment) => appointment.capturedByUid === profile?.uid)
     : [];
@@ -187,15 +238,15 @@ export function appointmentQuotaStatus(settings, appointmentDate, appointments =
   const meiAfternoonUsed = meiAppointments.length - meiMorningUsed;
   const appointmentMinutes = timeToMinutes(appointmentTime);
   const meiPeriod = appointmentMinutes === null ? '' : appointmentMinutes < 720 ? 'morning' : 'afternoon';
-  const meiMorningRemaining = meiLimited && isMei ? Math.max(0, schedule.meiMorningQuota - meiMorningUsed) : null;
-  const meiAfternoonRemaining = meiLimited && isMei ? Math.max(0, schedule.meiAfternoonQuota - meiAfternoonUsed) : null;
+  const meiMorningRemaining = meiLimited ? Math.max(0, meiRule.morningQuota - meiMorningUsed) : null;
+  const meiAfternoonRemaining = meiLimited ? Math.max(0, meiRule.afternoonQuota - meiAfternoonUsed) : null;
   const meiUsed = meiMorningUsed + meiAfternoonUsed;
-  const dailyRemaining = limited ? Math.max(0, schedule.limitedDayCapacity - dailyUsed) : null;
-  const meiRemaining = meiLimited && isMei
+  const dailyRemaining = limited ? Math.max(0, limitedRule.capacity - dailyUsed) : null;
+  const meiRemaining = meiLimited
     ? (meiMorningRemaining + meiAfternoonRemaining)
     : null;
   const dailyBlocked = limited && dailyRemaining === 0;
-  const meiBlocked = meiLimited && isMei && (
+  const meiBlocked = meiLimited && (
     (meiPeriod === 'morning' && meiMorningRemaining === 0)
     || (meiPeriod === 'afternoon' && meiAfternoonRemaining === 0)
     || (!meiPeriod && meiMorningRemaining === 0 && meiAfternoonRemaining === 0)
@@ -213,8 +264,9 @@ export function appointmentQuotaStatus(settings, appointmentDate, appointments =
     meiAfternoonUsed,
     meiAfternoonRemaining,
     meiPeriod,
-    blocked: dailyBlocked || meiBlocked,
-    reason: dailyBlocked ? 'daily-limit' : meiBlocked ? 'mei-quota' : ''
+    meiDayAllowed,
+    blocked: dailyBlocked || !meiDayAllowed || meiBlocked,
+    reason: dailyBlocked ? 'daily-limit' : !meiDayAllowed ? 'mei-day-not-allowed' : meiBlocked ? 'mei-quota' : ''
   };
 }
 

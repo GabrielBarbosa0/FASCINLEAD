@@ -19,11 +19,19 @@ describe('store schedule helpers', () => {
       limitedDaysEnabled: false,
       limitedWeekdays: [3, 6],
       limitedDayCapacity: 10,
+      limitedDayRules: [
+        { weekday: 3, capacity: 10 },
+        { weekday: 6, capacity: 10 }
+      ],
       meiDailyQuota: 2,
       meiQuotaEnabled: false,
       meiQuotaWeekdays: [3, 6],
       meiMorningQuota: 1,
       meiAfternoonQuota: 1,
+      meiQuotaRules: [
+        { weekday: 3, morningQuota: 1, afternoonQuota: 1 },
+        { weekday: 6, morningQuota: 1, afternoonQuota: 1 }
+      ],
       openingTime: '08:00',
       closingTime: '18:00'
     });
@@ -188,6 +196,61 @@ describe('store schedule helpers', () => {
     ]);
   });
 
+  it('uses different MEI quotas for each weekday and the scheduled period', () => {
+    const settings = {
+      meiQuotaEnabled: true,
+      meiQuotaRules: [
+        { weekday: 3, morningQuota: 4, afternoonQuota: 6 },
+        { weekday: 6, morningQuota: 2, afternoonQuota: 2 }
+      ]
+    };
+    const profile = { uid: 'mei-1', roleProfileId: 'system-mei' };
+    const wednesdayAppointments = [
+      ...Array.from({ length: 4 }, (_, index) => ({ id: `morning-${index}`, appointmentTime: `${String(8 + index).padStart(2, '0')}:00`, capturedByUid: 'mei-1' })),
+      ...Array.from({ length: 5 }, (_, index) => ({ id: `afternoon-${index}`, appointmentTime: `${13 + index}:00`, capturedByUid: 'mei-1' }))
+    ];
+
+    expect(appointmentQuotaStatus(settings, '2026-10-21', wednesdayAppointments, profile, '', '10:00')).toMatchObject({
+      meiMorningRemaining: 0,
+      meiAfternoonRemaining: 1,
+      blocked: true,
+      reason: 'mei-quota'
+    });
+    expect(appointmentQuotaStatus(settings, '2026-10-21', wednesdayAppointments, profile, '', '15:00')).toMatchObject({
+      blocked: false,
+      meiPeriod: 'afternoon'
+    });
+    expect(appointmentQuotaStatus(settings, '2026-10-24', [
+      { id: 'sat-1', appointmentTime: '09:00', capturedByUid: 'mei-1' },
+      { id: 'sat-2', appointmentTime: '10:00', capturedByUid: 'mei-1' }
+    ], profile, '', '11:00')).toMatchObject({
+      meiMorningRemaining: 0,
+      meiAfternoonRemaining: 2,
+      blocked: true
+    });
+  });
+
+  it('blocks MEI appointments on weekdays without configured quotas', () => {
+    const status = appointmentQuotaStatus({
+      meiQuotaEnabled: true,
+      meiQuotaRules: [{ weekday: 3, morningQuota: 4, afternoonQuota: 6 }]
+    }, '2026-10-22', [], { uid: 'mei-1', roleProfileId: 'system-mei' }, '', '14:00');
+    expect(status).toMatchObject({ blocked: true, meiDayAllowed: false, reason: 'mei-day-not-allowed' });
+  });
+
+  it('uses the general capacity configured for each weekday', () => {
+    const settings = {
+      limitedDaysEnabled: true,
+      limitedDayRules: [
+        { weekday: 3, capacity: 10 },
+        { weekday: 6, capacity: 4 }
+      ]
+    };
+    const appointments = Array.from({ length: 4 }, (_, index) => ({ id: `lead-${index}`, appointmentTime: `${String(8 + index).padStart(2, '0')}:00` }));
+    expect(appointmentQuotaStatus(settings, '2026-10-21', appointments)).toMatchObject({ dailyRemaining: 6, blocked: false });
+    expect(appointmentQuotaStatus(settings, '2026-10-24', appointments)).toMatchObject({ dailyRemaining: 0, blocked: true, reason: 'daily-limit' });
+  });
+
   it('blocks all remaining times after the daily capacity is reached', () => {
     const settings = {
       schedulingMode: 'controlled',
@@ -244,9 +307,8 @@ describe('store schedule helpers', () => {
       meiMorningQuota: 0,
       meiAfternoonQuota: 0
     }).errors).toEqual(expect.objectContaining({
-      limitedWeekdays: expect.any(String),
-      meiQuotaWeekdays: expect.any(String),
-      meiMorningQuota: expect.any(String)
+      limitedDayRules: expect.any(String),
+      meiQuotaRules: expect.any(String)
     }));
   });
 });

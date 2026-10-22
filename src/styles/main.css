@@ -2534,7 +2534,7 @@ svg {
 
 .mei-quota-dialog,
 .schedule-rule-dialog {
-  width: min(calc(100% - 32px), 640px);
+  width: min(calc(100% - 32px), 760px);
 }
 
 .schedule-rule-dialog-body {
@@ -2549,6 +2549,57 @@ svg {
 
 .schedule-rule-dialog-body .schedule-limit-fields {
   margin-top: 16px;
+}
+
+.schedule-rule-list {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-rule-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 0.8fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+  opacity: 0.68;
+}
+
+.schedule-rule-row.is-active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  opacity: 1;
+}
+
+.schedule-rule-day {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.schedule-rule-day input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
+}
+
+.schedule-rule-row .number-with-unit input {
+  min-height: 42px;
+}
+
+.schedule-mei-rule-row {
+  grid-template-columns: minmax(105px, 0.8fr) repeat(2, minmax(135px, 1fr)) 64px;
+}
+
+.schedule-rule-total {
+  color: var(--brand);
+  font-size: 0.72rem;
+  text-align: right;
 }
 
 .setting-toggle {
@@ -4886,6 +4937,24 @@ svg {
 
   .schedule-rule-dialog-body {
     padding: 16px;
+  }
+
+  .schedule-rule-row,
+  .schedule-mei-rule-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-rule-day {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-rule-row:not(.schedule-mei-rule-row) .number-with-unit {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-rule-total {
+    grid-column: 1 / -1;
+    text-align: left;
   }
 
   .role-settings-layout {

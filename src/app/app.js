@@ -648,6 +648,7 @@ function appointmentTimeField() {
   let placeholder = 'Escolha primeiro uma data';
   if (loading) placeholder = 'Consultando horarios...';
   else if (error) placeholder = 'Horarios indisponiveis';
+  else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
   else if (quota.reason === 'mei-quota') placeholder = 'Sua cota de agendamentos foi atingida';
   else if (quota.reason === 'daily-limit') placeholder = 'Limite de vagas do dia atingido';
   else if (appointmentDate && !availableSlots.length) placeholder = 'Dia sem horarios disponiveis';
@@ -1462,8 +1463,24 @@ function scheduleSettingsView() {
   const selected = records.find((item) => item.id === selectedStoreId)
     || { ...STORES.find((item) => item.id === selectedStoreId), ...DEFAULT_STORE_SCHEDULE };
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
-  const limitedWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="limitedWeekdays" value="${day.id}" ${selected.limitedWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
-  const meiWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="meiQuotaWeekdays" value="${day.id}" ${selected.meiQuotaWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
+  const limitedDayRuleRows = WEEKDAY_OPTIONS.map((day) => {
+    const rule = selected.limitedDayRules.find((item) => item.weekday === day.id);
+    return `<div class="schedule-rule-row ${rule ? 'is-active' : ''}" data-limited-day-row="${day.id}">
+      <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="limitedDayWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
+      <div class="number-with-unit"><input aria-label="Vagas de ${day.label}" name="limitedDayCapacity-${day.id}" type="number" min="1" max="100" step="1" value="${rule?.capacity || selected.limitedDayCapacity}" ${rule ? '' : 'disabled'} /><span>vagas</span></div>
+    </div>`;
+  }).join('');
+  const meiQuotaRuleRows = WEEKDAY_OPTIONS.map((day) => {
+    const rule = selected.meiQuotaRules.find((item) => item.weekday === day.id);
+    const morning = rule?.morningQuota ?? selected.meiMorningQuota;
+    const afternoon = rule?.afternoonQuota ?? selected.meiAfternoonQuota;
+    return `<div class="schedule-rule-row schedule-mei-rule-row ${rule ? 'is-active' : ''}" data-mei-day-row="${day.id}">
+      <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="meiQuotaWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
+      <div class="number-with-unit"><input aria-label="Cota da manha de ${day.label}" name="meiMorningQuota-${day.id}" type="number" min="0" max="100" step="1" value="${morning}" ${rule ? '' : 'disabled'} /><span>manha</span></div>
+      <div class="number-with-unit"><input aria-label="Cota da tarde de ${day.label}" name="meiAfternoonQuota-${day.id}" type="number" min="0" max="100" step="1" value="${afternoon}" ${rule ? '' : 'disabled'} /><span>tarde</span></div>
+      <strong class="schedule-rule-total" data-mei-day-total>${morning + afternoon} total</strong>
+    </div>`;
+  }).join('');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
@@ -1495,12 +1512,12 @@ function scheduleSettingsView() {
           <div class="schedule-form-column">
             <div class="schedule-config-launch">
               <span class="schedule-config-launch-icon"><i data-lucide="calendar-range"></i></span>
-              <span><strong>Limite de vagas</strong><small data-limited-days-summary>${selected.limitedDaysEnabled ? `${selected.limitedDayCapacity} ${selected.limitedDayCapacity === 1 ? 'vaga' : 'vagas'} por dia em ${selected.limitedWeekdays.length} ${selected.limitedWeekdays.length === 1 ? 'dia' : 'dias'}` : 'Desativado'}</small></span>
+              <span><strong>Limite de vagas</strong><small data-limited-days-summary>${selected.limitedDaysEnabled ? `${selected.limitedDayRules.length} ${selected.limitedDayRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
               <button class="button button-secondary" type="button" data-limited-days-open><i data-lucide="settings-2"></i><span>Configurar limite</span></button>
             </div>
             <div class="schedule-config-launch">
               <span class="schedule-config-launch-icon"><i data-lucide="briefcase-business"></i></span>
-              <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiMorningQuota} pela manha e ${selected.meiAfternoonQuota} a tarde` : 'Desativadas'}</small></span>
+              <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiQuotaRules.length} ${selected.meiQuotaRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativadas'}</small></span>
               <button class="button button-secondary" type="button" data-mei-quota-open><i data-lucide="settings-2"></i><span>Configurar cotas</span></button>
             </div>
           </div>
@@ -1509,18 +1526,17 @@ function scheduleSettingsView() {
           <header><div><span class="eyebrow">AGENDA</span><h2 id="limited-days-title">Limite de vagas</h2><p>Defina os dias e a quantidade maxima de clientes.</p></div><button class="icon-button" type="button" data-limited-days-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="limitedDaysEnabled" type="hidden" value="false" />
+            <input name="limitedDayRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.limitedDayRules))}" />
             <label class="setting-toggle checkbox-label" for="settings-limited-days">
               <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
               <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <fieldset class="field schedule-limit-fields ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedWeekdays" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
-              <legend>Dias com vagas limitadas</legend>
-              <div class="schedule-weekday-options">${limitedWeekdayOptions}</div>
+            <fieldset class="field schedule-limit-fields ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedDayRules" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
+              <legend>Limite por dia da semana</legend>
+              <small>Selecione os dias e informe a capacidade de cada um.</small>
+              <div class="schedule-rule-list">${limitedDayRuleRows}</div>
               <small class="field-error"></small>
-              <div class="field-row schedule-limit-numbers">
-                <div class="field" data-field="limitedDayCapacity"><label for="settings-day-capacity">Vagas totais por dia</label><div class="number-with-unit"><input id="settings-day-capacity" name="limitedDayCapacity" type="number" min="1" max="100" step="1" value="${selected.limitedDayCapacity}" /><span>vagas</span></div><small class="field-error"></small></div>
-              </div>
             </fieldset>
           </div>
           <footer><span>O limite vale para cada dia selecionado.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-limited-days-close>Cancelar</button><button class="button button-primary" type="button" data-limited-days-apply><i data-lucide="check"></i><span>Aplicar limite</span></button></div></footer>
@@ -1529,19 +1545,17 @@ function scheduleSettingsView() {
           <header><div><span class="eyebrow">AGENDA</span><h2 id="mei-quota-title">Cotas do MEI</h2><p>Defina os dias e os limites de agendamento por periodo.</p></div><button class="icon-button" type="button" data-mei-quota-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="meiQuotaEnabled" type="hidden" value="false" />
+            <input name="meiQuotaRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.meiQuotaRules))}" />
             <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
               <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
               <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaWeekdays" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
-              <legend>Dias com cota para o MEI</legend>
-              <div class="schedule-weekday-options">${meiWeekdayOptions}</div>
+            <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaRules" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
+              <legend>Cotas por dia da semana</legend>
+              <small>O periodo e definido pelo horario agendado para o cliente.</small>
+              <div class="schedule-rule-list">${meiQuotaRuleRows}</div>
               <small class="field-error"></small>
-              <div class="field-row schedule-limit-numbers">
-                <div class="field" data-field="meiMorningQuota"><label for="settings-mei-morning-quota">Cota pela manha</label><div class="number-with-unit"><input id="settings-mei-morning-quota" name="meiMorningQuota" type="number" min="0" max="100" step="1" value="${selected.meiMorningQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
-                <div class="field" data-field="meiAfternoonQuota"><label for="settings-mei-afternoon-quota">Cota a tarde</label><div class="number-with-unit"><input id="settings-mei-afternoon-quota" name="meiAfternoonQuota" type="number" min="0" max="100" step="1" value="${selected.meiAfternoonQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
-              </div>
               <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
             </fieldset>
           </div>
@@ -2504,15 +2518,22 @@ function bindPageEvents() {
     });
     const limitedDaysDialog = document.querySelector('#limited-days-dialog');
     const limitedDaysEnabledInput = document.querySelector('#settings-limited-days');
-    const limitedDaysFields = limitedDaysDialog?.querySelector('[data-field="limitedWeekdays"]');
+    const limitedDaysFields = limitedDaysDialog?.querySelector('[data-field="limitedDayRules"]');
     const syncLimitedDaysDraft = () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       if (!record || !limitedDaysDialog) return;
       limitedDaysEnabledInput.checked = record.limitedDaysEnabled;
-      limitedDaysDialog.querySelectorAll('[name="limitedWeekdays"]').forEach((input) => {
-        input.checked = record.limitedWeekdays.includes(Number(input.value));
+      limitedDaysDialog.querySelector('[name="limitedDayRules"]').value = JSON.stringify(record.limitedDayRules);
+      limitedDaysDialog.querySelectorAll('[data-limited-day-row]').forEach((row) => {
+        const weekday = Number(row.dataset.limitedDayRow);
+        const rule = record.limitedDayRules.find((item) => item.weekday === weekday);
+        const checkbox = row.querySelector('[name="limitedDayWeekday"]');
+        const capacityInput = row.querySelector(`[name="limitedDayCapacity-${weekday}"]`);
+        checkbox.checked = Boolean(rule);
+        capacityInput.value = rule?.capacity || record.limitedDayCapacity;
+        capacityInput.disabled = !rule || !record.limitedDaysEnabled;
+        row.classList.toggle('is-active', Boolean(rule));
       });
-      limitedDaysDialog.querySelector('[name="limitedDayCapacity"]').value = record.limitedDayCapacity;
       limitedDaysFields.disabled = !record.limitedDaysEnabled;
       limitedDaysFields.classList.toggle('is-disabled', !record.limitedDaysEnabled);
       setFieldErrors(limitedDaysDialog, {});
@@ -2536,16 +2557,34 @@ function bindPageEvents() {
     limitedDaysEnabledInput?.addEventListener('change', () => {
       limitedDaysFields.disabled = !limitedDaysEnabledInput.checked;
       limitedDaysFields.classList.toggle('is-disabled', !limitedDaysEnabledInput.checked);
+      limitedDaysDialog.querySelectorAll('[data-limited-day-row]').forEach((row) => {
+        const checked = row.querySelector('[name="limitedDayWeekday"]').checked;
+        row.querySelector('input[type="number"]').disabled = !limitedDaysEnabledInput.checked || !checked;
+      });
       setFieldErrors(limitedDaysDialog, {});
+    });
+    limitedDaysDialog?.querySelectorAll('[name="limitedDayWeekday"]').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        const row = checkbox.closest('[data-limited-day-row]');
+        row.classList.toggle('is-active', checkbox.checked);
+        row.querySelector('input[type="number"]').disabled = !checkbox.checked;
+      });
     });
     limitedDaysDialog?.querySelector('[data-limited-days-apply]')?.addEventListener('click', () => {
       const enabled = limitedDaysEnabledInput.checked;
-      const weekdays = [...limitedDaysDialog.querySelectorAll('[name="limitedWeekdays"]:checked')].map((item) => Number(item.value));
-      const capacity = Number(limitedDaysDialog.querySelector('[name="limitedDayCapacity"]').value);
+      const rules = [...limitedDaysDialog.querySelectorAll('[name="limitedDayWeekday"]:checked')].map((checkbox) => {
+        const weekday = Number(checkbox.value);
+        return {
+          weekday,
+          capacity: Number(limitedDaysDialog.querySelector(`[name="limitedDayCapacity-${weekday}"]`).value)
+        };
+      });
       const errors = {};
 
-      if (enabled && !weekdays.length) errors.limitedWeekdays = 'Selecione pelo menos um dia.';
-      if (enabled && (!Number.isInteger(capacity) || capacity < 1 || capacity > 100)) errors.limitedDayCapacity = 'Informe um valor entre 1 e 100.';
+      if (enabled && !rules.length) errors.limitedDayRules = 'Selecione pelo menos um dia.';
+      if (enabled && rules.some((rule) => !Number.isInteger(rule.capacity) || rule.capacity < 1 || rule.capacity > 100)) {
+        errors.limitedDayRules = 'Informe entre 1 e 100 vagas em cada dia selecionado.';
+      }
       setFieldErrors(limitedDaysDialog, errors);
       if (Object.keys(errors).length) return;
 
@@ -2553,27 +2592,39 @@ function bindPageEvents() {
       if (record) {
         record.limitedDaysEnabled = enabled;
         if (enabled) {
-          record.limitedWeekdays = weekdays;
-          record.limitedDayCapacity = capacity;
+          record.limitedDayRules = rules;
+          record.limitedWeekdays = rules.map((rule) => rule.weekday);
+          record.limitedDayCapacity = rules[0].capacity;
         }
       }
+      limitedDaysDialog.querySelector('[name="limitedDayRules"]').value = JSON.stringify(enabled ? rules : record.limitedDayRules);
       document.querySelector('[data-limited-days-summary]').textContent = enabled
-        ? `${capacity} ${capacity === 1 ? 'vaga' : 'vagas'} por dia em ${weekdays.length} ${weekdays.length === 1 ? 'dia' : 'dias'}`
+        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
         : 'Desativado';
       limitedDaysDialog.close();
     });
     const meiQuotaDialog = document.querySelector('#mei-quota-dialog');
     const meiQuotaEnabledInput = document.querySelector('#settings-mei-quota-enabled');
-    const meiQuotaFields = meiQuotaDialog?.querySelector('[data-field="meiQuotaWeekdays"]');
+    const meiQuotaFields = meiQuotaDialog?.querySelector('[data-field="meiQuotaRules"]');
     const syncMeiQuotaDraft = () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       if (!record || !meiQuotaDialog) return;
       meiQuotaEnabledInput.checked = record.meiQuotaEnabled;
-      meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekdays"]').forEach((input) => {
-        input.checked = record.meiQuotaWeekdays.includes(Number(input.value));
+      meiQuotaDialog.querySelector('[name="meiQuotaRules"]').value = JSON.stringify(record.meiQuotaRules);
+      meiQuotaDialog.querySelectorAll('[data-mei-day-row]').forEach((row) => {
+        const weekday = Number(row.dataset.meiDayRow);
+        const rule = record.meiQuotaRules.find((item) => item.weekday === weekday);
+        const checkbox = row.querySelector('[name="meiQuotaWeekday"]');
+        const morningInput = row.querySelector(`[name="meiMorningQuota-${weekday}"]`);
+        const afternoonInput = row.querySelector(`[name="meiAfternoonQuota-${weekday}"]`);
+        checkbox.checked = Boolean(rule);
+        morningInput.value = rule?.morningQuota ?? record.meiMorningQuota;
+        afternoonInput.value = rule?.afternoonQuota ?? record.meiAfternoonQuota;
+        morningInput.disabled = !rule || !record.meiQuotaEnabled;
+        afternoonInput.disabled = !rule || !record.meiQuotaEnabled;
+        row.classList.toggle('is-active', Boolean(rule));
+        row.querySelector('[data-mei-day-total]').textContent = `${Number(morningInput.value) + Number(afternoonInput.value)} total`;
       });
-      meiQuotaDialog.querySelector('[name="meiMorningQuota"]').value = record.meiMorningQuota;
-      meiQuotaDialog.querySelector('[name="meiAfternoonQuota"]').value = record.meiAfternoonQuota;
       meiQuotaFields.disabled = !record.meiQuotaEnabled;
       meiQuotaFields.classList.toggle('is-disabled', !record.meiQuotaEnabled);
       setFieldErrors(meiQuotaDialog, {});
@@ -2597,20 +2648,42 @@ function bindPageEvents() {
     meiQuotaEnabledInput?.addEventListener('change', () => {
       meiQuotaFields.disabled = !meiQuotaEnabledInput.checked;
       meiQuotaFields.classList.toggle('is-disabled', !meiQuotaEnabledInput.checked);
+      meiQuotaDialog.querySelectorAll('[data-mei-day-row]').forEach((row) => {
+        const checked = row.querySelector('[name="meiQuotaWeekday"]').checked;
+        row.querySelectorAll('input[type="number"]').forEach((input) => {
+          input.disabled = !meiQuotaEnabledInput.checked || !checked;
+        });
+      });
       setFieldErrors(meiQuotaDialog, {});
+    });
+    meiQuotaDialog?.querySelectorAll('[data-mei-day-row]').forEach((row) => {
+      const checkbox = row.querySelector('[name="meiQuotaWeekday"]');
+      const quotaInputs = [...row.querySelectorAll('input[type="number"]')];
+      checkbox.addEventListener('change', () => {
+        row.classList.toggle('is-active', checkbox.checked);
+        quotaInputs.forEach((input) => { input.disabled = !checkbox.checked; });
+      });
+      quotaInputs.forEach((input) => input.addEventListener('input', () => {
+        row.querySelector('[data-mei-day-total]').textContent = `${Number(quotaInputs[0].value) + Number(quotaInputs[1].value)} total`;
+      }));
     });
     meiQuotaDialog?.querySelector('[data-mei-quota-apply]')?.addEventListener('click', () => {
       const enabled = meiQuotaEnabledInput.checked;
-      const weekdays = [...meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekdays"]:checked')].map((item) => Number(item.value));
-      const morningQuota = Number(meiQuotaDialog.querySelector('[name="meiMorningQuota"]').value);
-      const afternoonQuota = Number(meiQuotaDialog.querySelector('[name="meiAfternoonQuota"]').value);
+      const rules = [...meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekday"]:checked')].map((checkbox) => {
+        const weekday = Number(checkbox.value);
+        return {
+          weekday,
+          morningQuota: Number(meiQuotaDialog.querySelector(`[name="meiMorningQuota-${weekday}"]`).value),
+          afternoonQuota: Number(meiQuotaDialog.querySelector(`[name="meiAfternoonQuota-${weekday}"]`).value)
+        };
+      });
       const errors = {};
 
-      if (enabled && !weekdays.length) errors.meiQuotaWeekdays = 'Selecione pelo menos um dia.';
-      if (enabled && (!Number.isInteger(morningQuota) || morningQuota < 0 || morningQuota > 100)) errors.meiMorningQuota = 'Informe um valor entre 0 e 100.';
-      if (enabled && (!Number.isInteger(afternoonQuota) || afternoonQuota < 0 || afternoonQuota > 100)) errors.meiAfternoonQuota = 'Informe um valor entre 0 e 100.';
-      if (enabled && !errors.meiMorningQuota && !errors.meiAfternoonQuota && morningQuota + afternoonQuota < 1) {
-        errors.meiMorningQuota = 'Informe ao menos uma vaga entre manha e tarde.';
+      if (enabled && !rules.length) errors.meiQuotaRules = 'Selecione pelo menos um dia.';
+      if (enabled && rules.some((rule) => !Number.isInteger(rule.morningQuota) || rule.morningQuota < 0 || rule.morningQuota > 100
+        || !Number.isInteger(rule.afternoonQuota) || rule.afternoonQuota < 0 || rule.afternoonQuota > 100
+        || rule.morningQuota + rule.afternoonQuota < 1)) {
+        errors.meiQuotaRules = 'Informe cotas validas em cada dia selecionado.';
       }
       setFieldErrors(meiQuotaDialog, errors);
       if (Object.keys(errors).length) return;
@@ -2619,14 +2692,16 @@ function bindPageEvents() {
       if (record) {
         record.meiQuotaEnabled = enabled;
         if (enabled) {
-          record.meiQuotaWeekdays = weekdays;
-          record.meiMorningQuota = morningQuota;
-          record.meiAfternoonQuota = afternoonQuota;
-          record.meiDailyQuota = morningQuota + afternoonQuota;
+          record.meiQuotaRules = rules;
+          record.meiQuotaWeekdays = rules.map((rule) => rule.weekday);
+          record.meiMorningQuota = rules[0].morningQuota;
+          record.meiAfternoonQuota = rules[0].afternoonQuota;
+          record.meiDailyQuota = rules[0].morningQuota + rules[0].afternoonQuota;
         }
       }
+      meiQuotaDialog.querySelector('[name="meiQuotaRules"]').value = JSON.stringify(enabled ? rules : record.meiQuotaRules);
       document.querySelector('[data-mei-quota-summary]').textContent = enabled
-        ? `${morningQuota} pela manha e ${afternoonQuota} a tarde`
+        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
         : 'Desativadas';
       meiQuotaDialog.close();
     });
@@ -2641,15 +2716,13 @@ function bindPageEvents() {
       values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
-      values.limitedWeekdays = values.limitedDaysEnabled
-        ? formData.getAll('limitedWeekdays').map(Number)
-        : [...current.limitedWeekdays];
-      values.limitedDayCapacity = values.limitedDaysEnabled ? Number(values.limitedDayCapacity) : current.limitedDayCapacity;
-      values.meiQuotaWeekdays = values.meiQuotaEnabled
-        ? formData.getAll('meiQuotaWeekdays').map(Number)
-        : [...current.meiQuotaWeekdays];
-      values.meiMorningQuota = values.meiQuotaEnabled ? Number(values.meiMorningQuota) : current.meiMorningQuota;
-      values.meiAfternoonQuota = values.meiQuotaEnabled ? Number(values.meiAfternoonQuota) : current.meiAfternoonQuota;
+      values.limitedDayRules = JSON.parse(values.limitedDayRules || '[]');
+      values.limitedWeekdays = values.limitedDayRules.map((rule) => rule.weekday);
+      values.limitedDayCapacity = values.limitedDayRules[0]?.capacity || current.limitedDayCapacity;
+      values.meiQuotaRules = JSON.parse(values.meiQuotaRules || '[]');
+      values.meiQuotaWeekdays = values.meiQuotaRules.map((rule) => rule.weekday);
+      values.meiMorningQuota = values.meiQuotaRules[0]?.morningQuota ?? current.meiMorningQuota;
+      values.meiAfternoonQuota = values.meiQuotaRules[0]?.afternoonQuota ?? current.meiAfternoonQuota;
       values.meiDailyQuota = values.meiMorningQuota + values.meiAfternoonQuota;
       if (values.schedulingMode === 'free') {
         values.openingTime = current.openingTime;
@@ -2667,10 +2740,12 @@ function bindPageEvents() {
             automaticPendingFollowUp: values.automaticPendingFollowUp,
             showAmetropiaFields: values.showAmetropiaFields,
             limitedDaysEnabled: values.limitedDaysEnabled,
+            limitedDayRules: values.limitedDayRules,
             limitedWeekdays: values.limitedWeekdays,
             limitedDayCapacity: values.limitedDayCapacity,
             meiDailyQuota: values.meiDailyQuota,
             meiQuotaEnabled: values.meiQuotaEnabled,
+            meiQuotaRules: values.meiQuotaRules,
             meiQuotaWeekdays: values.meiQuotaWeekdays,
             meiMorningQuota: values.meiMorningQuota,
             meiAfternoonQuota: values.meiAfternoonQuota
