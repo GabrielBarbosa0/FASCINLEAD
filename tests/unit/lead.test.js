@@ -154,13 +154,13 @@ describe('lead validation', () => {
     expect(result.data.pathologyLabels).toEqual(['Nao possui']);
   });
 
-  it('stores the additional eye conditions', () => {
+  it('ignores pathology options removed from the registration form', () => {
     const result = createLeadUpdate({
       ...validInput,
-      pathologyIds: ['macular-degeneration', 'retinal-detachment']
+      pathologyIds: ['dry-eye', 'macular-degeneration', 'retinal-detachment']
     });
 
-    expect(result.data.pathologyIds).toEqual(['macular-degeneration', 'retinal-detachment']);
-    expect(result.data.pathologyLabels).toEqual(['Degeneracao macular', 'Descolamento de retina']);
+    expect(result.data.pathologyIds).toEqual([]);
+    expect(result.data.pathologyLabels).toEqual([]);
   });
 });

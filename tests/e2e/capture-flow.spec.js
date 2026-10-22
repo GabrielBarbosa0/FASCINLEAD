@@ -80,6 +80,9 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByLabel('Numero', { exact: true }).fill('SN');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
+  for (const removedPathology of ['Olho seco', 'Degeneracao macular', 'Descolamento de retina']) {
+    await expect(page.getByLabel(removedPathology, { exact: true })).toHaveCount(0);
+  }
   await page.getByLabel('Glaucoma').check();
   await page.getByLabel('Diabetes').check();
   await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
@@ -550,6 +553,9 @@ test('keeps new registration beside the management return action', async ({ page
   await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
   await expect(dialog.getByLabel('Sexo')).toBeVisible();
+  for (const removedPathology of ['Olho seco', 'Degeneracao macular', 'Descolamento de retina']) {
+    await expect(dialog.getByLabel(removedPathology, { exact: true })).toHaveCount(0);
+  }
   const fieldOrder = await dialog.locator('input, select, textarea').evaluateAll((controls) => {
     const tracked = new Set([
       'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
