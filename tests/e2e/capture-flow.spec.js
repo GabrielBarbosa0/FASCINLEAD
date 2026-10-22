@@ -217,9 +217,16 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await expect(page.getByLabel('Nome')).toBeVisible();
   await expect(page.getByLabel('E-mail')).toBeVisible();
   await expect(page.getByLabel('Senha inicial')).toBeVisible();
+  await expect(page.getByLabel('Senha inicial')).toHaveValue('mudar123');
+  await expect(page.getByLabel('Senha inicial')).toHaveAttribute('readonly', '');
   await expect(page.getByLabel('Telefone')).toBeVisible();
   await expect(page.getByLabel('Codigo SavWin')).toBeVisible();
+  await page.getByLabel('Perfil / cargo').selectOption('system-admin');
+  await expect(page.getByLabel('Senha inicial')).toHaveValue('');
+  await expect(page.getByLabel('Senha inicial')).not.toHaveAttribute('readonly', '');
   await page.getByLabel('Perfil / cargo').selectOption('system-manager');
+  await expect(page.getByLabel('Senha inicial')).toHaveValue('mudar123');
+  await expect(page.getByLabel('Senha inicial')).toHaveAttribute('readonly', '');
   await expect(page.getByText('Unidades permitidas', { exact: true })).toBeVisible();
   await page.getByLabel('Loja 02').check();
   await page.getByLabel('Loja 06').check();
@@ -938,6 +945,12 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
   await page.getByRole('button', { name: 'Configurar agenda' }).click();
   const generalScheduleDialog = page.getByRole('dialog', { name: 'Configuracoes gerais' });
+  const storeScheduleGap = await generalScheduleDialog.evaluate((dialog) => {
+    const availability = dialog.querySelector('[name="schedulingMode"]').getBoundingClientRect();
+    const legend = dialog.querySelector('[data-field="storeHoursRules"] legend').getBoundingClientRect();
+    return legend.top - availability.bottom;
+  });
+  expect(storeScheduleGap).toBeLessThanOrEqual(40);
   await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
   await generalScheduleDialog.getByLabel('Exibir ametropias no cadastro').check();
   await generalScheduleDialog.getByLabel('Alertar atraso apos').fill('5');
@@ -986,6 +999,12 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('2 dias configurados')).toHaveCount(2);
   await page.getByRole('button', { name: 'Configurar triagem' }).click();
   const ophthalmologyDialog = page.getByRole('dialog', { name: 'Atendimento oftalmologico' });
+  const ophthalmologyScheduleGap = await ophthalmologyDialog.evaluate((dialog) => {
+    const minimumAge = dialog.querySelector('[name="ophthalmologyMinimumAge"]').getBoundingClientRect();
+    const legend = dialog.querySelector('[data-field="ophthalmologyHoursRules"] legend').getBoundingClientRect();
+    return legend.top - minimumAge.bottom;
+  });
+  expect(ophthalmologyScheduleGap).toBeLessThanOrEqual(40);
   await expect(ophthalmologyDialog.getByLabel('Ativar triagem para oftalmologista')).toBeChecked();
   await expect(ophthalmologyDialog.getByLabel('Perguntar sobre cirurgia a partir de')).toHaveValue('55');
   await ophthalmologyDialog.getByRole('checkbox', { name: 'Quinta', exact: true }).check();

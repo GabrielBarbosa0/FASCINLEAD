@@ -1,6 +1,7 @@
 import { STORE_IDS } from './stores.js';
 
 const VALID_ROLES = new Set(['captor', 'manager', 'admin']);
+export const DEFAULT_TEAM_PASSWORD = 'mudar123';
 
 export function normalizeAccessEmail(value = '') {
   return String(value).trim().toLowerCase();
@@ -29,12 +30,15 @@ export function formatAccessStoreSummary(access = {}) {
 export function validateAccess(values, roleProfiles = [], options = {}) {
   const displayName = String(values.displayName || '').trim();
   const email = normalizeAccessEmail(values.email);
-  const password = String(values.password || '');
+  const requestedPassword = String(values.password || '');
   const phone = String(values.phone || '').replace(/\D/g, '');
   const savwinCode = String(values.savwinCode || '').trim();
   const roleProfileId = String(values.roleProfileId || '');
   const selectedProfile = roleProfiles.find((profile) => profile.id === roleProfileId && profile.active !== false);
   const role = selectedProfile?.baseRole || String(values.role || '');
+  const password = options.requirePassword && role !== 'admin'
+    ? DEFAULT_TEAM_PASSWORD
+    : requestedPassword;
   const storeId = String(values.storeId || '').trim().toLowerCase();
   const requestedStoreIds = Array.isArray(values.storeIds) ? values.storeIds : [values.storeIds].filter(Boolean);
   const errors = {};
@@ -47,7 +51,7 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
     errors.email = 'Informe um e-mail valido.';
   }
 
-  if ((options.requirePassword || password) && (password.length < 6 || password.length > 72)) {
+  if ((options.requirePassword || requestedPassword) && (password.length < 6 || password.length > 72)) {
     errors.password = options.requirePassword
       ? 'Crie uma senha inicial entre 6 e 72 caracteres.'
       : 'A nova senha deve ter entre 6 e 72 caracteres.';

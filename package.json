@@ -17,6 +17,7 @@
     "migrate:appointment-services": "node scripts/migrate-appointment-services.js",
     "migrate:appointment-blocks": "node scripts/migrate-appointment-blocks.js",
     "sync:captar-team": "node scripts/sync-captar-team.js",
+    "reset:team-passwords": "node scripts/reset-team-default-password.js",
     "emulators": "firebase emulators:start",
     "deploy": "npm run build && firebase deploy"
   },

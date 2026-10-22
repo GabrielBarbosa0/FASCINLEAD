@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAccessStoreSummary, normalizeAccessEmail, validateAccess } from '../../src/utils/access.js';
+import { DEFAULT_TEAM_PASSWORD, formatAccessStoreSummary, normalizeAccessEmail, validateAccess } from '../../src/utils/access.js';
 
 describe('access validation', () => {
   it('normalizes an authorized Google email', () => {
@@ -59,12 +59,26 @@ describe('access validation', () => {
     expect(result.data.storeIds).toEqual(['loja-06', 'loja-02']);
   });
 
-  it('requires an initial password only when requested', () => {
+  it('uses the standard initial password for new non-admin access', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',
       email: 'pessoa@exemplo.com',
       phone: '81999999999',
       role: 'captor',
+      storeId: 'loja-06',
+      password: '123'
+    }, [], { requirePassword: true });
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.password).toBe(DEFAULT_TEAM_PASSWORD);
+  });
+
+  it('requires an exclusive initial password for a new administrator', () => {
+    const result = validateAccess({
+      displayName: 'Nova Administradora',
+      email: 'admin-nova@exemplo.com',
+      phone: '81999999999',
+      role: 'admin',
       storeId: 'loja-06',
       password: '123'
     }, [], { requirePassword: true });

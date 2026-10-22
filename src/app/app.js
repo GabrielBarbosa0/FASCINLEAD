@@ -65,7 +65,7 @@ import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, 
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
-import { formatAccessStoreSummary } from '../utils/access.js';
+import { DEFAULT_TEAM_PASSWORD, formatAccessStoreSummary } from '../utils/access.js';
 import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, normalizeRolePermissions, permissionsForScope, systemRoleProfileForId, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { duplicateGoalDraft } from '../utils/goal.js';
@@ -1978,7 +1978,7 @@ function accessView() {
         <div class="access-form-body">
           <div class="field access-field-wide" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" value="${escapeHtml(editingAccess?.displayName || '')}" required /><small class="field-error"></small></div>
           <div class="field access-field-wide" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(editingAccess?.email || '')}" placeholder="nome@exemplo.com" ${editingAccess ? 'readonly' : ''} required /><small class="field-error"></small></div>
-          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="password" minlength="6" maxlength="72" autocomplete="new-password" required /><small>A pessoa recebera um e-mail para confirmar a conta.</small><small class="field-error"></small></div>`}
+          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" value="${DEFAULT_TEAM_PASSWORD}" readonly required /><small data-access-password-help>Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.</small><small class="field-error"></small></div>`}
           <div class="field" data-field="role"><label for="access-role-profile">Perfil / cargo</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
           <div class="field" data-field="phone"><label for="access-phone">Telefone</label><input id="access-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" value="${escapeHtml(formatBrazilianPhone(editingAccess?.phone || ''))}" placeholder="(81) 99999-9999" required /><small class="field-error"></small></div>
           <div class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
@@ -2552,11 +2552,23 @@ function bindPageEvents() {
 
   const accessForm = document.querySelector('#access-form');
   if (accessForm) {
+    const creatingAccess = !state.access.editingEmail;
     const syncStorePicker = () => {
       const selected = state.settings.roleProfiles.find((profile) => profile.id === accessForm.elements.roleProfileId.value);
       const manager = selected?.baseRole === 'manager';
+      const administrator = selected?.baseRole === 'admin';
       const picker = document.querySelector('#access-stores-field');
       picker.hidden = !manager;
+      if (creatingAccess) {
+        const passwordInput = accessForm.elements.password;
+        const passwordHelp = accessForm.querySelector('[data-access-password-help]');
+        passwordInput.readOnly = !administrator;
+        passwordInput.type = administrator ? 'password' : 'text';
+        passwordInput.value = administrator ? '' : DEFAULT_TEAM_PASSWORD;
+        passwordHelp.textContent = administrator
+          ? 'Defina uma senha exclusiva para o acesso administrativo.'
+          : 'Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.';
+      }
       if (manager && !new FormData(accessForm).getAll('storeIds').length) {
         const primary = accessForm.querySelector(`[name="storeIds"][value="${accessForm.elements.storeId.value}"]`);
         if (primary) primary.checked = true;

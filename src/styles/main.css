@@ -2701,7 +2701,12 @@ svg {
 }
 
 .schedule-rule-dialog-body .schedule-limit-fields {
-  margin-top: 16px;
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+.schedule-rule-dialog-body .schedule-limit-fields > legend {
+  padding-top: 4px;
 }
 
 .general-schedule-dialog-body {
