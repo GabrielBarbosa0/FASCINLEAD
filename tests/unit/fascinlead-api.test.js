@@ -27,6 +27,7 @@ describe('FascinLead integration API contract', () => {
       birthDate: '1985-04-12',
       sex: 'female',
       customerCpf: '52998224725',
+      customerRg: '12.345.678-X',
       ametropiaLabels: ['Miopia'],
       pathologyLabels: ['Glaucoma'],
       updatedAtServer: new Date('2026-10-19T12:00:00.000Z')
@@ -34,11 +35,13 @@ describe('FascinLead integration API contract', () => {
 
     expect(publicLead('lead-1', lead)).toMatchObject({ street: 'Rua das Flores', streetNumber: 'S/N' });
     expect(publicLead('lead-1', lead)).not.toHaveProperty('customerCpf');
+    expect(publicLead('lead-1', lead)).not.toHaveProperty('customerRg');
     expect(publicLead('lead-1', lead)).not.toHaveProperty('birthDate');
     expect(publicLead('lead-1', lead)).not.toHaveProperty('sex');
     expect(publicLead('lead-1', lead)).not.toHaveProperty('health');
     expect(publicLead('lead-1', lead, { includeSensitive: true })).toMatchObject({
       customerCpf: '52998224725',
+      customerRg: '12.345.678-X',
       birthDate: '1985-04-12',
       sex: 'female',
       health: { ametropias: ['Miopia'], conditions: ['Glaucoma'] }

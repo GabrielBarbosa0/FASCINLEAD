@@ -114,6 +114,7 @@ describe('lead correction rules', () => {
       phone: '+5581999995678',
       phoneSearch: '81999995678',
       customerCpf: '52998224725',
+      customerRg: '12.345.678-X',
       birthDate: '1985-04-12',
       sex: 'female',
       street: 'Rua das Flores',
@@ -176,6 +177,14 @@ describe('lead correction rules', () => {
       ametropiaLabels: ['Presbiopia'],
       pathologyIds: ['hypertension'],
       pathologyLabels: ['Pressao alta'],
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('rejects an RG longer than the supported field', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      customerRg: '1'.repeat(21),
       updatedAtServer: Timestamp.now()
     }));
   });

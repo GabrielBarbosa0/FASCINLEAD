@@ -49,6 +49,7 @@ export function publicLead(id, lead, { includeSensitive = false } = {}) {
 
   if (includeSensitive) {
     result.customerCpf = String(lead.customerCpf || '');
+    result.customerRg = String(lead.customerRg || '');
     result.birthDate = String(lead.birthDate || '');
     result.sex = String(lead.sex || '');
     result.health = {

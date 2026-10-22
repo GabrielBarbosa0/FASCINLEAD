@@ -76,6 +76,10 @@ function normalizeStreetNumber(value) {
   return /^s\/?n$/i.test(number) ? 'S/N' : number;
 }
 
+function normalizeRg(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
 function parseBirthDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
   if (!match) return null;
@@ -103,6 +107,7 @@ export function validateLeadInput(input) {
   const fullName = input.fullName?.trim() || '';
   const phone = normalizeBrazilianPhone(input.phone);
   const customerCpf = normalizeCpf(input.customerCpf);
+  const customerRg = normalizeRg(input.customerRg);
   const birthDate = String(input.birthDate || '').trim();
   const sex = String(input.sex || '').trim();
 
@@ -110,6 +115,7 @@ export function validateLeadInput(input) {
   if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF valido.';
+  if (customerRg.length > 20) errors.customerRg = 'Use no maximo 20 caracteres.';
   if (birthDate && calculateAge(birthDate) === null) errors.birthDate = 'Informe uma data de nascimento valida.';
   if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opcao valida.';
   if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no maximo 120 caracteres.';
@@ -132,7 +138,7 @@ export function validateLeadInput(input) {
     errors.appointmentServiceId = 'Selecione um servico valido.';
   }
 
-  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, birthDate, sex };
+  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, customerRg, birthDate, sex };
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
@@ -150,6 +156,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
       customerCpf: validation.customerCpf,
+      customerRg: validation.customerRg,
       birthDate: validation.birthDate,
       sex: validation.sex,
       street: input.street?.trim() || '',
@@ -199,6 +206,7 @@ export function createLeadUpdate(input) {
       phone: validation.phone.e164,
       phoneSearch: validation.phone.search,
       customerCpf: validation.customerCpf,
+      customerRg: validation.customerRg,
       birthDate: validation.birthDate,
       sex: validation.sex,
       street: input.street?.trim() || '',

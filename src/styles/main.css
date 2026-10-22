@@ -818,6 +818,10 @@ svg {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 0.65fr);
 }
 
+.contact-fields {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.55fr);
+}
+
 .appointment-fields {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -4507,6 +4511,14 @@ svg {
 
   .identity-fields {
     grid-template-columns: 1fr;
+  }
+
+  .contact-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-fields .field:first-child {
+    grid-column: 1;
   }
 
   .identity-fields .field:first-child {

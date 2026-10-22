@@ -45,6 +45,7 @@ const CSV_COLUMNS = [
   ['Nome do cliente', (lead) => lead.fullName],
   ['Nome preferido', (lead) => lead.preferredName],
   ['Telefone', (lead) => formatBrazilianPhone(lead.phoneSearch || lead.phone)],
+  ['RG', (lead) => lead.customerRg],
   ['Data de nascimento', (lead) => inputDatePart(lead.birthDate)],
   ['Idade atual', (lead) => calculateAge(lead.birthDate) ?? ''],
   ['Sexo', (lead) => sexLabel(lead.sex)],

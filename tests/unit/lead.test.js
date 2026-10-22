@@ -4,6 +4,7 @@ import { calculateAge, createLeadDocument, createLeadUpdate, validateLeadInput }
 const validInput = {
   fullName: 'Cliente Exemplo',
   phone: '(81) 99999-1234',
+  customerRg: '12.345.678-x',
   customerCpf: '529.982.247-25',
   birthDate: '1985-04-12',
   sex: 'female',
@@ -53,6 +54,11 @@ describe('lead validation', () => {
     expect(result.errors.customerCpf).toBeDefined();
   });
 
+  it('normalizes an optional RG and limits its length', () => {
+    expect(createLeadUpdate(validInput).data.customerRg).toBe('12.345.678-X');
+    expect(validateLeadInput({ ...validInput, customerRg: '1'.repeat(21) }).errors.customerRg).toBeDefined();
+  });
+
   it('calculates age and rejects a future birth date', () => {
     expect(calculateAge('2000-11-10', new Date(2026, 9, 21))).toBe(25);
     expect(calculateAge('2000-10-10', new Date(2026, 9, 21))).toBe(26);
@@ -87,6 +93,7 @@ describe('lead validation', () => {
       phone: '+5581999991234',
       phoneSearch: '81999991234',
       customerCpf: '52998224725',
+      customerRg: '12.345.678-X',
       birthDate: '1985-04-12',
       sex: 'female',
       street: 'Rua das Flores',
@@ -116,6 +123,7 @@ describe('lead validation', () => {
     const result = createLeadUpdate({
       ...validInput,
       fullName: 'Cliente Corrigido',
+      customerRg: '12.345.678-X',
       city: 'Recife'
     });
 

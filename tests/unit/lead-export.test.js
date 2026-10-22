@@ -12,6 +12,7 @@ describe('createLeadsCsv', () => {
       sex: 'female',
       phone: '+5581999991234',
       phoneSearch: '81999991234',
+      customerRg: '12.345.678-X',
       interestLabel: 'Armacao',
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyLabels: ['Glaucoma', 'Pressao alta'],
@@ -34,6 +35,8 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"ID do lead";"Nome do cliente"');
     expect(csv).toContain('"lead-001";"Cliente Exemplo";"Cliente";"(81) 99999-1234"');
     expect(csv).toContain('"Data de nascimento";"Idade atual"');
+    expect(csv).toContain('"Telefone";"RG"');
+    expect(csv).toContain('"12.345.678-X"');
     expect(csv).toContain('"12/04/1985"');
     expect(csv).toContain('"Sexo"');
     expect(csv).toContain('"Feminino"');

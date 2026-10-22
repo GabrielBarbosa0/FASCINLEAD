@@ -96,7 +96,7 @@ service cloud.firestore {
     function validLead(data) {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'birthDate', 'sex',
+          'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
@@ -123,6 +123,7 @@ service cloud.firestore {
           data.customerCpf is string
           && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))
         ))
+        && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
         && (!('birthDate' in data) || (
           data.birthDate is string
           && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
@@ -253,6 +254,7 @@ service cloud.firestore {
         && data.phoneSearch.matches('^\\d{10,11}$')
         && (!('customerCpf' in data) || (data.customerCpf is string
           && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))))
+        && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
         && (!('birthDate' in data) || (data.birthDate is string
           && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))))
         && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
@@ -321,7 +323,7 @@ service cloud.firestore {
         && resource.data.capturedByUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'birthDate', 'sex',
+          'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
@@ -405,7 +407,7 @@ service cloud.firestore {
     function isAdminLeadCorrection() {
       return isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'birthDate', 'sex',
+          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',

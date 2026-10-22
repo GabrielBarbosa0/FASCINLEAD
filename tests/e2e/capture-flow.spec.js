@@ -50,6 +50,17 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Cadastro' })).toBeVisible();
+  const standardContactLayout = await page.locator('#lead-form').evaluate((form) => {
+    const phone = form.elements.phone.getBoundingClientRect();
+    const rg = form.elements.customerRg.getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, phoneTop: phone.top, phoneBottom: phone.bottom, phoneRight: phone.right, rgTop: rg.top, rgLeft: rg.left };
+  });
+  if (standardContactLayout.viewportWidth > 560) {
+    expect(Math.abs(standardContactLayout.phoneTop - standardContactLayout.rgTop)).toBeLessThanOrEqual(2);
+    expect(standardContactLayout.rgLeft).toBeGreaterThanOrEqual(standardContactLayout.phoneRight);
+  } else {
+    expect(standardContactLayout.rgTop).toBeGreaterThanOrEqual(standardContactLayout.phoneBottom);
+  }
   const standardPairLayout = await page.locator('#lead-form').evaluate((form) => {
     const interest = form.elements.interestId.getBoundingClientRect();
     const service = form.elements.appointmentServiceId.getBoundingClientRect();
@@ -71,8 +82,10 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByLabel('RG', { exact: true }).fill('12.345.678-X');
   await page.getByLabel('CPF', { exact: true }).fill('52998224725');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
+  await expect(page.getByLabel('RG', { exact: true })).toHaveValue('12.345.678-X');
   await page.getByLabel('Data de nascimento').fill('1985-04-12');
   await expect(page.locator('[data-birth-age]')).toHaveText(/\d+ anos/);
   await page.getByLabel('Sexo').selectOption('female');
@@ -553,12 +566,23 @@ test('keeps new registration beside the management return action', async ({ page
   await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
   await expect(dialog.getByLabel('Sexo')).toBeVisible();
+  const modalContactLayout = await dialog.evaluate((element) => {
+    const phone = element.querySelector('[name="phone"]').getBoundingClientRect();
+    const rg = element.querySelector('[name="customerRg"]').getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, phoneTop: phone.top, phoneBottom: phone.bottom, phoneRight: phone.right, rgTop: rg.top, rgLeft: rg.left };
+  });
+  if (modalContactLayout.viewportWidth > 560) {
+    expect(Math.abs(modalContactLayout.phoneTop - modalContactLayout.rgTop)).toBeLessThanOrEqual(2);
+    expect(modalContactLayout.rgLeft).toBeGreaterThanOrEqual(modalContactLayout.phoneRight);
+  } else {
+    expect(modalContactLayout.rgTop).toBeGreaterThanOrEqual(modalContactLayout.phoneBottom);
+  }
   for (const removedPathology of ['Olho seco', 'Degeneracao macular', 'Descolamento de retina']) {
     await expect(dialog.getByLabel(removedPathology, { exact: true })).toHaveCount(0);
   }
   const fieldOrder = await dialog.locator('input, select, textarea').evaluateAll((controls) => {
     const tracked = new Set([
-      'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
+      'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
       'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId',
       'storeId', 'appointmentServiceId', 'ametropiaIds', 'pathologyIds',
       'appointmentDate', 'appointmentTime', 'notes'
@@ -574,7 +598,7 @@ test('keeps new registration beside the management return action', async ({ page
     }, []);
   });
   expect(fieldOrder).toEqual([
-    'fullName', 'phone', 'customerCpf', 'birthDate', 'sex', 'preferredName',
+    'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
     'street', 'streetNumber', 'neighborhood', 'city', 'state', 'storeId',
     'interestId', 'appointmentServiceId', 'pathologyIds', 'appointmentDate',
     'appointmentTime', 'notes'
@@ -598,8 +622,10 @@ test('keeps new registration beside the management return action', async ({ page
     expect(modalPairLayout.serviceTop).toBeGreaterThanOrEqual(modalPairLayout.interestBottom);
   }
   await dialog.getByLabel('Nome *').fill('Cliente preservado');
+  await dialog.getByLabel('RG', { exact: true }).fill('98.765.432-1');
   await dialog.getByLabel('Loja').selectOption('loja-02');
   await expect(dialog.getByLabel('Nome *')).toHaveValue('Cliente preservado');
+  await expect(dialog.getByLabel('RG', { exact: true })).toHaveValue('98.765.432-1');
   const identityLayout = await dialog.evaluate((element) => {
     const cpf = element.querySelector('[data-field="customerCpf"]').getBoundingClientRect();
     const birthDate = element.querySelector('[data-field="birthDate"]').getBoundingClientRect();
