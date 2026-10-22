@@ -37,6 +37,19 @@ export const SEX_OPTIONS = [
   { id: 'male', label: 'Masculino' }
 ];
 
+export const EYE_SURGERY_STATUS_OPTIONS = [
+  { id: '', label: 'Selecione' },
+  { id: 'yes', label: 'Sim' },
+  { id: 'no', label: 'Nao' },
+  { id: 'unknown', label: 'Nao sabe informar' }
+];
+
+export const EYE_SURGERIES = [
+  { id: '', label: 'Selecione' },
+  { id: 'cataract', label: 'Catarata' },
+  { id: 'other', label: 'Outra' }
+];
+
 function normalizeAmetropias(values) {
   const requested = Array.isArray(values) ? values : [values].filter(Boolean);
   const validIds = new Set(AMETROPIAS.map((item) => item.id));
@@ -102,6 +115,63 @@ export function calculateAge(birthDate, referenceDate = new Date()) {
   return age >= 0 ? age : null;
 }
 
+function booleanValue(value) {
+  return value === true || value === 'true';
+}
+
+function weekdayFromDate(value) {
+  const parsed = parseBirthDate(value);
+  return parsed ? new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)).getUTCDay() : null;
+}
+
+export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = new Date()) {
+  const enabled = settings.ophthalmologyRoutingEnabled === undefined
+    ? true
+    : booleanValue(settings.ophthalmologyRoutingEnabled);
+  const minimumAge = Number.isInteger(Number(settings.ophthalmologyMinimumAge))
+    ? Number(settings.ophthalmologyMinimumAge)
+    : 55;
+  const age = calculateAge(input.birthDate, referenceDate);
+  const surgeryQuestionRequired = enabled && age !== null && age >= minimumAge;
+  const surgeryStatus = EYE_SURGERY_STATUS_OPTIONS.some((item) => item.id === input.eyeSurgeryStatus)
+    ? input.eyeSurgeryStatus
+    : '';
+  const surgeryType = EYE_SURGERIES.some((item) => item.id === input.eyeSurgeryType)
+    ? input.eyeSurgeryType
+    : '';
+  const pathologyCriteria = Array.isArray(settings.ophthalmologyPathologyIds)
+    ? settings.ophthalmologyPathologyIds
+    : ['cataract'];
+  const surgeryCriteria = Array.isArray(settings.ophthalmologySurgeryIds)
+    ? settings.ophthalmologySurgeryIds
+    : ['cataract'];
+  const pathologyIds = normalizePathologies(input.pathologyIds);
+  const pathologyMatch = pathologyIds.some((id) => pathologyCriteria.includes(id));
+  const surgeryMatch = surgeryStatus === 'yes' && surgeryCriteria.includes(surgeryType);
+  const override = ['automatic', 'ophthalmologist', 'optometrist'].includes(input.careRouteOverride)
+    ? input.careRouteOverride
+    : 'automatic';
+  const automaticRoute = enabled && (pathologyMatch || surgeryMatch) ? 'ophthalmologist' : 'optometrist';
+  const careRoute = override === 'automatic' ? automaticRoute : override;
+  const reasons = [];
+  if (pathologyMatch) reasons.push('pathology');
+  if (surgeryMatch) reasons.push('surgery');
+  if (override !== 'automatic') reasons.push('manual');
+
+  return {
+    age,
+    surgeryQuestionRequired,
+    eyeSurgeryStatus: surgeryStatus,
+    eyeSurgeryType: surgeryStatus === 'yes' ? surgeryType : '',
+    eyeSurgeryDetails: surgeryStatus === 'yes' && surgeryType === 'other'
+      ? String(input.eyeSurgeryDetails || '').trim().slice(0, 120)
+      : '',
+    careRoute,
+    careRouteOverride: override,
+    careRouteReasons: reasons
+  };
+}
+
 export function validateLeadInput(input) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
@@ -122,6 +192,22 @@ export function validateLeadInput(input) {
   if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no maximo 12 caracteres.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no maximo 500 caracteres.';
 
+  const triage = ophthalmologyTriage(input, {
+    ophthalmologyRoutingEnabled: input.ophthalmologyRoutingEnabled,
+    ophthalmologyMinimumAge: input.ophthalmologyMinimumAge,
+    ophthalmologyPathologyIds: input.ophthalmologyPathologyIds,
+    ophthalmologySurgeryIds: input.ophthalmologySurgeryIds
+  });
+  if (triage.surgeryQuestionRequired && !triage.eyeSurgeryStatus) {
+    errors.eyeSurgeryStatus = 'Informe se o cliente ja realizou cirurgia nos olhos.';
+  }
+  if (triage.eyeSurgeryStatus === 'yes' && !triage.eyeSurgeryType) {
+    errors.eyeSurgeryType = 'Informe qual cirurgia foi realizada.';
+  }
+  if (triage.eyeSurgeryStatus === 'yes' && triage.eyeSurgeryType === 'other' && !triage.eyeSurgeryDetails) {
+    errors.eyeSurgeryDetails = 'Informe o nome da cirurgia.';
+  }
+
   const appointmentDate = input.appointmentDate?.trim() || '';
   const appointmentTime = input.appointmentTime?.trim() || '';
   if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
@@ -137,8 +223,15 @@ export function validateLeadInput(input) {
   if (input.appointmentServiceId && String(input.appointmentServiceId).length > 120) {
     errors.appointmentServiceId = 'Selecione um servico valido.';
   }
+  const allowedWeekdays = Array.isArray(input.ophthalmologyAllowedWeekdays)
+    ? input.ophthalmologyAllowedWeekdays.map(Number)
+    : [];
+  if (triage.careRoute === 'ophthalmologist' && appointmentDate && allowedWeekdays.length
+    && !allowedWeekdays.includes(weekdayFromDate(appointmentDate))) {
+    errors.appointmentDate = 'Escolha um dia de atendimento do oftalmologista.';
+  }
 
-  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, customerRg, birthDate, sex };
+  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, customerRg, birthDate, sex, triage };
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
@@ -168,6 +261,12 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
       ...pathologyData(input),
+      eyeSurgeryStatus: validation.triage.eyeSurgeryStatus,
+      eyeSurgeryType: validation.triage.eyeSurgeryType,
+      eyeSurgeryDetails: validation.triage.eyeSurgeryDetails,
+      careRoute: validation.triage.careRoute,
+      careRouteOverride: validation.triage.careRouteOverride,
+      careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() ? {
@@ -218,6 +317,12 @@ export function createLeadUpdate(input) {
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
       ...pathologyData(input),
+      eyeSurgeryStatus: validation.triage.eyeSurgeryStatus,
+      eyeSurgeryType: validation.triage.eyeSurgeryType,
+      eyeSurgeryDetails: validation.triage.eyeSurgeryDetails,
+      careRoute: validation.triage.careRoute,
+      careRouteOverride: validation.triage.careRouteOverride,
+      careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() && input.schedulingMode ? {

@@ -4,7 +4,9 @@ import {
   appointmentQuotaStatus,
   appointmentSlotId,
   buildAppointmentSlots,
+  isOphthalmologyDateAllowed,
   normalizeStoreSchedule,
+  ophthalmologyAppointmentSchedule,
   validateStoreSchedule
 } from '../../src/utils/schedule.js';
 
@@ -17,6 +19,13 @@ describe('store schedule helpers', () => {
       rescheduleAfterMinutes: 30,
       automaticPendingFollowUp: false,
       showAmetropiaFields: false,
+      ophthalmologyRoutingEnabled: true,
+      ophthalmologyMinimumAge: 55,
+      ophthalmologyWeekdays: [6],
+      ophthalmologyOpeningTime: '08:00',
+      ophthalmologyClosingTime: '12:00',
+      ophthalmologyPathologyIds: ['cataract'],
+      ophthalmologySurgeryIds: ['cataract'],
       limitedDaysEnabled: false,
       limitedWeekdays: [3, 6],
       limitedDayCapacity: 10,
@@ -156,6 +165,33 @@ describe('store schedule helpers', () => {
     expect(normalizeStoreSchedule({}).showAmetropiaFields).toBe(false);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'true' }).showAmetropiaFields).toBe(true);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'false' }).showAmetropiaFields).toBe(false);
+  });
+
+  it('limits ophthalmology availability to configured days and hours', () => {
+    const settings = normalizeStoreSchedule({
+      ophthalmologyWeekdays: [3, 6],
+      ophthalmologyOpeningTime: '09:00',
+      ophthalmologyClosingTime: '13:00'
+    });
+
+    expect(isOphthalmologyDateAllowed(settings, '2026-10-21')).toBe(true);
+    expect(isOphthalmologyDateAllowed(settings, '2026-10-22')).toBe(false);
+    expect(ophthalmologyAppointmentSchedule(settings)).toMatchObject({ openingTime: '09:00', closingTime: '13:00' });
+  });
+
+  it('validates enabled ophthalmology settings', () => {
+    expect(validateStoreSchedule({
+      ...normalizeStoreSchedule({}),
+      ophthalmologyWeekdays: [],
+      ophthalmologyOpeningTime: '13:00',
+      ophthalmologyClosingTime: '09:00'
+    })).toMatchObject({
+      isValid: false,
+      errors: {
+        ophthalmologyWeekdays: expect.any(String),
+        ophthalmologyClosingTime: expect.any(String)
+      }
+    });
   });
 
   it('limits each MEI on configured weekdays', () => {

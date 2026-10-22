@@ -141,6 +141,34 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
 
+test('routes cataract clients to configured ophthalmology days', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+
+  await page.getByLabel('Data de nascimento').fill('1960-01-01');
+  await expect(page.getByLabel('Ja realizou cirurgia nos olhos? *')).toBeVisible();
+  await expect(page.getByLabel('Qual cirurgia? *')).toBeVisible();
+  await expect(page.getByLabel('Qual cirurgia? *')).toBeDisabled();
+  await page.getByLabel('Ja realizou cirurgia nos olhos? *').selectOption('yes');
+  await expect(page.getByLabel('Qual cirurgia? *')).toBeEnabled();
+  await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
+  await page.getByLabel('Catarata', { exact: true }).check();
+  await expect(page.getByText('Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.')).toBeVisible();
+
+  await page.getByLabel('Data do pre-agendamento').fill('2026-10-22');
+  await expect(page.getByLabel('Horario disponivel')).toBeDisabled();
+  await expect(page.getByText('O oftalmologista nao atende neste dia.')).toBeVisible();
+
+  await page.getByLabel('Data do pre-agendamento').fill('2026-10-24');
+  const timeSelect = page.getByLabel('Horario disponivel');
+  await expect(timeSelect).toBeEnabled();
+  await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="11:40"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="12:00"]')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('ophthalmology-triage.png'), fullPage: true });
+});
+
 test('opens the personal goals screen on mobile and desktop', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Metas/ }).click();
@@ -954,6 +982,13 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await meiQuotaDialog.getByRole('button', { name: 'Aplicar cotas' }).click();
   await expect(meiQuotaDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Configurar triagem' }).click();
+  const ophthalmologyDialog = page.getByRole('dialog', { name: 'Atendimento oftalmologico' });
+  await expect(ophthalmologyDialog.getByLabel('Ativar triagem para oftalmologista')).toBeChecked();
+  await expect(ophthalmologyDialog.getByLabel('Perguntar sobre cirurgia a partir de')).toHaveValue('55');
+  await expect(ophthalmologyDialog.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
+  await ophthalmologyDialog.getByRole('button', { name: 'Aplicar triagem' }).click();
+  await expect(ophthalmologyDialog).not.toBeVisible();
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   if (!testInfo.project.name.includes('mobile')) {
@@ -1017,8 +1052,8 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
     };
   });
   expect(layout.formWidth).toBeGreaterThan(900);
-  expect(layout.cardCount).toBe(3);
-  expect(Math.max(...layout.cardTops) - Math.min(...layout.cardTops)).toBeLessThanOrEqual(2);
+  expect(layout.cardCount).toBe(4);
+  expect(new Set(layout.cardTops.map((top) => Math.round(top))).size).toBeLessThanOrEqual(2);
   expect(layout.cardsInsideForm).toBe(true);
   expect(layout.overflow).toBeLessThanOrEqual(1);
   await expect(page.locator('.schedule-preview')).toHaveCount(0);

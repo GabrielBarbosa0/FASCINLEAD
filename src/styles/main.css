@@ -881,6 +881,72 @@ svg {
   background: var(--brand-soft);
 }
 
+.eye-triage-section {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.eye-triage-section .field {
+  margin-bottom: 0;
+}
+
+.eye-surgery-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.eye-surgery-dependent {
+  transition: opacity 160ms ease;
+}
+
+.eye-surgery-dependent.is-disabled {
+  opacity: 0.5;
+}
+
+.eye-surgery-dependent.is-disabled select {
+  cursor: not-allowed;
+  background: #edf0f3;
+}
+
+.eye-surgery-fields [data-eye-surgery-details] {
+  grid-column: 1 / -1;
+}
+
+.eye-surgery-fields[hidden],
+.eye-surgery-fields [hidden],
+.eye-route-status[hidden] {
+  display: none;
+}
+
+.eye-route-override {
+  max-width: 360px;
+}
+
+.eye-route-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #9db7dc;
+  border-radius: 8px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.eye-route-status svg {
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+}
+
 .field .ametropia-option input {
   flex: 0 0 17px;
   width: 17px;
@@ -914,8 +980,14 @@ svg {
   background: #edf0f3;
 }
 
-.field.is-fully-booked .schedule-date-status {
+.field.is-fully-booked .schedule-date-status,
+.field.is-date-restricted .schedule-date-status {
   display: block;
+}
+
+.field.is-date-restricted input {
+  border-color: #d7a552;
+  background: #fff9ed;
 }
 
 .field label:not(.checkbox-label) {
@@ -2392,9 +2464,22 @@ svg {
 
 .schedule-config-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 18px;
+}
+
+.ophthalmology-settings {
+  display: grid;
+  gap: 16px;
+}
+
+.ophthalmology-settings.is-disabled {
+  display: none;
+}
+
+.ophthalmology-criteria {
+  margin: 0;
 }
 
 .schedule-settings-fields.is-disabled {
@@ -4655,6 +4740,14 @@ svg {
 
   .contact-fields {
     grid-template-columns: 1fr;
+  }
+
+  .eye-surgery-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .eye-surgery-fields .field:first-child {
+    grid-column: auto;
   }
 
   .contact-fields .field:first-child {

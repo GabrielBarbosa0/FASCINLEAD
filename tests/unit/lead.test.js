@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAge, createLeadDocument, createLeadUpdate, validateLeadInput } from '../../src/utils/lead.js';
+import { calculateAge, createLeadDocument, createLeadUpdate, ophthalmologyTriage, validateLeadInput } from '../../src/utils/lead.js';
 
 const validInput = {
   fullName: 'Cliente Exemplo',
@@ -170,5 +170,59 @@ describe('lead validation', () => {
 
     expect(result.data.pathologyIds).toEqual([]);
     expect(result.data.pathologyLabels).toEqual([]);
+  });
+
+  it('requires the eye surgery answer from the configured minimum age', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      birthDate: '1960-01-01',
+      ophthalmologyRoutingEnabled: true,
+      ophthalmologyMinimumAge: 55,
+      eyeSurgeryStatus: ''
+    });
+
+    expect(result.errors.eyeSurgeryStatus).toBeDefined();
+  });
+
+  it('requires which surgery was performed and supports another description', () => {
+    expect(validateLeadInput({
+      ...validInput,
+      birthDate: '1960-01-01',
+      ophthalmologyRoutingEnabled: true,
+      ophthalmologyMinimumAge: 55,
+      eyeSurgeryStatus: 'yes',
+      eyeSurgeryType: ''
+    }).errors.eyeSurgeryType).toBeDefined();
+    expect(validateLeadInput({
+      ...validInput,
+      birthDate: '1960-01-01',
+      ophthalmologyRoutingEnabled: true,
+      ophthalmologyMinimumAge: 55,
+      eyeSurgeryStatus: 'yes',
+      eyeSurgeryType: 'other',
+      eyeSurgeryDetails: ''
+    }).errors.eyeSurgeryDetails).toBeDefined();
+  });
+
+  it('routes cataract pathology or surgery to ophthalmology', () => {
+    const settings = {
+      ophthalmologyRoutingEnabled: true,
+      ophthalmologyMinimumAge: 55,
+      ophthalmologyPathologyIds: ['cataract'],
+      ophthalmologySurgeryIds: ['cataract']
+    };
+    expect(ophthalmologyTriage({ ...validInput, pathologyIds: ['cataract'] }, settings).careRoute).toBe('ophthalmologist');
+    expect(ophthalmologyTriage({ ...validInput, pathologyIds: [], eyeSurgeryStatus: 'yes', eyeSurgeryType: 'cataract' }, settings).careRoute).toBe('ophthalmologist');
+    expect(ophthalmologyTriage({ ...validInput, pathologyIds: ['glaucoma'] }, settings).careRoute).toBe('optometrist');
+  });
+
+  it('rejects ophthalmology appointments outside configured weekdays', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      appointmentDate: '2026-10-22',
+      careRouteOverride: 'ophthalmologist',
+      ophthalmologyAllowedWeekdays: [6]
+    });
+    expect(result.errors.appointmentDate).toBeDefined();
   });
 });

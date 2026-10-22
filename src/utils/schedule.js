@@ -5,6 +5,13 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   rescheduleAfterMinutes: 30,
   automaticPendingFollowUp: false,
   showAmetropiaFields: false,
+  ophthalmologyRoutingEnabled: true,
+  ophthalmologyMinimumAge: 55,
+  ophthalmologyWeekdays: Object.freeze([6]),
+  ophthalmologyOpeningTime: '08:00',
+  ophthalmologyClosingTime: '12:00',
+  ophthalmologyPathologyIds: Object.freeze(['cataract']),
+  ophthalmologySurgeryIds: Object.freeze(['cataract']),
   limitedDaysEnabled: false,
   limitedWeekdays: Object.freeze([3, 6]),
   limitedDayCapacity: 10,
@@ -140,6 +147,16 @@ export function normalizeStoreSchedule(value = {}) {
   const primaryMeiRule = meiQuotaRules[0];
   const opening = TIME_PATTERN.test(value.openingTime || '') ? value.openingTime : DEFAULT_STORE_SCHEDULE.openingTime;
   const closing = TIME_PATTERN.test(value.closingTime || '') ? value.closingTime : DEFAULT_STORE_SCHEDULE.closingTime;
+  const ophthalmologyWeekdays = Array.isArray(value.ophthalmologyWeekdays)
+    ? [...new Set(value.ophthalmologyWeekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [...DEFAULT_STORE_SCHEDULE.ophthalmologyWeekdays];
+  const ophthalmologyMinimumAge = Number(value.ophthalmologyMinimumAge);
+  const ophthalmologyOpeningTime = TIME_PATTERN.test(value.ophthalmologyOpeningTime || '')
+    ? value.ophthalmologyOpeningTime
+    : DEFAULT_STORE_SCHEDULE.ophthalmologyOpeningTime;
+  const ophthalmologyClosingTime = TIME_PATTERN.test(value.ophthalmologyClosingTime || '')
+    ? value.ophthalmologyClosingTime
+    : DEFAULT_STORE_SCHEDULE.ophthalmologyClosingTime;
   return {
     schedulingMode: value.schedulingMode === 'free' ? 'free' : 'controlled',
     appointmentDurationMinutes: Number.isInteger(duration) && duration >= 5 && duration <= 180
@@ -149,6 +166,21 @@ export function normalizeStoreSchedule(value = {}) {
     rescheduleAfterMinutes: normalizedRescheduleAfter,
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
+    ophthalmologyRoutingEnabled: value.ophthalmologyRoutingEnabled === undefined
+      ? DEFAULT_STORE_SCHEDULE.ophthalmologyRoutingEnabled
+      : value.ophthalmologyRoutingEnabled === true || value.ophthalmologyRoutingEnabled === 'true',
+    ophthalmologyMinimumAge: Number.isInteger(ophthalmologyMinimumAge) && ophthalmologyMinimumAge >= 0 && ophthalmologyMinimumAge <= 120
+      ? ophthalmologyMinimumAge
+      : DEFAULT_STORE_SCHEDULE.ophthalmologyMinimumAge,
+    ophthalmologyWeekdays,
+    ophthalmologyOpeningTime,
+    ophthalmologyClosingTime,
+    ophthalmologyPathologyIds: Array.isArray(value.ophthalmologyPathologyIds)
+      ? [...new Set(value.ophthalmologyPathologyIds.map(String).filter(Boolean))]
+      : [...DEFAULT_STORE_SCHEDULE.ophthalmologyPathologyIds],
+    ophthalmologySurgeryIds: Array.isArray(value.ophthalmologySurgeryIds)
+      ? [...new Set(value.ophthalmologySurgeryIds.map(String).filter(Boolean))]
+      : [...DEFAULT_STORE_SCHEDULE.ophthalmologySurgeryIds],
     limitedDaysEnabled: value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true',
     limitedDayRules,
     limitedWeekdays: limitedDayRules.map((rule) => rule.weekday),
@@ -193,6 +225,13 @@ export function validateStoreSchedule(value) {
     );
   const opening = timeToMinutes(value.openingTime);
   const closing = timeToMinutes(value.closingTime);
+  const ophthalmologyEnabled = value.ophthalmologyRoutingEnabled === true || value.ophthalmologyRoutingEnabled === 'true';
+  const ophthalmologyMinimumAge = Number(value.ophthalmologyMinimumAge);
+  const ophthalmologyOpening = timeToMinutes(value.ophthalmologyOpeningTime);
+  const ophthalmologyClosing = timeToMinutes(value.ophthalmologyClosingTime);
+  const ophthalmologyWeekdays = Array.isArray(value.ophthalmologyWeekdays)
+    ? value.ophthalmologyWeekdays.map(Number)
+    : [];
 
   if (!Number.isInteger(rawDuration) || rawDuration < 5 || rawDuration > 180) {
     errors.appointmentDurationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
@@ -222,8 +261,37 @@ export function validateStoreSchedule(value) {
   if (meiQuotaEnabled && (!meiQuotaRules.length || validMeiRules.length !== meiQuotaRules.length)) {
     errors.meiQuotaRules = 'Configure ao menos um dia com cotas validas para manha e tarde.';
   }
+  if (ophthalmologyEnabled && (!Number.isInteger(ophthalmologyMinimumAge) || ophthalmologyMinimumAge < 0 || ophthalmologyMinimumAge > 120)) {
+    errors.ophthalmologyMinimumAge = 'Informe uma idade entre 0 e 120 anos.';
+  }
+  if (ophthalmologyEnabled && (!ophthalmologyWeekdays.length
+    || ophthalmologyWeekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6))) {
+    errors.ophthalmologyWeekdays = 'Selecione pelo menos um dia de atendimento.';
+  }
+  if (ophthalmologyEnabled && ophthalmologyOpening === null) errors.ophthalmologyOpeningTime = 'Informe um horario inicial valido.';
+  if (ophthalmologyEnabled && ophthalmologyClosing === null) errors.ophthalmologyClosingTime = 'Informe um horario final valido.';
+  if (ophthalmologyEnabled && ophthalmologyOpening !== null && ophthalmologyClosing !== null
+    && ophthalmologyOpening >= ophthalmologyClosing) {
+    errors.ophthalmologyClosingTime = 'O encerramento deve ser depois do inicio.';
+  }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };
+}
+
+export function isOphthalmologyDateAllowed(settings, appointmentDate) {
+  const schedule = normalizeStoreSchedule(settings);
+  const weekday = weekdayFromDate(appointmentDate);
+  return !schedule.ophthalmologyRoutingEnabled
+    || (weekday !== null && schedule.ophthalmologyWeekdays.includes(weekday));
+}
+
+export function ophthalmologyAppointmentSchedule(settings) {
+  const schedule = normalizeStoreSchedule(settings);
+  return {
+    ...schedule,
+    openingTime: schedule.ophthalmologyOpeningTime,
+    closingTime: schedule.ophthalmologyClosingTime
+  };
 }
 
 function weekdayFromDate(appointmentDate) {

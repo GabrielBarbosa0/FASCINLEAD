@@ -59,8 +59,8 @@ import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwi
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { AMETROPIAS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge } from '../utils/lead.js';
-import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
+import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, ophthalmologyTriage } from '../utils/lead.js';
+import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, ophthalmologyAppointmentSchedule, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
@@ -180,7 +180,8 @@ const state = {
     appointmentDate: '',
     appointments: [],
     services: [],
-    serviceId: ''
+    serviceId: '',
+    triage: {}
   },
   leadDetailSchedule: {
     loading: false,
@@ -635,7 +636,17 @@ function homeView() {
 function appointmentTimeField() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
-  const serviceSchedule = { ...settings, appointmentDurationMinutes: service.durationMinutes };
+  const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
+  const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
+    && appointmentDate
+    && !isOphthalmologyDateAllowed(settings, appointmentDate);
+  const baseSchedule = triage.careRoute === 'ophthalmologist'
+    ? ophthalmologyAppointmentSchedule(settings)
+    : settings;
+  const serviceSchedule = { ...baseSchedule, appointmentDurationMinutes: service.durationMinutes };
+  if (ophthalmologyDateBlocked) {
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmologico.</small></div>`;
+  }
   if (settings.schedulingMode === 'free') {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
   }
@@ -651,7 +662,9 @@ function appointmentTimeField() {
   else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
   else if (quota.reason === 'mei-quota') placeholder = 'Sua cota de agendamentos foi atingida';
   else if (quota.reason === 'daily-limit') placeholder = 'Limite de vagas do dia atingido';
-  else if (appointmentDate && !availableSlots.length) placeholder = 'Dia sem horarios disponiveis';
+  else if (appointmentDate && !availableSlots.length) placeholder = triage.careRoute === 'ophthalmologist'
+    ? 'Sem horarios do oftalmologista neste dia'
+    : 'Dia sem horarios disponiveis';
   else if (appointmentDate) placeholder = 'Selecione um horario';
 
   const options = availableSlots
@@ -690,6 +703,99 @@ function pathologyOptions(selectedIds = []) {
 
 function sexOptions(selectedId = '') {
   return SEX_OPTIONS.map((item) => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.label}</option>`).join('');
+}
+
+function eyeSurgeryStatusOptions(selectedId = '') {
+  return EYE_SURGERY_STATUS_OPTIONS.map((item) => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.label}</option>`).join('');
+}
+
+function eyeSurgeryOptions(selectedId = '') {
+  return EYE_SURGERIES.map((item) => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.label}</option>`).join('');
+}
+
+function canOverrideCareRoute() {
+  return isAdmin() || hasAccess('appointments.attendance') || hasAccess('management.access');
+}
+
+function triageConfigFields(settings) {
+  return `<input name="ophthalmologyRoutingEnabled" type="hidden" value="${settings.ophthalmologyRoutingEnabled}" />
+    <input name="ophthalmologyMinimumAge" type="hidden" value="${settings.ophthalmologyMinimumAge}" />`;
+}
+
+function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOverride = false, idPrefix = 'eye') {
+  const triage = ophthalmologyTriage(values, settings);
+  const showSurgeryQuestion = triage.surgeryQuestionRequired || Boolean(values.eyeSurgeryStatus);
+  const showSurgeryType = values.eyeSurgeryStatus === 'yes';
+  return `<section class="eye-triage-section" data-eye-triage>
+    <div class="field-row eye-surgery-fields" data-eye-surgery-question ${showSurgeryQuestion ? '' : 'hidden'}>
+      <div class="field" data-field="eyeSurgeryStatus">
+        <label for="${idPrefix}-surgery-status">Ja realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
+        <select id="${idPrefix}-surgery-status" name="eyeSurgeryStatus">${eyeSurgeryStatusOptions(values.eyeSurgeryStatus || '')}</select>
+        <small class="field-help">Pergunta obrigatoria a partir de ${settings.ophthalmologyMinimumAge} anos.</small>
+        <small class="field-error"></small>
+      </div>
+      <div class="field eye-surgery-dependent ${showSurgeryType ? '' : 'is-disabled'}" data-field="eyeSurgeryType" data-eye-surgery-type>
+        <label for="${idPrefix}-surgery-type">Qual cirurgia? <span aria-hidden="true">*</span></label>
+        <select id="${idPrefix}-surgery-type" name="eyeSurgeryType" ${showSurgeryType ? '' : 'disabled'}>${eyeSurgeryOptions(values.eyeSurgeryType || '')}</select>
+        <small class="field-error"></small>
+      </div>
+      <div class="field" data-field="eyeSurgeryDetails" data-eye-surgery-details ${showSurgeryType && values.eyeSurgeryType === 'other' ? '' : 'hidden'}>
+        <label for="${idPrefix}-surgery-details">Nome da cirurgia <span aria-hidden="true">*</span></label>
+        <input id="${idPrefix}-surgery-details" name="eyeSurgeryDetails" maxlength="120" value="${escapeHtml(values.eyeSurgeryDetails || '')}" placeholder="Informe a cirurgia" />
+        <small class="field-error"></small>
+      </div>
+    </div>
+    ${allowOverride ? `<div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automatico</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>` : '<input name="careRouteOverride" type="hidden" value="automatic" />'}
+    <div class="eye-route-status ${triage.careRoute === 'ophthalmologist' ? 'is-ophthalmology' : ''}" data-eye-route-status ${triage.careRoute === 'ophthalmologist' ? '' : 'hidden'}><i data-lucide="stethoscope"></i><span>Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.</span></div>
+  </section>`;
+}
+
+function enrichLeadTriage(values, settings) {
+  const triage = ophthalmologyTriage(values, settings);
+  return {
+    ...values,
+    ophthalmologyRoutingEnabled: settings.ophthalmologyRoutingEnabled,
+    ophthalmologyMinimumAge: settings.ophthalmologyMinimumAge,
+    ophthalmologyPathologyIds: settings.ophthalmologyPathologyIds,
+    ophthalmologySurgeryIds: settings.ophthalmologySurgeryIds,
+    ophthalmologyAllowedWeekdays: settings.ophthalmologyWeekdays,
+    eyeSurgeryStatus: triage.eyeSurgeryStatus,
+    eyeSurgeryType: triage.eyeSurgeryType,
+    eyeSurgeryDetails: triage.eyeSurgeryDetails,
+    careRoute: triage.careRoute,
+    careRouteOverride: triage.careRouteOverride,
+    careRouteReasons: triage.careRouteReasons
+  };
+}
+
+function bindEyeTriage(form, settings, onChange = () => {}) {
+  const section = form.querySelector('[data-eye-triage]');
+  if (!section) return;
+  const refresh = () => {
+    const values = leadFormValues(form);
+    const triage = ophthalmologyTriage(values, settings);
+    const question = section.querySelector('[data-eye-surgery-question]');
+    const typeField = section.querySelector('[data-eye-surgery-type]');
+    const detailsField = section.querySelector('[data-eye-surgery-details]');
+    const routeStatus = section.querySelector('[data-eye-route-status]');
+    question.hidden = !triage.surgeryQuestionRequired && !values.eyeSurgeryStatus;
+    const surgeryTypeEnabled = values.eyeSurgeryStatus === 'yes';
+    typeField.classList.toggle('is-disabled', !surgeryTypeEnabled);
+    form.elements.eyeSurgeryType.disabled = !surgeryTypeEnabled;
+    detailsField.hidden = values.eyeSurgeryStatus !== 'yes' || values.eyeSurgeryType !== 'other';
+    form.elements.eyeSurgeryStatus.required = triage.surgeryQuestionRequired;
+    form.elements.eyeSurgeryType.required = surgeryTypeEnabled;
+    form.elements.eyeSurgeryDetails.required = values.eyeSurgeryStatus === 'yes' && values.eyeSurgeryType === 'other';
+    routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
+    routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
+    onChange(values, triage);
+  };
+  form.elements.birthDate?.addEventListener('input', refresh);
+  form.elements.eyeSurgeryStatus?.addEventListener('change', refresh);
+  form.elements.eyeSurgeryType?.addEventListener('change', refresh);
+  form.elements.careRouteOverride?.addEventListener('change', refresh);
+  form.querySelectorAll('[name="pathologyIds"]').forEach((input) => input.addEventListener('change', refresh));
+  refresh();
 }
 
 function leadFormValues(form) {
@@ -745,6 +851,7 @@ function newLeadView() {
     </section>
     <form id="lead-form" class="form-panel" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
+      ${triageConfigFields(state.newLeadSchedule.settings)}
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
       <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
       <div class="field" data-field="fullName">
@@ -814,6 +921,7 @@ function newLeadView() {
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
+      ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
@@ -971,6 +1079,7 @@ function leadDetailView() {
     </section>
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || 'free')}" />
+      ${triageConfigFields(state.leadDetailSchedule.settings)}
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
       ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required ${locked} /><small class="field-error"></small></div>
@@ -995,6 +1104,7 @@ function leadDetailView() {
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
       </fieldset>
+      ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
         <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
@@ -1328,8 +1438,14 @@ function appointmentCreateService() {
 function appointmentCreateTimeField() {
   const schedule = appointmentCreateSchedule();
   const service = appointmentCreateService();
+  const triage = ophthalmologyTriage(state.appointmentCreate.draft || {}, schedule);
+  const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
+    && !isOphthalmologyDateAllowed(schedule, state.appointments.selectedDate);
   if (state.appointmentCreate.loading) {
     return '<div id="appointment-create-time-field" class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
+  }
+  if (ophthalmologyDateBlocked) {
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (schedule.schedulingMode === 'free') {
     return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
@@ -1338,13 +1454,13 @@ function appointmentCreateTimeField() {
     .filter((lead) => lead.storeId === state.appointmentCreate.storeId
       && lead.appointmentDate === state.appointments.selectedDate);
   const available = buildAppointmentSlots(
-    { ...schedule, appointmentDurationMinutes: service.durationMinutes },
+    { ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(schedule) : schedule), appointmentDurationMinutes: service.durationMinutes },
     records,
     '',
     { appointmentDate: state.appointments.selectedDate, profile: state.profile }
   )
     .filter((slot) => slot.available);
-  return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+  return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : triage.careRoute === 'ophthalmologist' ? 'Sem horarios do oftalmologista neste dia' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
 }
 
 function appointmentCreateDialog(allowedStores) {
@@ -1367,6 +1483,7 @@ function appointmentCreateDialog(allowedStores) {
     <form id="appointment-create-form" novalidate>
       <div class="appointment-create-content">
       <input name="schedulingMode" type="hidden" value="${escapeHtml(schedule.schedulingMode)}" />
+      ${triageConfigFields(schedule)}
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
       <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
       <div class="appointment-create-grid">
@@ -1386,6 +1503,7 @@ function appointmentCreateDialog(allowedStores) {
         </div>
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
         <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
+        ${eyeTriageFields(draft, schedule, canOverrideCareRoute(), 'agenda-lead-eye')}
         <div class="field-row appointment-fields">
           <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pre-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
           ${appointmentCreateTimeField()}
@@ -1485,6 +1603,7 @@ function scheduleSettingsView() {
       <strong class="schedule-rule-total" data-mei-day-total>${morning + afternoon} total</strong>
     </div>`;
   }).join('');
+  const ophthalmologyWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-rule-day checkbox-label"><input type="checkbox" name="ophthalmologyWeekday" value="${day.id}" ${selected.ophthalmologyWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
@@ -1505,6 +1624,11 @@ function scheduleSettingsView() {
             <span class="schedule-config-launch-icon"><i data-lucide="users"></i></span>
             <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiQuotaRules.length} ${selected.meiQuotaRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativadas'}</small></span>
             <button class="button button-secondary" type="button" data-mei-quota-open><i data-lucide="wrench"></i><span>Configurar cotas</span></button>
+          </div>
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="stethoscope"></i></span>
+            <span><strong>Atendimento oftalmologico</strong><small data-ophthalmology-summary>${selected.ophthalmologyRoutingEnabled ? `${selected.ophthalmologyWeekdays.length} ${selected.ophthalmologyWeekdays.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
+            <button class="button button-secondary" type="button" data-ophthalmology-open><i data-lucide="wrench"></i><span>Configurar triagem</span></button>
           </div>
         </div>
         <dialog id="general-schedule-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="general-schedule-title">
@@ -1574,6 +1698,26 @@ function scheduleSettingsView() {
             </fieldset>
           </div>
           <footer><span>As cotas sao individuais para cada MEI.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-mei-quota-close>Cancelar</button><button class="button button-primary" type="button" data-mei-quota-apply><i data-lucide="check"></i><span>Aplicar cotas</span></button></div></footer>
+        </dialog>
+        <dialog id="ophthalmology-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="ophthalmology-title">
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Atendimento oftalmologico</h2><p>Defina quando a triagem deve encaminhar o cliente ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <div class="schedule-rule-dialog-body">
+            <input name="ophthalmologyRoutingEnabled" type="hidden" value="false" />
+            <input name="ophthalmologyWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyWeekdays))}" />
+            <input name="ophthalmologyPathologyIds" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyPathologyIds))}" />
+            <input name="ophthalmologySurgeryIds" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologySurgeryIds))}" />
+            <label class="setting-toggle checkbox-label" for="settings-ophthalmology-enabled"><span><strong>Ativar triagem para oftalmologista</strong><small>Catarata informada na patologia ou na cirurgia direciona para esta agenda.</small></span><input id="settings-ophthalmology-enabled" name="ophthalmologyRoutingEnabled" type="checkbox" value="true" ${selected.ophthalmologyRoutingEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
+            <div class="ophthalmology-settings ${selected.ophthalmologyRoutingEnabled ? '' : 'is-disabled'}" data-ophthalmology-fields>
+              <div class="field" data-field="ophthalmologyMinimumAge"><label for="settings-ophthalmology-age">Perguntar sobre cirurgia a partir de</label><div class="number-with-unit"><input id="settings-ophthalmology-age" name="ophthalmologyMinimumAge" type="number" min="0" max="120" step="1" value="${selected.ophthalmologyMinimumAge}" /><span>anos</span></div><small class="field-error"></small></div>
+              <fieldset class="field schedule-limit-fields" data-field="ophthalmologyWeekdays"><legend>Dias do oftalmologista</legend><small>Somente estes dias aparecerao para clientes encaminhados.</small><div class="schedule-weekday-options">${ophthalmologyWeekdayOptions}</div><small class="field-error"></small></fieldset>
+              <div class="field-row schedule-hours">
+                <div class="field" data-field="ophthalmologyOpeningTime"><label for="settings-ophthalmology-opening">Inicio</label><input id="settings-ophthalmology-opening" name="ophthalmologyOpeningTime" type="time" value="${selected.ophthalmologyOpeningTime}" /><small class="field-error"></small></div>
+                <div class="field" data-field="ophthalmologyClosingTime"><label for="settings-ophthalmology-closing">Fim</label><input id="settings-ophthalmology-closing" name="ophthalmologyClosingTime" type="time" value="${selected.ophthalmologyClosingTime}" /><small class="field-error"></small></div>
+              </div>
+              <div class="notice notice-info ophthalmology-criteria"><i data-lucide="info"></i><span>Critérios iniciais: patologia Catarata ou cirurgia de Catarata. Novos critérios podem ser adicionados depois.</span></div>
+            </div>
+          </div>
+          <footer><span>A configuracao vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar triagem</span></button></div></footer>
         </dialog>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
@@ -1956,13 +2100,19 @@ function bindPageEvents() {
     });
     bindExclusiveOptions(form, 'ametropiaIds');
     bindExclusiveOptions(form, 'pathologyIds');
+    bindEyeTriage(form, state.newLeadSchedule.settings, (values) => {
+      state.newLeadSchedule.triage = values;
+      refreshAppointmentTimeControl();
+    });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = leadFormValues(form);
+      const values = enrichLeadTriage(leadFormValues(form), state.newLeadSchedule.settings);
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
         const selectedSlot = buildAppointmentSlots({
-          ...state.newLeadSchedule.settings,
+          ...(values.careRoute === 'ophthalmologist'
+            ? ophthalmologyAppointmentSchedule(state.newLeadSchedule.settings)
+            : state.newLeadSchedule.settings),
           appointmentDurationMinutes: Number(values.appointmentDurationMinutes)
         }, state.newLeadSchedule.appointments, '', {
           appointmentDate: values.appointmentDate,
@@ -2014,13 +2164,14 @@ function bindPageEvents() {
     notesInput.addEventListener('input', () => { document.querySelector('#edit-notes-count').textContent = notesInput.value.length; });
     bindExclusiveOptions(editLeadForm, 'ametropiaIds');
     bindExclusiveOptions(editLeadForm, 'pathologyIds');
+    bindEyeTriage(editLeadForm, state.leadDetailSchedule.settings);
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const managementEdit = editLeadForm.dataset.management === 'true';
       const existingLead = managementEdit
         ? state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId)
         : state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
-      let values = leadFormValues(editLeadForm);
+      let values = enrichLeadTriage(leadFormValues(editLeadForm), state.leadDetailSchedule.settings);
       if (existingLead && !editLeadForm.querySelector('[name="ametropiaIds"]')) {
         values.ametropiaIds = existingLead.ametropiaIds || [];
       }
@@ -2182,6 +2333,11 @@ function bindPageEvents() {
     bindBirthDateInput(appointmentCreateForm);
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
+    bindEyeTriage(appointmentCreateForm, appointmentCreateSchedule(), (values) => {
+      state.appointmentCreate.draft = values;
+      const timeField = document.querySelector('#appointment-create-time-field');
+      if (timeField) timeField.outerHTML = appointmentCreateTimeField();
+    });
     appointmentCreateForm.elements.storeId?.addEventListener('change', (event) => {
       state.appointmentCreate.draft = leadFormValues(appointmentCreateForm);
       state.appointmentCreate.storeId = event.target.value;
@@ -2203,7 +2359,7 @@ function bindPageEvents() {
     });
     appointmentCreateForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = leadFormValues(appointmentCreateForm);
+      const values = enrichLeadTriage(leadFormValues(appointmentCreateForm), appointmentCreateSchedule());
       const storeId = appointmentCreateForm.elements.storeId.value;
       if (!profileStoreIds(state.profile).includes(storeId)) {
         setFieldErrors(appointmentCreateForm, { storeId: 'Selecione uma loja permitida.' });
@@ -2763,6 +2919,65 @@ function bindPageEvents() {
         : 'Desativadas';
       meiQuotaDialog.close();
     });
+    const ophthalmologyDialog = document.querySelector('#ophthalmology-dialog');
+    const ophthalmologyEnabledInput = document.querySelector('#settings-ophthalmology-enabled');
+    const ophthalmologyFields = ophthalmologyDialog?.querySelector('[data-ophthalmology-fields]');
+    const setOphthalmologyFieldsState = () => {
+      const enabled = ophthalmologyEnabledInput.checked;
+      ophthalmologyFields.classList.toggle('is-disabled', !enabled);
+    };
+    const syncOphthalmologyDraft = () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (!record || !ophthalmologyDialog) return;
+      ophthalmologyEnabledInput.checked = record.ophthalmologyRoutingEnabled;
+      scheduleSettingsForm.elements.ophthalmologyMinimumAge.value = record.ophthalmologyMinimumAge;
+      scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = record.ophthalmologyOpeningTime;
+      scheduleSettingsForm.elements.ophthalmologyClosingTime.value = record.ophthalmologyClosingTime;
+      ophthalmologyDialog.querySelectorAll('[name="ophthalmologyWeekday"]').forEach((input) => {
+        input.checked = record.ophthalmologyWeekdays.includes(Number(input.value));
+      });
+      ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(record.ophthalmologyWeekdays);
+      setOphthalmologyFieldsState();
+      setFieldErrors(ophthalmologyDialog, {});
+    };
+    const discardOphthalmologyDraft = () => {
+      syncOphthalmologyDraft();
+      ophthalmologyDialog.close();
+    };
+    document.querySelector('[data-ophthalmology-open]')?.addEventListener('click', () => {
+      syncOphthalmologyDraft();
+      ophthalmologyDialog?.showModal();
+    });
+    ophthalmologyDialog?.querySelectorAll('[data-ophthalmology-close]').forEach((button) => button.addEventListener('click', discardOphthalmologyDraft));
+    ophthalmologyDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      discardOphthalmologyDraft();
+    });
+    ophthalmologyEnabledInput?.addEventListener('change', setOphthalmologyFieldsState);
+    ophthalmologyDialog?.querySelector('[data-ophthalmology-apply]')?.addEventListener('click', () => {
+      const enabled = ophthalmologyEnabledInput.checked;
+      const weekdays = [...ophthalmologyDialog.querySelectorAll('[name="ophthalmologyWeekday"]:checked')].map((input) => Number(input.value));
+      const candidate = {
+        ophthalmologyRoutingEnabled: enabled,
+        ophthalmologyMinimumAge: Number(scheduleSettingsForm.elements.ophthalmologyMinimumAge.value),
+        ophthalmologyWeekdays: weekdays,
+        ophthalmologyOpeningTime: scheduleSettingsForm.elements.ophthalmologyOpeningTime.value,
+        ophthalmologyClosingTime: scheduleSettingsForm.elements.ophthalmologyClosingTime.value,
+        ophthalmologyPathologyIds: ['cataract'],
+        ophthalmologySurgeryIds: ['cataract']
+      };
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      const validation = validateStoreSchedule({ ...record, ...candidate });
+      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => name.startsWith('ophthalmology')));
+      setFieldErrors(ophthalmologyDialog, errors);
+      if (Object.keys(errors).length) return;
+      Object.assign(record, candidate);
+      ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(weekdays);
+      document.querySelector('[data-ophthalmology-summary]').textContent = enabled
+        ? `${weekdays.length} ${weekdays.length === 1 ? 'dia configurado' : 'dias configurados'}`
+        : 'Desativado';
+      ophthalmologyDialog.close();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
@@ -2772,6 +2987,7 @@ function bindPageEvents() {
       values.showAmetropiaFields = values.showAmetropiaFields === 'true';
       values.limitedDaysEnabled = values.limitedDaysEnabled === 'true';
       values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
+      values.ophthalmologyRoutingEnabled = values.ophthalmologyRoutingEnabled === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       values.limitedDayRules = JSON.parse(values.limitedDayRules || '[]');
@@ -2782,6 +2998,10 @@ function bindPageEvents() {
       values.meiMorningQuota = values.meiQuotaRules[0]?.morningQuota ?? current.meiMorningQuota;
       values.meiAfternoonQuota = values.meiQuotaRules[0]?.afternoonQuota ?? current.meiAfternoonQuota;
       values.meiDailyQuota = values.meiMorningQuota + values.meiAfternoonQuota;
+      values.ophthalmologyMinimumAge = Number(values.ophthalmologyMinimumAge);
+      values.ophthalmologyWeekdays = JSON.parse(values.ophthalmologyWeekdays || '[]');
+      values.ophthalmologyPathologyIds = JSON.parse(values.ophthalmologyPathologyIds || '["cataract"]');
+      values.ophthalmologySurgeryIds = JSON.parse(values.ophthalmologySurgeryIds || '["cataract"]');
       if (values.schedulingMode === 'free') {
         values.openingTime = current.openingTime;
         values.closingTime = current.closingTime;
@@ -2807,7 +3027,14 @@ function bindPageEvents() {
             meiQuotaRules: values.meiQuotaRules,
             meiQuotaWeekdays: values.meiQuotaWeekdays,
             meiMorningQuota: values.meiMorningQuota,
-            meiAfternoonQuota: values.meiAfternoonQuota
+            meiAfternoonQuota: values.meiAfternoonQuota,
+            ophthalmologyRoutingEnabled: values.ophthalmologyRoutingEnabled,
+            ophthalmologyMinimumAge: values.ophthalmologyMinimumAge,
+            ophthalmologyWeekdays: values.ophthalmologyWeekdays,
+            ophthalmologyOpeningTime: values.ophthalmologyOpeningTime,
+            ophthalmologyClosingTime: values.ophthalmologyClosingTime,
+            ophthalmologyPathologyIds: values.ophthalmologyPathologyIds,
+            ophthalmologySurgeryIds: values.ophthalmologySurgeryIds
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
@@ -3179,17 +3406,25 @@ function refreshAppointmentTimeControl() {
   const dateStatus = dateField?.querySelector('.schedule-date-status');
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
+  const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
+  const dateAllowed = triage.careRoute !== 'ophthalmologist' || isOphthalmologyDateAllowed(settings, appointmentDate);
   const slots = appointmentDate && settings.schedulingMode === 'controlled'
     ? buildAppointmentSlots(
-      { ...settings, appointmentDurationMinutes: service.durationMinutes },
+      {
+        ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(settings) : settings),
+        appointmentDurationMinutes: service.durationMinutes
+      },
       appointments,
       '',
       { appointmentDate, profile: state.profile }
     )
     : [];
-  const fullyBooked = Boolean(appointmentDate && !loading && !error && slots.length && !slots.some((slot) => slot.available));
+  const fullyBooked = Boolean(appointmentDate && dateAllowed && !loading && !error && slots.length && !slots.some((slot) => slot.available));
   dateField?.classList.toggle('is-fully-booked', fullyBooked);
-  if (dateStatus) dateStatus.textContent = fullyBooked ? 'Dia sem horarios disponiveis.' : '';
+  dateField?.classList.toggle('is-date-restricted', Boolean(appointmentDate && !dateAllowed));
+  if (dateStatus) dateStatus.textContent = !dateAllowed
+    ? 'O oftalmologista nao atende neste dia.'
+    : fullyBooked ? 'Dia sem horarios disponiveis.' : '';
 }
 
 function refreshNewLeadAmetropiaField() {
@@ -3561,7 +3796,8 @@ async function handleAction(action) {
       schedules: [],
       storeId: '',
       services: [],
-      serviceId: ''
+      serviceId: '',
+      draft: {}
     };
     state.newLeadSchedule = {
       loaded: false,
@@ -3571,7 +3807,8 @@ async function handleAction(action) {
       appointmentDate: '',
       appointments: [],
       services: [],
-      serviceId: ''
+      serviceId: '',
+      triage: {}
     };
     state.leadDetailSchedule = {
       loading: false,
@@ -4251,6 +4488,7 @@ export async function startApp() {
       state.newLeadSchedule.loaded = false;
       state.newLeadSchedule.appointmentDate = '';
       state.newLeadSchedule.appointments = [];
+      state.newLeadSchedule.triage = {};
     } else if (previousRoute !== 'new') {
       state.newLeadSchedule.loaded = false;
     }
