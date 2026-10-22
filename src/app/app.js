@@ -1461,12 +1461,9 @@ function scheduleSettingsView() {
   const { records, selectedStoreId, loading, saving } = state.settings;
   const selected = records.find((item) => item.id === selectedStoreId)
     || { ...STORES.find((item) => item.id === selectedStoreId), ...DEFAULT_STORE_SCHEDULE };
-  const previewSlots = buildAppointmentSlots(selected);
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
   const limitedWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="limitedWeekdays" value="${day.id}" ${selected.limitedWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
-  const limitedDayLabels = WEEKDAY_OPTIONS.filter((day) => selected.limitedWeekdays.includes(day.id)).map((day) => day.label).join(', ');
   const meiWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="meiQuotaWeekdays" value="${day.id}" ${selected.meiQuotaWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
-  const meiDayLabels = WEEKDAY_OPTIONS.filter((day) => selected.meiQuotaWeekdays.includes(day.id)).map((day) => day.label).join(', ');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
@@ -1533,13 +1530,6 @@ function scheduleSettingsView() {
         </div>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
-      <aside class="schedule-preview">
-        <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
-        ${selected.schedulingMode === 'free'
-          ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
-          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div><div><span>Ametropias no cadastro</span><strong>${selected.showAmetropiaFields ? 'Ativas' : 'Desativadas'}</strong></div><div><span>Limite geral</span><strong>${selected.limitedDaysEnabled ? `${selected.limitedDayCapacity} vagas em ${escapeHtml(limitedDayLabels || 'dias nao definidos')}` : 'Desativado'}</strong></div><div><span>Cotas do MEI</span><strong>${selected.meiQuotaEnabled ? `${selected.meiMorningQuota} manha; ${selected.meiAfternoonQuota} tarde em ${escapeHtml(meiDayLabels || 'dias nao definidos')}` : 'Desativadas'}</strong></div></div>
-            <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
-      </aside>
     </section>`;
 }
 

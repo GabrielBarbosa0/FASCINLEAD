@@ -1968,7 +1968,7 @@ svg {
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(600px, 2fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 22px;
 }
@@ -2510,12 +2510,6 @@ svg {
 .schedule-section-heading strong,
 .schedule-section-heading small {
   display: block;
-}
-
-@media (max-width: 950px) and (min-width: 761px) {
-  .settings-layout {
-    grid-template-columns: 1fr;
-  }
 }
 
 .schedule-section-heading strong {

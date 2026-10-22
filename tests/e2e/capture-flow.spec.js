@@ -934,10 +934,11 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Fim').fill('18:00');
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
-  await expect(page.getByText('45 min')).toBeVisible();
-  await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
-  await expect(page.getByText(/6 vagas em Quarta, Sabado/)).toBeVisible();
-  await expect(page.getByText(/2 manha; 1 tarde em Quarta, Sabado/)).toBeVisible();
+  await expect(page.getByLabel('Tolerancia apos o horario')).toHaveValue('45');
+  await expect(page.getByLabel('Gerar retorno automaticamente')).toBeChecked();
+  await expect(page.getByLabel('Vagas totais por dia')).toHaveValue('6');
+  await expect(page.getByLabel('Cota pela manha')).toHaveValue('2');
+  await expect(page.getByLabel('Cota a tarde')).toHaveValue('1');
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
@@ -971,12 +972,9 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.getByRole('button', { name: /Configuracoes/ }).click();
   const layout = await page.locator('.settings-layout').evaluate((element) => {
     const form = element.querySelector('.settings-form').getBoundingClientRect();
-    const preview = element.querySelector('.schedule-preview').getBoundingClientRect();
     const columns = [...element.querySelectorAll('.schedule-form-column')].map((item) => item.getBoundingClientRect());
     return {
       formWidth: form.width,
-      formTop: form.top,
-      previewTop: preview.top,
       firstColumnTop: columns[0].top,
       firstColumnRight: columns[0].right,
       secondColumnTop: columns[1].top,
@@ -984,24 +982,15 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
     };
   });
-  expect(layout.formWidth).toBeGreaterThan(600);
+  expect(layout.formWidth).toBeGreaterThan(900);
   expect(Math.abs(layout.firstColumnTop - layout.secondColumnTop)).toBeLessThanOrEqual(2);
   expect(layout.secondColumnLeft).toBeGreaterThan(layout.firstColumnRight);
-  expect(Math.abs(layout.previewTop - layout.formTop)).toBeLessThanOrEqual(2);
   expect(layout.overflow).toBeLessThanOrEqual(1);
+  await expect(page.locator('.schedule-preview')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
   await page.setViewportSize({ width: 900, height: 768 });
-  const compactLayout = await page.locator('.settings-layout').evaluate((element) => {
-    const form = element.querySelector('.settings-form').getBoundingClientRect();
-    const preview = element.querySelector('.schedule-preview').getBoundingClientRect();
-    return {
-      formBottom: form.bottom,
-      previewTop: preview.top,
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
-    };
-  });
-  expect(compactLayout.previewTop).toBeGreaterThan(compactLayout.formBottom);
-  expect(compactLayout.overflow).toBeLessThanOrEqual(1);
+  const compactOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(compactOverflow).toBeLessThanOrEqual(1);
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {
