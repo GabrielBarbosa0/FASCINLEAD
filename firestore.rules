@@ -105,6 +105,7 @@ service cloud.firestore {
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
+          'appointmentReservation',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
           'followUpContactedAt', 'followUpContactedByUid',
           'followUpContactedByName', 'followUpContactedAppointmentKey',
@@ -365,6 +366,7 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+          'appointmentReservation',
           'appointmentAttendance', 'notes', 'updatedAtServer'
         ])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
@@ -416,6 +418,7 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
               'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+              'appointmentReservation',
               'appointmentAttendance', 'updatedAtServer'
             ]))
         );
@@ -452,6 +455,7 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+          'appointmentReservation',
           'appointmentAttendance', 'notes', 'updatedAtServer'
         ]);
     }

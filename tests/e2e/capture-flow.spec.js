@@ -141,6 +141,55 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
 
+test('preserves an offline lead and lists its pending appointment in Sync', async ({ page, context }, testInfo) => {
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+
+  await page.getByLabel('Nome *').fill('Cliente Offline');
+  await page.getByLabel('Telefone ou WhatsApp *').fill('81999994567');
+  await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
+  await page.getByLabel('Horario disponivel').selectOption('14:20');
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  const storedLead = await page.evaluate(() => JSON.parse(localStorage.getItem('fascinlead:demo-leads'))[0]);
+  expect(storedLead).toMatchObject({
+    fullName: 'Cliente Offline',
+    appointmentDate: '',
+    appointmentTime: '',
+    appointmentReservation: {
+      status: 'pending',
+      reason: 'offline',
+      requestedDate: '2026-10-02',
+      requestedTime: '14:20'
+    }
+  });
+
+  await page.getByRole('button', { name: 'Sync', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Sincronizacao' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pendencias de agendamento' })).toBeVisible();
+  await expect(page.getByText('Cliente Offline')).toBeVisible();
+  await expect(page.getByText('Salvo offline')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Chamar no WhatsApp' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Escolher horario' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('offline-appointment-sync.png'), fullPage: true });
+
+  await context.setOffline(false);
+  await page.getByRole('button', { name: 'Escolher horario' }).click();
+  await expect(page.getByText('Agendamento ainda nao confirmado')).toBeVisible();
+  await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
+  await expect(page.getByLabel('Horario')).toHaveValue('14:20');
+  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  const confirmedLead = await page.evaluate(() => JSON.parse(localStorage.getItem('fascinlead:demo-leads'))[0]);
+  expect(confirmedLead).toMatchObject({
+    appointmentDate: '2026-10-02',
+    appointmentTime: '14:20',
+    appointmentReservation: { status: 'confirmed', reason: '', requestedDate: '', requestedTime: '' }
+  });
+});
+
 test('routes cataract clients to configured ophthalmology days', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
