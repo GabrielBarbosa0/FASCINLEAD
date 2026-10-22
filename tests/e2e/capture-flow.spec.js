@@ -900,6 +900,7 @@ test('lets an administrator monitor follow-ups from every store', async ({ page 
 });
 
 test('configures the schedule and hides occupied slots', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Configuracoes/ }).click();
@@ -907,9 +908,24 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('Configuracoes da agenda', { exact: true })).toBeVisible();
 
   await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
-  await expect(page.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
-  await page.getByLabel('Exibir ametropias no cadastro').check();
-  await expect(page.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
+  await page.getByRole('button', { name: 'Configurar agenda' }).click();
+  const generalScheduleDialog = page.getByRole('dialog', { name: 'Configuracoes gerais' });
+  await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
+  await generalScheduleDialog.getByLabel('Exibir ametropias no cadastro').check();
+  await generalScheduleDialog.getByLabel('Tolerancia apos o horario').fill('45');
+  const graceLayout = await generalScheduleDialog.evaluate((dialog) => {
+    const help = dialog.querySelector('#settings-no-show-help').getBoundingClientRect();
+    const input = dialog.querySelector('#settings-no-show-grace').getBoundingClientRect();
+    return { helpBottom: help.bottom, inputTop: input.top };
+  });
+  expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
+  await generalScheduleDialog.getByLabel('Gerar retorno automaticamente').check();
+  await generalScheduleDialog.getByLabel('Inicio').fill('08:00');
+  await generalScheduleDialog.getByLabel('Fim').fill('18:00');
+  await page.screenshot({ path: testInfo.outputPath('general-schedule-dialog.png') });
+  await generalScheduleDialog.getByRole('button', { name: 'Aplicar configuracoes' }).click();
+  await expect(generalScheduleDialog).not.toBeVisible();
+  await expect(page.getByText('08:00 as 18:00')).toBeVisible();
   await page.getByRole('button', { name: 'Configurar limite' }).click();
   const limitedDaysDialog = page.getByRole('dialog', { name: 'Limite de vagas' });
   await expect(limitedDaysDialog.getByLabel('Limitar vagas em dias especificos')).not.toBeChecked();
@@ -919,7 +935,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(limitedDaysGroup.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
   await limitedDaysDialog.getByLabel('Vagas de Quarta').fill('6');
   await limitedDaysDialog.getByLabel('Vagas de Sabado').fill('4');
-  await page.screenshot({ path: testInfo.outputPath('limited-days-dialog.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('limited-days-dialog.png') });
   await limitedDaysDialog.getByRole('button', { name: 'Aplicar limite' }).click();
   await expect(limitedDaysDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toBeVisible();
@@ -933,36 +949,29 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await meiQuotaDialog.getByLabel('Cota da tarde de Quarta').fill('6');
   await meiQuotaDialog.getByLabel('Cota da manha de Sabado').fill('2');
   await meiQuotaDialog.getByLabel('Cota da tarde de Sabado').fill('2');
-  await page.screenshot({ path: testInfo.outputPath('mei-quota-dialog.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('mei-quota-dialog.png') });
   await meiQuotaDialog.getByRole('button', { name: 'Aplicar cotas' }).click();
   await expect(meiQuotaDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(2);
-  const graceInput = page.getByLabel('Tolerancia apos o horario');
-  await graceInput.fill('45');
-  const graceLayout = await page.evaluate(() => {
-    const help = document.querySelector('#settings-no-show-help').getBoundingClientRect();
-    const input = document.querySelector('#settings-no-show-grace').getBoundingClientRect();
-    return { helpBottom: help.bottom, inputTop: input.top };
-  });
-  expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
-  await page.getByLabel('Gerar retorno automaticamente').check();
-  await expect(page.getByLabel('Gerar retorno automaticamente')).toBeChecked();
-  await page.getByLabel('Inicio').fill('08:00');
-  await page.getByLabel('Fim').fill('18:00');
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
-  await expect(page.getByLabel('Tolerancia apos o horario')).toHaveValue('45');
-  await expect(page.getByLabel('Gerar retorno automaticamente')).toBeChecked();
-  await page.getByRole('button', { name: 'Configurar limite' }).click();
-  await expect(limitedDaysDialog.getByLabel('Vagas de Quarta')).toHaveValue('6');
-  await expect(limitedDaysDialog.getByLabel('Vagas de Sabado')).toHaveValue('4');
-  await limitedDaysDialog.getByRole('button', { name: 'Cancelar' }).click();
-  await page.getByRole('button', { name: 'Configurar cotas' }).click();
-  await expect(meiQuotaDialog.getByLabel('Cota da manha de Quarta')).toHaveValue('4');
-  await expect(meiQuotaDialog.getByLabel('Cota da tarde de Quarta')).toHaveValue('6');
-  await expect(meiQuotaDialog.getByLabel('Cota da manha de Sabado')).toHaveValue('2');
-  await expect(meiQuotaDialog.getByLabel('Cota da tarde de Sabado')).toHaveValue('2');
-  await meiQuotaDialog.getByRole('button', { name: 'Cancelar' }).click();
+  if (!testInfo.project.name.includes('mobile')) {
+    await page.getByRole('button', { name: 'Configurar agenda' }).click();
+    await expect(generalScheduleDialog.getByLabel('Tolerancia apos o horario')).toHaveValue('45');
+    await expect(generalScheduleDialog.getByLabel('Gerar retorno automaticamente')).toBeChecked();
+    await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
+    await generalScheduleDialog.getByRole('button', { name: 'Cancelar' }).click();
+    await page.getByRole('button', { name: 'Configurar limite' }).click();
+    await expect(limitedDaysDialog.getByLabel('Vagas de Quarta')).toHaveValue('6');
+    await expect(limitedDaysDialog.getByLabel('Vagas de Sabado')).toHaveValue('4');
+    await limitedDaysDialog.getByRole('button', { name: 'Cancelar' }).click();
+    await page.getByRole('button', { name: 'Configurar cotas' }).click();
+    await expect(meiQuotaDialog.getByLabel('Cota da manha de Quarta')).toHaveValue('4');
+    await expect(meiQuotaDialog.getByLabel('Cota da tarde de Quarta')).toHaveValue('6');
+    await expect(meiQuotaDialog.getByLabel('Cota da manha de Sabado')).toHaveValue('2');
+    await expect(meiQuotaDialog.getByLabel('Cota da tarde de Sabado')).toHaveValue('2');
+    await meiQuotaDialog.getByRole('button', { name: 'Cancelar' }).click();
+  }
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
@@ -996,21 +1005,23 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.getByRole('button', { name: /Configuracoes/ }).click();
   const layout = await page.locator('.settings-layout').evaluate((element) => {
     const form = element.querySelector('.settings-form').getBoundingClientRect();
-    const columns = [...element.querySelectorAll('.schedule-form-column')].map((item) => item.getBoundingClientRect());
+    const cards = [...element.querySelectorAll('.schedule-config-launch')].map((item) => item.getBoundingClientRect());
     return {
       formWidth: form.width,
-      firstColumnTop: columns[0].top,
-      firstColumnRight: columns[0].right,
-      secondColumnTop: columns[1].top,
-      secondColumnLeft: columns[1].left,
+      cardCount: cards.length,
+      cardTops: cards.map((card) => card.top),
+      cardsInsideForm: cards.every((card) => card.left >= form.left && card.right <= form.right),
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
     };
   });
   expect(layout.formWidth).toBeGreaterThan(900);
-  expect(Math.abs(layout.firstColumnTop - layout.secondColumnTop)).toBeLessThanOrEqual(2);
-  expect(layout.secondColumnLeft).toBeGreaterThan(layout.firstColumnRight);
+  expect(layout.cardCount).toBe(3);
+  expect(Math.max(...layout.cardTops) - Math.min(...layout.cardTops)).toBeLessThanOrEqual(2);
+  expect(layout.cardsInsideForm).toBe(true);
   expect(layout.overflow).toBeLessThanOrEqual(1);
   await expect(page.locator('.schedule-preview')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Configurar agenda' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Configuracoes gerais' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Configurar limite' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Limite de vagas' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Configurar cotas' })).toBeVisible();

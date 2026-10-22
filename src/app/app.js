@@ -60,7 +60,7 @@ import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge } from '../utils/lead.js';
-import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, WEEKDAY_OPTIONS } from '../utils/schedule.js';
+import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
@@ -1486,8 +1486,26 @@ function scheduleSettingsView() {
       <form id="schedule-settings-form" class="settings-form" novalidate>
         <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configuracoes da agenda</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
-        <div class="schedule-form-grid">
-          <div class="schedule-form-column">
+        <div class="schedule-config-grid">
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="calendar-days"></i></span>
+            <span><strong>Configuracoes gerais</strong><small data-general-schedule-summary>${selected.schedulingMode === 'free' ? 'Cadastro livre' : `${selected.openingTime} as ${selected.closingTime}`}</small></span>
+            <button class="button button-secondary" type="button" data-general-schedule-open><i data-lucide="wrench"></i><span>Configurar agenda</span></button>
+          </div>
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="calendar-days"></i></span>
+            <span><strong>Limite de vagas</strong><small data-limited-days-summary>${selected.limitedDaysEnabled ? `${selected.limitedDayRules.length} ${selected.limitedDayRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
+            <button class="button button-secondary" type="button" data-limited-days-open><i data-lucide="wrench"></i><span>Configurar limite</span></button>
+          </div>
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="users"></i></span>
+            <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiQuotaRules.length} ${selected.meiQuotaRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativadas'}</small></span>
+            <button class="button button-secondary" type="button" data-mei-quota-open><i data-lucide="wrench"></i><span>Configurar cotas</span></button>
+          </div>
+        </div>
+        <dialog id="general-schedule-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="general-schedule-title">
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="general-schedule-title">Configuracoes gerais</h2><p>Defina a disponibilidade e as regras gerais da agenda.</p></div><button class="icon-button" type="button" data-general-schedule-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <div class="schedule-rule-dialog-body general-schedule-dialog-body">
             <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
             <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
               <div class="field-row schedule-hours">
@@ -1509,19 +1527,8 @@ function scheduleSettingsView() {
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
           </div>
-          <div class="schedule-form-column">
-            <div class="schedule-config-launch">
-              <span class="schedule-config-launch-icon"><i data-lucide="calendar-range"></i></span>
-              <span><strong>Limite de vagas</strong><small data-limited-days-summary>${selected.limitedDaysEnabled ? `${selected.limitedDayRules.length} ${selected.limitedDayRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
-              <button class="button button-secondary" type="button" data-limited-days-open><i data-lucide="settings-2"></i><span>Configurar limite</span></button>
-            </div>
-            <div class="schedule-config-launch">
-              <span class="schedule-config-launch-icon"><i data-lucide="briefcase-business"></i></span>
-              <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiQuotaRules.length} ${selected.meiQuotaRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativadas'}</small></span>
-              <button class="button button-secondary" type="button" data-mei-quota-open><i data-lucide="settings-2"></i><span>Configurar cotas</span></button>
-            </div>
-          </div>
-        </div>
+          <footer><span>As alteracoes serao salvas com a configuracao da loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-general-schedule-close>Cancelar</button><button class="button button-primary" type="button" data-general-schedule-apply><i data-lucide="check"></i><span>Aplicar configuracoes</span></button></div></footer>
+        </dialog>
         <dialog id="limited-days-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="limited-days-title">
           <header><div><span class="eyebrow">AGENDA</span><h2 id="limited-days-title">Limite de vagas</h2><p>Defina os dias e a quantidade maxima de clientes.</p></div><button class="icon-button" type="button" data-limited-days-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
@@ -2492,29 +2499,71 @@ function bindPageEvents() {
       state.settings.selectedStoreId = scheduleSettingsForm.elements.storeId.value;
       render();
     });
+    const generalScheduleDialog = document.querySelector('#general-schedule-dialog');
+    const generalScheduleFields = generalScheduleDialog?.querySelector('.schedule-settings-fields');
+    const setGeneralScheduleMode = () => {
+      const isFree = scheduleSettingsForm.elements.schedulingMode.value === 'free';
+      generalScheduleFields?.classList.toggle('is-disabled', isFree);
+      scheduleSettingsForm.elements.openingTime.disabled = isFree;
+      scheduleSettingsForm.elements.closingTime.disabled = isFree;
+    };
+    const syncGeneralScheduleDraft = () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (!record || !generalScheduleDialog) return;
+      scheduleSettingsForm.elements.schedulingMode.value = record.schedulingMode;
+      scheduleSettingsForm.elements.openingTime.value = record.openingTime;
+      scheduleSettingsForm.elements.closingTime.value = record.closingTime;
+      scheduleSettingsForm.elements.noShowGraceMinutes.value = record.noShowGraceMinutes;
+      document.querySelector('#settings-automatic-follow-up').checked = record.automaticPendingFollowUp;
+      document.querySelector('#settings-show-ametropias').checked = record.showAmetropiaFields;
+      setGeneralScheduleMode();
+      setFieldErrors(generalScheduleDialog, {});
+    };
+    const discardGeneralScheduleDraft = () => {
+      syncGeneralScheduleDraft();
+      generalScheduleDialog.close();
+    };
+
+    document.querySelector('[data-general-schedule-open]')?.addEventListener('click', () => {
+      syncGeneralScheduleDraft();
+      generalScheduleDialog?.showModal();
+    });
+    generalScheduleDialog?.querySelectorAll('[data-general-schedule-close]').forEach((button) => {
+      button.addEventListener('click', discardGeneralScheduleDraft);
+    });
+    generalScheduleDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      discardGeneralScheduleDraft();
+    });
     scheduleSettingsForm.elements.schedulingMode.addEventListener('change', () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) record.schedulingMode = scheduleSettingsForm.elements.schedulingMode.value;
-      render();
+      setGeneralScheduleMode();
+      setFieldErrors(generalScheduleDialog, {});
     });
-    ['noShowGraceMinutes', 'openingTime', 'closingTime'].forEach((name) => {
-      scheduleSettingsForm.elements[name]?.addEventListener('change', () => {
-        const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-        if (!record) return;
-        record[name] = name === 'noShowGraceMinutes'
-          ? Number(scheduleSettingsForm.elements[name].value)
-          : scheduleSettingsForm.elements[name].value;
-      });
-    });
-    document.querySelector('#settings-automatic-follow-up')?.addEventListener('change', (event) => {
+    generalScheduleDialog?.querySelector('[data-general-schedule-apply]')?.addEventListener('click', () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) record.automaticPendingFollowUp = event.target.checked;
-      render();
-    });
-    document.querySelector('#settings-show-ametropias')?.addEventListener('change', (event) => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) record.showAmetropiaFields = event.target.checked;
-      render();
+      if (!record) return;
+      const schedulingMode = scheduleSettingsForm.elements.schedulingMode.value;
+      const candidate = {
+        ...record,
+        schedulingMode,
+        openingTime: schedulingMode === 'free' ? record.openingTime : scheduleSettingsForm.elements.openingTime.value,
+        closingTime: schedulingMode === 'free' ? record.closingTime : scheduleSettingsForm.elements.closingTime.value,
+        noShowGraceMinutes: Number(scheduleSettingsForm.elements.noShowGraceMinutes.value),
+        automaticPendingFollowUp: document.querySelector('#settings-automatic-follow-up').checked,
+        showAmetropiaFields: document.querySelector('#settings-show-ametropias').checked
+      };
+      const validation = validateStoreSchedule(candidate);
+      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => (
+        ['openingTime', 'closingTime', 'noShowGraceMinutes'].includes(name)
+      )));
+      setFieldErrors(generalScheduleDialog, errors);
+      if (Object.keys(errors).length) return;
+
+      Object.assign(record, candidate);
+      document.querySelector('[data-general-schedule-summary]').textContent = schedulingMode === 'free'
+        ? 'Cadastro livre'
+        : `${candidate.openingTime} as ${candidate.closingTime}`;
+      generalScheduleDialog.close();
     });
     const limitedDaysDialog = document.querySelector('#limited-days-dialog');
     const limitedDaysEnabledInput = document.querySelector('#settings-limited-days');

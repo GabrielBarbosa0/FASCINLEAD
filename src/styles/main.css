@@ -2390,15 +2390,11 @@ svg {
   box-shadow: var(--shadow);
 }
 
-.schedule-form-grid {
+.schedule-config-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 24px;
-}
-
-.schedule-form-column {
-  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .schedule-settings-fields.is-disabled {
@@ -2488,18 +2484,18 @@ svg {
 
 .schedule-config-launch {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  margin-top: 20px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface-subtle);
 }
 
-.schedule-form-column > .schedule-config-launch:first-child {
-  margin-top: 0;
+.schedule-config-launch .button {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .schedule-config-launch-icon {
@@ -2549,6 +2545,16 @@ svg {
 
 .schedule-rule-dialog-body .schedule-limit-fields {
   margin-top: 16px;
+}
+
+.general-schedule-dialog-body {
+  display: grid;
+  gap: 16px;
+}
+
+.general-schedule-dialog-body .schedule-grace-field,
+.general-schedule-dialog-body .setting-toggle {
+  margin: 0;
 }
 
 .schedule-rule-list {
@@ -4921,9 +4927,9 @@ svg {
     grid-template-columns: 1fr;
   }
 
-  .schedule-form-grid {
+  .schedule-config-grid {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 12px;
   }
 
   .schedule-config-launch {
