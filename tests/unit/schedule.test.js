@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAppointmentSlots, normalizeStoreSchedule, validateStoreSchedule } from '../../src/utils/schedule.js';
+import { appointmentQuotaStatus, buildAppointmentSlots, normalizeStoreSchedule, validateStoreSchedule } from '../../src/utils/schedule.js';
 
 describe('store schedule helpers', () => {
   it('uses controlled twenty-minute appointments by default', () => {
@@ -9,6 +9,10 @@ describe('store schedule helpers', () => {
       noShowGraceMinutes: 30,
       automaticPendingFollowUp: false,
       showAmetropiaFields: false,
+      limitedDaysEnabled: false,
+      limitedWeekdays: [3, 6],
+      limitedDayCapacity: 10,
+      meiDailyQuota: 2,
       openingTime: '08:00',
       closingTime: '18:00'
     });
@@ -96,5 +100,65 @@ describe('store schedule helpers', () => {
     expect(normalizeStoreSchedule({}).showAmetropiaFields).toBe(false);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'true' }).showAmetropiaFields).toBe(true);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'false' }).showAmetropiaFields).toBe(false);
+  });
+
+  it('limits each MEI on configured weekdays', () => {
+    const settings = {
+      limitedDaysEnabled: true,
+      limitedWeekdays: [3, 6],
+      limitedDayCapacity: 10,
+      meiDailyQuota: 2
+    };
+    const profile = { uid: 'mei-1', roleProfileId: 'system-mei' };
+    const appointments = [
+      { id: 'slot-1', capturedByUid: 'mei-1' },
+      { id: 'slot-2', capturedByUid: 'mei-1' },
+      { id: 'slot-3', capturedByUid: 'other' }
+    ];
+
+    expect(appointmentQuotaStatus(settings, '2026-10-21', appointments, profile)).toMatchObject({
+      limited: true,
+      isMei: true,
+      dailyRemaining: 7,
+      meiRemaining: 0,
+      blocked: true,
+      reason: 'mei-quota'
+    });
+    expect(appointmentQuotaStatus(settings, '2026-10-22', appointments, profile).limited).toBe(false);
+  });
+
+  it('blocks all remaining times after the daily capacity is reached', () => {
+    const settings = {
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      openingTime: '08:00',
+      closingTime: '09:00',
+      limitedDaysEnabled: true,
+      limitedWeekdays: [3],
+      limitedDayCapacity: 2,
+      meiDailyQuota: 1
+    };
+    const appointments = [
+      { id: 'slot-1', appointmentTime: '08:00', capturedByUid: 'one' },
+      { id: 'slot-2', appointmentTime: '08:20', capturedByUid: 'two' }
+    ];
+    const slots = buildAppointmentSlots(settings, appointments, '', { appointmentDate: '2026-10-21', profile: { uid: 'admin', roleProfileId: 'system-admin' } });
+    expect(slots.every((slot) => !slot.available)).toBe(true);
+  });
+
+  it('validates limited-day capacity and MEI quota', () => {
+    expect(validateStoreSchedule({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      openingTime: '08:00',
+      closingTime: '18:00',
+      limitedDaysEnabled: true,
+      limitedWeekdays: [],
+      limitedDayCapacity: 3,
+      meiDailyQuota: 4
+    }).errors).toEqual(expect.objectContaining({
+      limitedWeekdays: expect.any(String),
+      meiDailyQuota: expect.any(String)
+    }));
   });
 });

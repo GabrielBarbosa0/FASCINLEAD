@@ -876,6 +876,12 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
   await page.getByLabel('Exibir ametropias no cadastro').check();
   await expect(page.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
+  await expect(page.getByLabel('Limitar vagas em dias especificos')).not.toBeChecked();
+  await page.getByLabel('Limitar vagas em dias especificos').check();
+  await expect(page.getByLabel('Quarta')).toBeChecked();
+  await expect(page.getByLabel('Sabado')).toBeChecked();
+  await page.getByLabel('Vagas totais por dia').fill('6');
+  await page.getByLabel('Cota por MEI').fill('2');
   const graceInput = page.getByLabel('Tolerancia apos o horario');
   await graceInput.fill('45');
   const graceLayout = await page.evaluate(() => {
@@ -892,6 +898,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   await expect(page.getByText('45 min')).toBeVisible();
   await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
+  await expect(page.getByText('6 vagas; MEI 2')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
@@ -928,7 +935,8 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
   await expect(page.getByText('Atendente de balcao', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
-  await expect(page.locator('.role-catalog-row')).toHaveCount(4);
+  await expect(page.getByText('MEI', { exact: true })).toBeVisible();
+  await expect(page.locator('.role-catalog-row')).toHaveCount(5);
   await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
   const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcao' });
   await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);

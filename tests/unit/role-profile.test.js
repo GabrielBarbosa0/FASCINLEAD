@@ -15,6 +15,13 @@ describe('role profiles', () => {
     expect(hasPermission({ role: 'admin', permissions: [] }, 'roles.manage')).toBe(true);
   });
 
+  it('provides a standard MEI profile with collaborator permissions', () => {
+    const collaborator = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-captor');
+    const mei = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-mei');
+    expect(mei).toMatchObject({ name: 'MEI', scope: 'own', baseRole: 'captor', system: true });
+    expect(mei.permissions).toEqual(collaborator.permissions);
+  });
+
   it('keeps the receptionist focused on front-desk scheduling', () => {
     const receptionist = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-receptionist');
 

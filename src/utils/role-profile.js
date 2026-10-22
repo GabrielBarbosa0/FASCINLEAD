@@ -72,6 +72,7 @@ const RECEPTIONIST_PERMISSIONS = [
 
 export const SYSTEM_ROLE_PROFILES = [
   { id: 'system-captor', name: 'Colaborador', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
+  { id: 'system-mei', name: 'MEI', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
   { id: 'system-manager', name: 'Gestor de unidades', scope: 'stores', baseRole: 'manager', permissions: MANAGER_PERMISSIONS, system: true, active: true },
   { id: 'system-receptionist', name: 'Atendente de balcao', scope: 'stores', baseRole: 'manager', permissions: RECEPTIONIST_PERMISSIONS, system: true, active: true },
   { id: 'system-admin', name: 'Administrador', scope: 'admin', baseRole: 'admin', permissions: ALL_PERMISSION_IDS, system: true, active: true }

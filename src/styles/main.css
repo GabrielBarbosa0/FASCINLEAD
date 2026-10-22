@@ -2413,6 +2413,64 @@ svg {
   background: var(--surface);
 }
 
+.schedule-limit-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.schedule-limit-fields.is-disabled {
+  display: none;
+}
+
+.schedule-limit-fields > legend {
+  padding: 18px 0 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.schedule-limit-fields > small {
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.schedule-weekday-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schedule-weekday-option {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+}
+
+.schedule-weekday-option:has(input:checked) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.schedule-weekday-option input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
+}
+
+.schedule-limit-numbers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .setting-toggle {
   min-height: 68px;
   display: grid;
@@ -4787,6 +4845,11 @@ svg {
   }
 
   .schedule-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-weekday-options,
+  .schedule-limit-numbers {
     grid-template-columns: 1fr;
   }
 
