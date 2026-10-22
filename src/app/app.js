@@ -1493,7 +1493,6 @@ function scheduleSettingsView() {
             </label>
           </div>
           <div class="schedule-form-column">
-            <div class="schedule-section-heading schedule-section-heading-first"><i data-lucide="calendar-range"></i><div><strong>Limites de agendamento</strong><small>Defina regras especiais para dias e cargos.</small></div></div>
             <input name="limitedDaysEnabled" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-limited-days">
               <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>

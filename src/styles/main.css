@@ -2486,43 +2486,6 @@ svg {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.schedule-section-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 22px 0 12px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-
-.schedule-section-heading-first {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.schedule-section-heading > svg {
-  width: 19px;
-  height: 19px;
-  color: var(--brand);
-}
-
-.schedule-section-heading strong,
-.schedule-section-heading small {
-  display: block;
-}
-
-.schedule-section-heading strong {
-  color: var(--ink);
-  font-size: 0.88rem;
-}
-
-.schedule-section-heading small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
 .mei-quota-launch {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
@@ -4905,12 +4868,6 @@ svg {
   .schedule-form-grid {
     grid-template-columns: 1fr;
     gap: 0;
-  }
-
-  .schedule-section-heading-first {
-    margin-top: 22px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
   }
 
   .mei-quota-launch {
