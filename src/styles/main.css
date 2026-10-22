@@ -1968,7 +1968,7 @@ svg {
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(600px, 2fr) minmax(300px, 1fr);
   align-items: start;
   gap: 22px;
 }
@@ -2390,6 +2390,17 @@ svg {
   box-shadow: var(--shadow);
 }
 
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+}
+
+.schedule-form-column {
+  min-width: 0;
+}
+
 .schedule-settings-fields.is-disabled {
   display: none;
 }
@@ -2484,6 +2495,12 @@ svg {
   border-top: 1px solid var(--line);
 }
 
+.schedule-section-heading-first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .schedule-section-heading > svg {
   width: 19px;
   height: 19px;
@@ -2493,6 +2510,12 @@ svg {
 .schedule-section-heading strong,
 .schedule-section-heading small {
   display: block;
+}
+
+@media (max-width: 950px) and (min-width: 761px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .schedule-section-heading strong {
@@ -4823,6 +4846,17 @@ svg {
 
   .settings-layout {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .schedule-section-heading-first {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
   }
 
   .role-settings-layout {

@@ -963,6 +963,47 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:10"]')).toHaveCount(0);
 });
 
+test('uses the available width in schedule settings', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.includes('mobile'), 'Intermediate desktop layout only.');
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Configuracoes/ }).click();
+  const layout = await page.locator('.settings-layout').evaluate((element) => {
+    const form = element.querySelector('.settings-form').getBoundingClientRect();
+    const preview = element.querySelector('.schedule-preview').getBoundingClientRect();
+    const columns = [...element.querySelectorAll('.schedule-form-column')].map((item) => item.getBoundingClientRect());
+    return {
+      formWidth: form.width,
+      formTop: form.top,
+      previewTop: preview.top,
+      firstColumnTop: columns[0].top,
+      firstColumnRight: columns[0].right,
+      secondColumnTop: columns[1].top,
+      secondColumnLeft: columns[1].left,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+  expect(layout.formWidth).toBeGreaterThan(600);
+  expect(Math.abs(layout.firstColumnTop - layout.secondColumnTop)).toBeLessThanOrEqual(2);
+  expect(layout.secondColumnLeft).toBeGreaterThan(layout.firstColumnRight);
+  expect(Math.abs(layout.previewTop - layout.formTop)).toBeLessThanOrEqual(2);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
+  await page.setViewportSize({ width: 900, height: 768 });
+  const compactLayout = await page.locator('.settings-layout').evaluate((element) => {
+    const form = element.querySelector('.settings-form').getBoundingClientRect();
+    const preview = element.querySelector('.schedule-preview').getBoundingClientRect();
+    return {
+      formBottom: form.bottom,
+      previewTop: preview.top,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+    };
+  });
+  expect(compactLayout.previewTop).toBeGreaterThan(compactLayout.formBottom);
+  expect(compactLayout.overflow).toBeLessThanOrEqual(1);
+});
+
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();

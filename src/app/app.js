@@ -1472,58 +1472,65 @@ function scheduleSettingsView() {
       <form id="schedule-settings-form" class="settings-form" novalidate>
         <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configuracoes da agenda</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
-        <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
-        <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
-          <div class="field-row schedule-hours">
-            <div class="field" data-field="openingTime"><label for="settings-opening">Inicio</label><input id="settings-opening" name="openingTime" type="time" value="${selected.openingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
-            <div class="field" data-field="closingTime"><label for="settings-closing">Fim</label><input id="settings-closing" name="closingTime" type="time" value="${selected.closingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
+        <div class="schedule-form-grid">
+          <div class="schedule-form-column">
+            <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
+            <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
+              <div class="field-row schedule-hours">
+                <div class="field" data-field="openingTime"><label for="settings-opening">Inicio</label><input id="settings-opening" name="openingTime" type="time" value="${selected.openingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
+                <div class="field" data-field="closingTime"><label for="settings-closing">Fim</label><input id="settings-closing" name="closingTime" type="time" value="${selected.closingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
+              </div>
+            </div>
+            <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Tolerancia apos o horario</label><small id="settings-no-show-help" class="field-help">Tempo para liberar o retorno ao captador quando houver falta.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
+            <input name="automaticPendingFollowUp" type="hidden" value="false" />
+            <label class="setting-toggle checkbox-label" for="settings-automatic-follow-up">
+              <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois da tolerancia.</small></span>
+              <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
+              <span class="setting-toggle-control" aria-hidden="true"></span>
+            </label>
+            <input name="showAmetropiaFields" type="hidden" value="false" />
+            <label class="setting-toggle checkbox-label" for="settings-show-ametropias">
+              <span><strong>Exibir ametropias no cadastro</strong><small>Mostra estas opcoes nos novos cadastros e agendamentos.</small></span>
+              <input id="settings-show-ametropias" name="showAmetropiaFields" type="checkbox" value="true" ${selected.showAmetropiaFields ? 'checked' : ''} />
+              <span class="setting-toggle-control" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="schedule-form-column">
+            <div class="schedule-section-heading schedule-section-heading-first"><i data-lucide="calendar-range"></i><div><strong>Limites de agendamento</strong><small>Defina regras especiais para dias e cargos.</small></div></div>
+            <input name="limitedDaysEnabled" type="hidden" value="false" />
+            <label class="setting-toggle checkbox-label" for="settings-limited-days">
+              <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
+              <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
+              <span class="setting-toggle-control" aria-hidden="true"></span>
+            </label>
+            <fieldset class="field schedule-limit-fields ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedWeekdays" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
+              <legend>Dias com vagas limitadas</legend>
+              <small>Quarta e sabado ficam selecionados inicialmente, mas podem ser alterados.</small>
+              <div class="schedule-weekday-options">${limitedWeekdayOptions}</div>
+              <small class="field-error"></small>
+              <div class="field-row schedule-limit-numbers">
+                <div class="field" data-field="limitedDayCapacity"><label for="settings-day-capacity">Vagas totais por dia</label><div class="number-with-unit"><input id="settings-day-capacity" name="limitedDayCapacity" type="number" min="1" max="100" step="1" value="${selected.limitedDayCapacity}" /><span>vagas</span></div><small class="field-error"></small></div>
+              </div>
+            </fieldset>
+            <div class="schedule-section-heading"><i data-lucide="briefcase-business"></i><div><strong>Cotas do MEI</strong><small>Controle os agendamentos feitos por cada pessoa com este cargo.</small></div></div>
+            <input name="meiQuotaEnabled" type="hidden" value="false" />
+            <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
+              <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
+              <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
+              <span class="setting-toggle-control" aria-hidden="true"></span>
+            </label>
+            <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaWeekdays" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
+              <legend>Dias com cota para o MEI</legend>
+              <div class="schedule-weekday-options">${meiWeekdayOptions}</div>
+              <small class="field-error"></small>
+              <div class="field-row schedule-limit-numbers">
+                <div class="field" data-field="meiMorningQuota"><label for="settings-mei-morning-quota">Cota pela manha</label><div class="number-with-unit"><input id="settings-mei-morning-quota" name="meiMorningQuota" type="number" min="0" max="100" step="1" value="${selected.meiMorningQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
+                <div class="field" data-field="meiAfternoonQuota"><label for="settings-mei-afternoon-quota">Cota a tarde</label><div class="number-with-unit"><input id="settings-mei-afternoon-quota" name="meiAfternoonQuota" type="number" min="0" max="100" step="1" value="${selected.meiAfternoonQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
+              </div>
+              <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
+            </fieldset>
           </div>
         </div>
-        <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Tolerancia apos o horario</label><small id="settings-no-show-help" class="field-help">Tempo para liberar o retorno ao captador quando houver falta.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
-        <input name="automaticPendingFollowUp" type="hidden" value="false" />
-        <label class="setting-toggle checkbox-label" for="settings-automatic-follow-up">
-          <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois da tolerancia.</small></span>
-          <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
-          <span class="setting-toggle-control" aria-hidden="true"></span>
-        </label>
-        <input name="showAmetropiaFields" type="hidden" value="false" />
-        <label class="setting-toggle checkbox-label" for="settings-show-ametropias">
-          <span><strong>Exibir ametropias no cadastro</strong><small>Mostra estas opcoes nos novos cadastros e agendamentos.</small></span>
-          <input id="settings-show-ametropias" name="showAmetropiaFields" type="checkbox" value="true" ${selected.showAmetropiaFields ? 'checked' : ''} />
-          <span class="setting-toggle-control" aria-hidden="true"></span>
-        </label>
-        <input name="limitedDaysEnabled" type="hidden" value="false" />
-        <label class="setting-toggle checkbox-label" for="settings-limited-days">
-          <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
-          <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
-          <span class="setting-toggle-control" aria-hidden="true"></span>
-        </label>
-        <fieldset class="field schedule-limit-fields ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedWeekdays" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
-          <legend>Dias com vagas limitadas</legend>
-          <small>Quarta e sabado ficam selecionados inicialmente, mas podem ser alterados.</small>
-          <div class="schedule-weekday-options">${limitedWeekdayOptions}</div>
-          <small class="field-error"></small>
-          <div class="field-row schedule-limit-numbers">
-            <div class="field" data-field="limitedDayCapacity"><label for="settings-day-capacity">Vagas totais por dia</label><div class="number-with-unit"><input id="settings-day-capacity" name="limitedDayCapacity" type="number" min="1" max="100" step="1" value="${selected.limitedDayCapacity}" /><span>vagas</span></div><small class="field-error"></small></div>
-          </div>
-        </fieldset>
-        <div class="schedule-section-heading"><i data-lucide="briefcase-business"></i><div><strong>Cotas do MEI</strong><small>Controle os agendamentos feitos por cada pessoa com este cargo.</small></div></div>
-        <input name="meiQuotaEnabled" type="hidden" value="false" />
-        <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
-          <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
-          <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
-          <span class="setting-toggle-control" aria-hidden="true"></span>
-        </label>
-        <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaWeekdays" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
-          <legend>Dias com cota para o MEI</legend>
-          <div class="schedule-weekday-options">${meiWeekdayOptions}</div>
-          <small class="field-error"></small>
-          <div class="field-row schedule-limit-numbers">
-            <div class="field" data-field="meiMorningQuota"><label for="settings-mei-morning-quota">Cota pela manha</label><div class="number-with-unit"><input id="settings-mei-morning-quota" name="meiMorningQuota" type="number" min="0" max="100" step="1" value="${selected.meiMorningQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
-            <div class="field" data-field="meiAfternoonQuota"><label for="settings-mei-afternoon-quota">Cota a tarde</label><div class="number-with-unit"><input id="settings-mei-afternoon-quota" name="meiAfternoonQuota" type="number" min="0" max="100" step="1" value="${selected.meiAfternoonQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
-          </div>
-          <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
-        </fieldset>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
       <aside class="schedule-preview">
