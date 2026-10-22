@@ -1059,4 +1059,17 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:45"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(0);
+
+  await page.evaluate(() => { window.location.hash = '#/settings'; });
+  await page.getByRole('tab', { name: 'Servicos' }).click();
+  const savedServiceRow = page.locator('.service-catalog-row').filter({ hasText: 'Avaliacao especializada' });
+  await savedServiceRow.getByTitle('Excluir servico').click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Excluir servico?' });
+  await expect(deleteDialog).toContainText('Os agendamentos ja cadastrados serao preservados.');
+  await deleteDialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(savedServiceRow).toBeVisible();
+
+  await savedServiceRow.getByTitle('Excluir servico').click();
+  await page.getByRole('dialog', { name: 'Excluir servico?' }).getByRole('button', { name: 'Excluir servico' }).click();
+  await expect(savedServiceRow).toHaveCount(0);
 });

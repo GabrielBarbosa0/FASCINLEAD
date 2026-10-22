@@ -532,6 +532,7 @@ describe('appointment service catalog', () => {
       updatedAt: Timestamp.now(),
       updatedByUid: 'admin-uid'
     }));
+    await assertSucceeds(deleteDoc(reference));
   });
 
   it('lets a captor list active services from their own store', async () => {
@@ -560,6 +561,7 @@ describe('appointment service catalog', () => {
       createdByUid: 'captor-uid',
       updatedByUid: 'captor-uid'
     }));
+    await assertFails(deleteDoc(doc(db, 'appointmentServices', 'inactive-service')));
   });
 });
 

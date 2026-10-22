@@ -489,7 +489,7 @@ service cloud.firestore {
         && validAppointmentService(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.createdByUid == resource.data.createdByUid;
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /leads/{leadId} {

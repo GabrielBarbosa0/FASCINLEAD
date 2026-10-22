@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { defaultAppointmentService, normalizeAppointmentService, servicesForStore, validateAppointmentService } from '../utils/service-catalog.js';
@@ -54,6 +54,25 @@ export async function setAppointmentServiceActive(profile, service, active) {
     }
   }
   return saveAppointmentService(profile, { ...service, active }, service.id);
+}
+
+export async function deleteAppointmentService(profile, service) {
+  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem excluir servicos.');
+  if (!service?.id) throw new Error('Servico invalido.');
+
+  if (service.active) {
+    const services = await loadAppointmentServices(profile, { includeInactive: true });
+    const uncoveredStoreIds = service.storeIds.filter((storeId) => !servicesForStore(
+      services.filter((item) => item.id !== service.id), storeId
+    ).length);
+    if (uncoveredStoreIds.length) {
+      const error = new Error('Mantenha pelo menos um servico ativo em cada unidade atendida.');
+      error.code = 'last-active-service';
+      throw error;
+    }
+  }
+
+  await deleteDoc(doc(db, 'appointmentServices', service.id));
 }
 
 export async function ensureDefaultAppointmentServices(profile, schedules, services) {

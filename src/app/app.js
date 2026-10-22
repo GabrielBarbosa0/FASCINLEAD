@@ -54,7 +54,7 @@ import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, upda
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedule, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
-import { ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
+import { deleteAppointmentService, ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
@@ -208,6 +208,7 @@ const state = {
     services: [],
     serviceEditorOpen: false,
     editingServiceId: '',
+    pendingDeleteServiceId: '',
     roleEditorOpen: false,
     roleDraft: createDefaultRoleDraft(),
     editingRoleId: '',
@@ -1410,7 +1411,7 @@ function settingsView() {
 }
 
 function serviceCatalogSettingsView() {
-  const { services, saving, serviceEditorOpen, editingServiceId } = state.settings;
+  const { services, saving, serviceEditorOpen, editingServiceId, pendingDeleteServiceId } = state.settings;
   const editing = services.find((service) => service.id === editingServiceId) || null;
   const rows = services.map((service) => `<article class="service-catalog-row ${service.active ? '' : 'is-inactive'}">
     <span class="service-catalog-icon"><i data-lucide="stethoscope"></i></span>
@@ -1420,8 +1421,10 @@ function serviceCatalogSettingsView() {
     <div class="service-catalog-actions">
       <button class="icon-button" type="button" data-service-edit="${escapeHtml(service.id)}" title="Editar servico" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
       <button class="button button-secondary" type="button" data-service-toggle="${escapeHtml(service.id)}" ${saving ? 'disabled' : ''}><i data-lucide="${service.active ? 'circle-x' : 'circle-check'}"></i><span>${service.active ? 'Desativar' : 'Ativar'}</span></button>
+      <button class="icon-button role-delete-button" type="button" data-service-delete="${escapeHtml(service.id)}" title="Excluir servico" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>
     </div>
   </article>`).join('');
+  const deleting = services.find((service) => service.id === pendingDeleteServiceId) || null;
   const selectedStoreIds = editing?.storeIds || [state.settings.selectedStoreId || STORES[0].id];
   const storeOptions = STORES.map((store) => `<label class="service-store-option">
     <input type="checkbox" name="storeIds" value="${store.id}" ${selectedStoreIds.includes(store.id) ? 'checked' : ''} />
@@ -1443,7 +1446,8 @@ function serviceCatalogSettingsView() {
       </div>
       <footer><button class="button button-secondary" type="button" data-service-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar servico'}</span></button></footer>
     </form>
-  </dialog>` : ''}`;
+  </dialog>` : ''}
+  ${deleting ? `<dialog id="delete-service-dialog" class="confirmation-dialog" aria-labelledby="delete-service-title" aria-describedby="delete-service-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-service-title">Excluir servico?</h2><p id="delete-service-description">O servico <strong>${escapeHtml(deleting.name)}</strong> sera removido do catalogo e nao aparecera em novos agendamentos. Os agendamentos ja cadastrados serao preservados.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-service-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-service-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir servico</span></button></div></dialog>` : ''}`;
 }
 
 function scheduleSettingsView() {
@@ -2419,6 +2423,13 @@ function bindPageEvents() {
     state.settings.editingServiceId = '';
     render();
   });
+  const deleteServiceDialog = document.querySelector('#delete-service-dialog');
+  deleteServiceDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    deleteServiceDialog.close();
+    state.settings.pendingDeleteServiceId = '';
+    render();
+  });
 
   const scheduleSettingsForm = document.querySelector('#schedule-settings-form');
   if (scheduleSettingsForm) {
@@ -3264,6 +3275,7 @@ async function handleAction(action) {
       services: [],
       serviceEditorOpen: false,
       editingServiceId: '',
+      pendingDeleteServiceId: '',
       roleEditorOpen: false,
       roleDraft: createDefaultRoleDraft(),
       editingRoleId: '',
@@ -3421,6 +3433,56 @@ export async function startApp() {
           : error?.code === 'last-active-service'
             ? error.message
             : 'Nao foi possivel alterar o servico.';
+        render();
+      }
+      return;
+    }
+    const deleteServiceButton = event.target.closest('[data-service-delete]');
+    if (deleteServiceButton && !deleteServiceButton.disabled) {
+      state.settings.pendingDeleteServiceId = deleteServiceButton.dataset.serviceDelete;
+      render();
+      document.querySelector('#delete-service-dialog')?.showModal();
+      return;
+    }
+    if (event.target.closest('[data-service-delete-cancel]')) {
+      document.querySelector('#delete-service-dialog')?.close();
+      state.settings.pendingDeleteServiceId = '';
+      render();
+      return;
+    }
+    const confirmServiceDeleteButton = event.target.closest('[data-service-delete-confirm]');
+    if (confirmServiceDeleteButton && !confirmServiceDeleteButton.disabled) {
+      const service = state.settings.services.find((item) => item.id === confirmServiceDeleteButton.dataset.serviceDeleteConfirm);
+      if (!service) return;
+      state.settings.saving = true;
+      render();
+      try {
+        if (state.demoMode) {
+          const uncoveredStoreIds = service.active ? service.storeIds.filter((storeId) => !servicesForStore(
+            state.settings.services.filter((item) => item.id !== service.id), storeId
+          ).length) : [];
+          if (uncoveredStoreIds.length) {
+            const error = new Error('Mantenha pelo menos um servico ativo em cada unidade atendida.');
+            error.code = 'last-active-service';
+            throw error;
+          }
+          state.settings.services = state.settings.services.filter((item) => item.id !== service.id);
+          state.settings.saving = false;
+        } else {
+          await deleteAppointmentService(state.profile, service);
+        }
+        state.settings.pendingDeleteServiceId = '';
+        if (!state.demoMode) await loadServiceCatalogData();
+        else render();
+        showToast('Servico excluido.');
+      } catch (error) {
+        state.settings.saving = false;
+        state.settings.pendingDeleteServiceId = '';
+        state.settings.error = error?.code === 'permission-denied'
+          ? 'Seu perfil nao pode excluir este servico.'
+          : error?.code === 'last-active-service'
+            ? error.message
+            : 'Nao foi possivel excluir o servico.';
         render();
       }
       return;
