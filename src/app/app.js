@@ -803,12 +803,12 @@ function newLeadView() {
           <small class="field-error"></small>
         </div>
       </div>
-      ${state.newLeadSchedule.settings.showAmetropiaFields ? `<fieldset class="field ametropia-field">
+      ${state.newLeadSchedule.settings.showAmetropiaFields ? `<fieldset id="new-lead-ametropias" class="field ametropia-field">
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${ametropiaOptions()}</div>
       </fieldset>` : ''}
-      <fieldset class="field ametropia-field">
+      <fieldset id="new-lead-pathologies" class="field ametropia-field">
         <legend>Patologias e condicoes de saude</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions()}</div>
@@ -3058,6 +3058,26 @@ function refreshAppointmentTimeControl() {
   if (dateStatus) dateStatus.textContent = fullyBooked ? 'Dia sem horarios disponiveis.' : '';
 }
 
+function refreshNewLeadAmetropiaField() {
+  const form = document.querySelector('#lead-form');
+  const pathologiesField = document.querySelector('#new-lead-pathologies');
+  const existingField = document.querySelector('#new-lead-ametropias');
+  if (!form || !pathologiesField) return;
+
+  if (!state.newLeadSchedule.settings.showAmetropiaFields) {
+    existingField?.remove();
+    return;
+  }
+  if (existingField) return;
+
+  pathologiesField.insertAdjacentHTML('beforebegin', `<fieldset id="new-lead-ametropias" class="field ametropia-field">
+    <legend>Ametropias</legend>
+    <small>Marque todas que se aplicam.</small>
+    <div class="ametropia-options">${ametropiaOptions()}</div>
+  </fieldset>`);
+  bindExclusiveOptions(form, 'ametropiaIds');
+}
+
 function startDayAppointmentsSubscription() {
   state.unsubscribeDayAppointments?.();
   state.unsubscribeDayAppointments = null;
@@ -3135,6 +3155,7 @@ async function ensureNewLeadSchedule() {
         state.newLeadSchedule.settings = settings;
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
+        refreshNewLeadAmetropiaField();
         refreshAppointmentTimeControl();
       },
       () => {
@@ -3142,6 +3163,7 @@ async function ensureNewLeadSchedule() {
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
         state.newLeadSchedule.error = 'Usando a configuracao padrao da agenda.';
+        refreshNewLeadAmetropiaField();
         refreshAppointmentTimeControl();
       }
     );
