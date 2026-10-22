@@ -906,16 +906,20 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByRole('heading', { name: 'Configuracoes' })).toBeVisible();
   await expect(page.getByText('Configuracoes da agenda', { exact: true })).toBeVisible();
 
-  await page.getByLabel('Loja').selectOption('loja-06');
+  await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
   await expect(page.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
   await page.getByLabel('Exibir ametropias no cadastro').check();
   await expect(page.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
   await expect(page.getByLabel('Limitar vagas em dias especificos')).not.toBeChecked();
   await page.getByLabel('Limitar vagas em dias especificos').check();
-  await expect(page.getByLabel('Quarta')).toBeChecked();
-  await expect(page.getByLabel('Sabado')).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Dias com vagas limitadas' }).getByLabel('Quarta')).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Dias com vagas limitadas' }).getByLabel('Sabado')).toBeChecked();
   await page.getByLabel('Vagas totais por dia').fill('6');
-  await page.getByLabel('Cota por MEI').fill('2');
+  await page.getByLabel('Aplicar cotas ao cargo MEI').check();
+  await expect(page.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Quarta')).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Sabado')).toBeChecked();
+  await page.getByLabel('Cota pela manha').fill('2');
+  await page.getByLabel('Cota a tarde').fill('1');
   const graceInput = page.getByLabel('Tolerancia apos o horario');
   await graceInput.fill('45');
   const graceLayout = await page.evaluate(() => {
@@ -932,7 +936,8 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   await expect(page.getByText('45 min')).toBeVisible();
   await expect(page.getByText('Ativo', { exact: true })).toBeVisible();
-  await expect(page.getByText('6 vagas; MEI 2')).toBeVisible();
+  await expect(page.getByText(/6 vagas em Quarta, Sabado/)).toBeVisible();
+  await expect(page.getByText(/2 manha; 1 tarde em Quarta, Sabado/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();

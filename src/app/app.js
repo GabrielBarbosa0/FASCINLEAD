@@ -662,7 +662,7 @@ function appointmentTimeField() {
       <option value="">${placeholder}</option>${options}
     </select>
     <small class="field-error"></small>
-    ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${quota.limited ? `${quota.dailyRemaining} vaga(s) restante(s) no dia${quota.isMei ? `; sua cota: ${quota.meiRemaining}` : ''}` : `${availableSlots.length} de ${slots.length} horario(s) disponivel(is)`}</small>` : ''}
+    ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${quota.isMei && quota.meiLimited ? `Cota MEI: ${quota.meiMorningRemaining} pela manha e ${quota.meiAfternoonRemaining} a tarde${quota.limited ? `; ${quota.dailyRemaining} vaga(s) no dia` : ''}` : quota.limited ? `${quota.dailyRemaining} vaga(s) restante(s) no dia` : `${availableSlots.length} de ${slots.length} horario(s) disponivel(is)`}</small>` : ''}
   </div>`;
 }
 
@@ -1465,6 +1465,8 @@ function scheduleSettingsView() {
   const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
   const limitedWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="limitedWeekdays" value="${day.id}" ${selected.limitedWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
   const limitedDayLabels = WEEKDAY_OPTIONS.filter((day) => selected.limitedWeekdays.includes(day.id)).map((day) => day.label).join(', ');
+  const meiWeekdayOptions = WEEKDAY_OPTIONS.map((day) => `<label class="schedule-weekday-option checkbox-label"><input type="checkbox" name="meiQuotaWeekdays" value="${day.id}" ${selected.meiQuotaWeekdays.includes(day.id) ? 'checked' : ''} /><span>${day.label}</span></label>`).join('');
+  const meiDayLabels = WEEKDAY_OPTIONS.filter((day) => selected.meiQuotaWeekdays.includes(day.id)).map((day) => day.label).join(', ');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
@@ -1492,7 +1494,7 @@ function scheduleSettingsView() {
         </label>
         <input name="limitedDaysEnabled" type="hidden" value="false" />
         <label class="setting-toggle checkbox-label" for="settings-limited-days">
-          <span><strong>Limitar vagas em dias especificos</strong><small>Reduz a disponibilidade nos dias escolhidos e aplica a cota do MEI.</small></span>
+          <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
           <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
           <span class="setting-toggle-control" aria-hidden="true"></span>
         </label>
@@ -1503,8 +1505,24 @@ function scheduleSettingsView() {
           <small class="field-error"></small>
           <div class="field-row schedule-limit-numbers">
             <div class="field" data-field="limitedDayCapacity"><label for="settings-day-capacity">Vagas totais por dia</label><div class="number-with-unit"><input id="settings-day-capacity" name="limitedDayCapacity" type="number" min="1" max="100" step="1" value="${selected.limitedDayCapacity}" /><span>vagas</span></div><small class="field-error"></small></div>
-            <div class="field" data-field="meiDailyQuota"><label for="settings-mei-quota">Cota por MEI</label><div class="number-with-unit"><input id="settings-mei-quota" name="meiDailyQuota" type="number" min="1" max="100" step="1" value="${selected.meiDailyQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
           </div>
+        </fieldset>
+        <div class="schedule-section-heading"><i data-lucide="briefcase-business"></i><div><strong>Cotas do MEI</strong><small>Controle os agendamentos feitos por cada pessoa com este cargo.</small></div></div>
+        <input name="meiQuotaEnabled" type="hidden" value="false" />
+        <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
+          <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
+          <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-control" aria-hidden="true"></span>
+        </label>
+        <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaWeekdays" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
+          <legend>Dias com cota para o MEI</legend>
+          <div class="schedule-weekday-options">${meiWeekdayOptions}</div>
+          <small class="field-error"></small>
+          <div class="field-row schedule-limit-numbers">
+            <div class="field" data-field="meiMorningQuota"><label for="settings-mei-morning-quota">Cota pela manha</label><div class="number-with-unit"><input id="settings-mei-morning-quota" name="meiMorningQuota" type="number" min="0" max="100" step="1" value="${selected.meiMorningQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
+            <div class="field" data-field="meiAfternoonQuota"><label for="settings-mei-afternoon-quota">Cota a tarde</label><div class="number-with-unit"><input id="settings-mei-afternoon-quota" name="meiAfternoonQuota" type="number" min="0" max="100" step="1" value="${selected.meiAfternoonQuota}" /><span>vagas</span></div><small class="field-error"></small></div>
+          </div>
+          <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
         </fieldset>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
@@ -1512,7 +1530,7 @@ function scheduleSettingsView() {
         <div class="filter-title"><i data-lucide="clock-3"></i><div><strong>Resumo do atendimento</strong><span>${escapeHtml(selected.label || storeLabel(selectedStoreId))}</span></div></div>
         ${selected.schedulingMode === 'free'
           ? '<div class="schedule-free-state"><i data-lucide="calendar-days"></i><strong>Cadastro livre</strong><span>O captador podera informar qualquer horario.</span></div>'
-          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div><div><span>Ametropias no cadastro</span><strong>${selected.showAmetropiaFields ? 'Ativas' : 'Desativadas'}</strong></div><div><span>Dias limitados</span><strong>${selected.limitedDaysEnabled ? escapeHtml(limitedDayLabels || 'Nao definidos') : 'Desativado'}</strong></div><div><span>Limites</span><strong>${selected.limitedDaysEnabled ? `${selected.limitedDayCapacity} vagas; MEI ${selected.meiDailyQuota}` : 'Sem limite especial'}</strong></div></div>
+          : `<div class="schedule-summary-grid"><div><span>Expediente</span><strong>${selected.openingTime} - ${selected.closingTime}</strong></div><div><span>Alerta de falta</span><strong>${selected.noShowGraceMinutes} min</strong></div><div><span>Retorno automatico</span><strong>${selected.automaticPendingFollowUp ? 'Ativo' : 'Desativado'}</strong></div><div><span>Ametropias no cadastro</span><strong>${selected.showAmetropiaFields ? 'Ativas' : 'Desativadas'}</strong></div><div><span>Limite geral</span><strong>${selected.limitedDaysEnabled ? `${selected.limitedDayCapacity} vagas em ${escapeHtml(limitedDayLabels || 'dias nao definidos')}` : 'Desativado'}</strong></div><div><span>Cotas do MEI</span><strong>${selected.meiQuotaEnabled ? `${selected.meiMorningQuota} manha; ${selected.meiAfternoonQuota} tarde em ${escapeHtml(meiDayLabels || 'dias nao definidos')}` : 'Desativadas'}</strong></div></div>
             <div class="schedule-slot-preview" aria-label="Exemplo de horarios">${previewSlots.slice(0, 12).map((slot) => `<span>${slot.time}</span>`).join('')}${previewSlots.length > 12 ? `<span>+${previewSlots.length - 12}</span>` : ''}</div>`}
       </aside>
     </section>`;
@@ -2458,7 +2476,7 @@ function bindPageEvents() {
           : scheduleSettingsForm.elements[name].value;
       });
     });
-    ['limitedDayCapacity', 'meiDailyQuota'].forEach((name) => {
+    ['limitedDayCapacity', 'meiMorningQuota', 'meiAfternoonQuota'].forEach((name) => {
       scheduleSettingsForm.elements[name]?.addEventListener('input', () => {
         const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
         if (record) record[name] = Number(scheduleSettingsForm.elements[name].value);
@@ -2468,6 +2486,12 @@ function bindPageEvents() {
       input.addEventListener('change', () => {
         const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
         if (record) record.limitedWeekdays = [...scheduleSettingsForm.querySelectorAll('[name="limitedWeekdays"]:checked')].map((item) => Number(item.value));
+      });
+    });
+    scheduleSettingsForm.querySelectorAll('[name="meiQuotaWeekdays"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+        if (record) record.meiQuotaWeekdays = [...scheduleSettingsForm.querySelectorAll('[name="meiQuotaWeekdays"]:checked')].map((item) => Number(item.value));
       });
     });
     document.querySelector('#settings-automatic-follow-up')?.addEventListener('change', (event) => {
@@ -2485,6 +2509,11 @@ function bindPageEvents() {
       if (record) record.limitedDaysEnabled = event.target.checked;
       render();
     });
+    document.querySelector('#settings-mei-quota-enabled')?.addEventListener('change', (event) => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (record) record.meiQuotaEnabled = event.target.checked;
+      render();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
@@ -2493,13 +2522,19 @@ function bindPageEvents() {
       values.automaticPendingFollowUp = values.automaticPendingFollowUp === 'true';
       values.showAmetropiaFields = values.showAmetropiaFields === 'true';
       values.limitedDaysEnabled = values.limitedDaysEnabled === 'true';
+      values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       values.limitedWeekdays = values.limitedDaysEnabled
         ? formData.getAll('limitedWeekdays').map(Number)
         : [...current.limitedWeekdays];
       values.limitedDayCapacity = values.limitedDaysEnabled ? Number(values.limitedDayCapacity) : current.limitedDayCapacity;
-      values.meiDailyQuota = values.limitedDaysEnabled ? Number(values.meiDailyQuota) : current.meiDailyQuota;
+      values.meiQuotaWeekdays = values.meiQuotaEnabled
+        ? formData.getAll('meiQuotaWeekdays').map(Number)
+        : [...current.meiQuotaWeekdays];
+      values.meiMorningQuota = values.meiQuotaEnabled ? Number(values.meiMorningQuota) : current.meiMorningQuota;
+      values.meiAfternoonQuota = values.meiQuotaEnabled ? Number(values.meiAfternoonQuota) : current.meiAfternoonQuota;
+      values.meiDailyQuota = values.meiMorningQuota + values.meiAfternoonQuota;
       if (values.schedulingMode === 'free') {
         values.openingTime = current.openingTime;
         values.closingTime = current.closingTime;
@@ -2518,7 +2553,11 @@ function bindPageEvents() {
             limitedDaysEnabled: values.limitedDaysEnabled,
             limitedWeekdays: values.limitedWeekdays,
             limitedDayCapacity: values.limitedDayCapacity,
-            meiDailyQuota: values.meiDailyQuota
+            meiDailyQuota: values.meiDailyQuota,
+            meiQuotaEnabled: values.meiQuotaEnabled,
+            meiQuotaWeekdays: values.meiQuotaWeekdays,
+            meiMorningQuota: values.meiMorningQuota,
+            meiAfternoonQuota: values.meiAfternoonQuota
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };

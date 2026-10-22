@@ -8,6 +8,10 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   limitedWeekdays: Object.freeze([3, 6]),
   limitedDayCapacity: 10,
   meiDailyQuota: 2,
+  meiQuotaEnabled: false,
+  meiQuotaWeekdays: Object.freeze([3, 6]),
+  meiMorningQuota: 1,
+  meiAfternoonQuota: 1,
   openingTime: '08:00',
   closingTime: '18:00'
 });
@@ -54,9 +58,24 @@ export function normalizeStoreSchedule(value = {}) {
   const noShowGrace = Number(value.noShowGraceMinutes);
   const limitedDayCapacity = Number(value.limitedDayCapacity);
   const meiDailyQuota = Number(value.meiDailyQuota);
+  const legacyMeiQuota = Number.isInteger(meiDailyQuota) && meiDailyQuota >= 1 && meiDailyQuota <= 100
+    ? meiDailyQuota
+    : DEFAULT_STORE_SCHEDULE.meiDailyQuota;
+  const meiMorningQuota = Number(value.meiMorningQuota);
+  const meiAfternoonQuota = Number(value.meiAfternoonQuota);
   const limitedWeekdays = Array.isArray(value.limitedWeekdays)
     ? [...new Set(value.limitedWeekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
     : [...DEFAULT_STORE_SCHEDULE.limitedWeekdays];
+  const meiQuotaWeekdays = Array.isArray(value.meiQuotaWeekdays)
+    ? [...new Set(value.meiQuotaWeekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [...limitedWeekdays];
+  const normalizedMeiMorningQuota = Number.isInteger(meiMorningQuota) && meiMorningQuota >= 0 && meiMorningQuota <= 100
+    ? meiMorningQuota
+    : Math.ceil(legacyMeiQuota / 2);
+  const normalizedMeiAfternoonQuota = Number.isInteger(meiAfternoonQuota) && meiAfternoonQuota >= 0 && meiAfternoonQuota <= 100
+    ? meiAfternoonQuota
+    : Math.floor(legacyMeiQuota / 2);
+  const hasPeriodQuotas = Number.isInteger(meiMorningQuota) && Number.isInteger(meiAfternoonQuota);
   const opening = TIME_PATTERN.test(value.openingTime || '') ? value.openingTime : DEFAULT_STORE_SCHEDULE.openingTime;
   const closing = TIME_PATTERN.test(value.closingTime || '') ? value.closingTime : DEFAULT_STORE_SCHEDULE.closingTime;
   return {
@@ -74,9 +93,15 @@ export function normalizeStoreSchedule(value = {}) {
     limitedDayCapacity: Number.isInteger(limitedDayCapacity) && limitedDayCapacity >= 1 && limitedDayCapacity <= 100
       ? limitedDayCapacity
       : DEFAULT_STORE_SCHEDULE.limitedDayCapacity,
-    meiDailyQuota: Number.isInteger(meiDailyQuota) && meiDailyQuota >= 1 && meiDailyQuota <= 100
-      ? meiDailyQuota
-      : DEFAULT_STORE_SCHEDULE.meiDailyQuota,
+    meiDailyQuota: hasPeriodQuotas
+      ? normalizedMeiMorningQuota + normalizedMeiAfternoonQuota
+      : legacyMeiQuota,
+    meiQuotaEnabled: value.meiQuotaEnabled === undefined
+      ? value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true'
+      : value.meiQuotaEnabled === true || value.meiQuotaEnabled === 'true',
+    meiQuotaWeekdays,
+    meiMorningQuota: normalizedMeiMorningQuota,
+    meiAfternoonQuota: normalizedMeiAfternoonQuota,
     openingTime: opening,
     closingTime: closing
   };
@@ -92,7 +117,10 @@ export function validateStoreSchedule(value) {
   const limitedDaysEnabled = value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true';
   const limitedWeekdays = Array.isArray(value.limitedWeekdays) ? value.limitedWeekdays.map(Number) : [];
   const limitedDayCapacity = Number(value.limitedDayCapacity);
-  const meiDailyQuota = Number(value.meiDailyQuota);
+  const meiQuotaEnabled = value.meiQuotaEnabled === true || value.meiQuotaEnabled === 'true';
+  const meiQuotaWeekdays = Array.isArray(value.meiQuotaWeekdays) ? value.meiQuotaWeekdays.map(Number) : [];
+  const meiMorningQuota = Number(value.meiMorningQuota);
+  const meiAfternoonQuota = Number(value.meiAfternoonQuota);
   const opening = timeToMinutes(value.openingTime);
   const closing = timeToMinutes(value.closingTime);
 
@@ -116,8 +144,17 @@ export function validateStoreSchedule(value) {
   if (limitedDaysEnabled && (!Number.isInteger(limitedDayCapacity) || limitedDayCapacity < 1 || limitedDayCapacity > 100)) {
     errors.limitedDayCapacity = 'Informe um limite entre 1 e 100 vagas.';
   }
-  if (limitedDaysEnabled && (!Number.isInteger(meiDailyQuota) || meiDailyQuota < 1 || meiDailyQuota > limitedDayCapacity)) {
-    errors.meiDailyQuota = 'A cota do MEI deve ficar entre 1 e o limite total do dia.';
+  if (meiQuotaEnabled && !meiQuotaWeekdays.length) {
+    errors.meiQuotaWeekdays = 'Escolha pelo menos um dia para aplicar as cotas do MEI.';
+  }
+  if (meiQuotaEnabled && (!Number.isInteger(meiMorningQuota) || meiMorningQuota < 0 || meiMorningQuota > 100)) {
+    errors.meiMorningQuota = 'Informe uma cota da manha entre 0 e 100.';
+  }
+  if (meiQuotaEnabled && (!Number.isInteger(meiAfternoonQuota) || meiAfternoonQuota < 0 || meiAfternoonQuota > 100)) {
+    errors.meiAfternoonQuota = 'Informe uma cota da tarde entre 0 e 100.';
+  }
+  if (meiQuotaEnabled && meiMorningQuota + meiAfternoonQuota < 1) {
+    errors.meiMorningQuota = 'Informe pelo menos uma vaga para o MEI.';
   }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };
@@ -129,10 +166,11 @@ function weekdayFromDate(appointmentDate) {
   return Number.isNaN(date.getTime()) ? null : date.getDay();
 }
 
-export function appointmentQuotaStatus(settings, appointmentDate, appointments = [], profile = null, ignoredLeadId = '') {
+export function appointmentQuotaStatus(settings, appointmentDate, appointments = [], profile = null, ignoredLeadId = '', appointmentTime = '') {
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
   const limited = schedule.limitedDaysEnabled && weekday !== null && schedule.limitedWeekdays.includes(weekday);
+  const meiLimited = schedule.meiQuotaEnabled && weekday !== null && schedule.meiQuotaWeekdays.includes(weekday);
   const uniqueAppointments = new Map();
   appointments.forEach((appointment) => {
     const appointmentKey = appointment.leadId || appointment.id;
@@ -142,20 +180,39 @@ export function appointmentQuotaStatus(settings, appointmentDate, appointments =
   const activeAppointments = [...uniqueAppointments.values()];
   const dailyUsed = activeAppointments.length;
   const isMei = profile?.roleProfileId === 'system-mei';
-  const meiUsed = isMei
-    ? activeAppointments.filter((appointment) => appointment.capturedByUid === profile?.uid).length
-    : 0;
+  const meiAppointments = isMei
+    ? activeAppointments.filter((appointment) => appointment.capturedByUid === profile?.uid)
+    : [];
+  const meiMorningUsed = meiAppointments.filter((appointment) => (timeToMinutes(appointment.appointmentTime) ?? 720) < 720).length;
+  const meiAfternoonUsed = meiAppointments.length - meiMorningUsed;
+  const appointmentMinutes = timeToMinutes(appointmentTime);
+  const meiPeriod = appointmentMinutes === null ? '' : appointmentMinutes < 720 ? 'morning' : 'afternoon';
+  const meiMorningRemaining = meiLimited && isMei ? Math.max(0, schedule.meiMorningQuota - meiMorningUsed) : null;
+  const meiAfternoonRemaining = meiLimited && isMei ? Math.max(0, schedule.meiAfternoonQuota - meiAfternoonUsed) : null;
+  const meiUsed = meiMorningUsed + meiAfternoonUsed;
   const dailyRemaining = limited ? Math.max(0, schedule.limitedDayCapacity - dailyUsed) : null;
-  const meiRemaining = limited && isMei ? Math.max(0, schedule.meiDailyQuota - meiUsed) : null;
+  const meiRemaining = meiLimited && isMei
+    ? (meiMorningRemaining + meiAfternoonRemaining)
+    : null;
   const dailyBlocked = limited && dailyRemaining === 0;
-  const meiBlocked = limited && isMei && meiRemaining === 0;
+  const meiBlocked = meiLimited && isMei && (
+    (meiPeriod === 'morning' && meiMorningRemaining === 0)
+    || (meiPeriod === 'afternoon' && meiAfternoonRemaining === 0)
+    || (!meiPeriod && meiMorningRemaining === 0 && meiAfternoonRemaining === 0)
+  );
   return {
     limited,
     isMei,
+    meiLimited,
     dailyUsed,
     dailyRemaining,
     meiUsed,
     meiRemaining,
+    meiMorningUsed,
+    meiMorningRemaining,
+    meiAfternoonUsed,
+    meiAfternoonRemaining,
+    meiPeriod,
     blocked: dailyBlocked || meiBlocked,
     reason: dailyBlocked ? 'daily-limit' : meiBlocked ? 'mei-quota' : ''
   };
@@ -168,13 +225,6 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
   const start = timeToMinutes(schedule.openingTime);
   const end = timeToMinutes(schedule.closingTime);
   const duration = schedule.appointmentDurationMinutes;
-  const quota = appointmentQuotaStatus(
-    schedule,
-    context.appointmentDate,
-    appointments,
-    context.profile,
-    ignoredLeadId
-  );
   const occupiedRanges = appointments
     .filter((appointment) => appointment.id !== ignoredLeadId && appointment.leadId !== ignoredLeadId)
     .map((appointment) => {
@@ -191,11 +241,20 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
   const slots = [];
   for (let slotStart = start; slotStart + duration <= end; slotStart += APPOINTMENT_BLOCK_MINUTES) {
     const slotEnd = slotStart + duration;
+    const slotTime = minutesToTime(slotStart);
+    const quota = appointmentQuotaStatus(
+      schedule,
+      context.appointmentDate,
+      appointments,
+      context.profile,
+      ignoredLeadId,
+      slotTime
+    );
     const occupied = occupiedRanges.some(([appointmentStart, appointmentEnd]) => (
       appointmentStart < slotEnd && appointmentEnd > slotStart
     ));
     slots.push({
-      time: minutesToTime(slotStart),
+      time: slotTime,
       endTime: minutesToTime(slotEnd),
       available: !occupied && !quota.blocked
     });
