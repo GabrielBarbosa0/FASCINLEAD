@@ -16,8 +16,24 @@ import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
+import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
+
+function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
+  return appointmentBlockTimes(appointmentTime, durationMinutes).map((blockTime) => ({
+    id: appointmentSlotId(storeId, appointmentDate, blockTime),
+    blockTime
+  }));
+}
+
+function setReservationBlock(batch, block, data) {
+  batch.set(doc(db, 'appointmentSlots', block.id), {
+    ...data,
+    blockTime: block.blockTime,
+    createdAt: serverTimestamp()
+  });
+}
 
 function readDemoLeads() {
   try {
@@ -91,18 +107,18 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
   };
   let writePromise;
   if (input.schedulingMode === 'controlled' && result.data.appointmentDate && result.data.appointmentTime) {
-    const slotId = `slot-${profile.storeId}-${result.data.appointmentDate}-${result.data.appointmentTime}`;
+    const durationMinutes = Number(input.appointmentDurationMinutes) || 20;
+    const blocks = reservationBlocks(profile.storeId, result.data.appointmentDate, result.data.appointmentTime, durationMinutes);
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadData);
-    batch.set(doc(db, 'appointmentSlots', slotId), {
+    blocks.forEach((block) => setReservationBlock(batch, block, {
       storeId: profile.storeId,
       appointmentDate: result.data.appointmentDate,
       appointmentTime: result.data.appointmentTime,
-      durationMinutes: Number(input.appointmentDurationMinutes) || 20,
+      durationMinutes,
       leadId: id,
-      capturedByUid: profile.uid,
-      createdAt: serverTimestamp()
-    });
+      capturedByUid: profile.uid
+    }));
     writePromise = batch.commit();
   } else {
     writePromise = setDoc(doc(db, 'leads', id), leadData);
@@ -146,28 +162,28 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     && existingLead.appointmentDate && existingLead.appointmentTime;
   const newControlled = result.data.appointmentSchedulingMode === 'controlled'
     && result.data.appointmentDate && result.data.appointmentTime;
-  const oldSlotId = oldControlled
-    ? `slot-${existingLead.storeId}-${existingLead.appointmentDate}-${existingLead.appointmentTime}`
-    : '';
-  const newSlotId = newControlled
-    ? `slot-${existingLead.storeId}-${result.data.appointmentDate}-${result.data.appointmentTime}`
-    : '';
+  const oldBlocks = oldControlled
+    ? reservationBlocks(existingLead.storeId, existingLead.appointmentDate, existingLead.appointmentTime, existingLead.appointmentDurationMinutes || 20)
+    : [];
+  const newBlocks = newControlled
+    ? reservationBlocks(existingLead.storeId, result.data.appointmentDate, result.data.appointmentTime, result.data.appointmentDurationMinutes || 20)
+    : [];
+  const newIds = new Set(newBlocks.map((block) => block.id));
+  const reservationChanged = oldBlocks.length !== newBlocks.length
+    || oldBlocks.some((block) => !newIds.has(block.id));
   let writePromise;
-  if (existingLead && oldSlotId !== newSlotId && (oldSlotId || newSlotId)) {
+  if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
-    if (oldSlotId) batch.delete(doc(db, 'appointmentSlots', oldSlotId));
-    if (newSlotId) {
-      batch.set(doc(db, 'appointmentSlots', newSlotId), {
-        storeId: existingLead.storeId,
-        appointmentDate: result.data.appointmentDate,
-        appointmentTime: result.data.appointmentTime,
-        durationMinutes: result.data.appointmentDurationMinutes,
-        leadId: id,
-        capturedByUid: existingLead.capturedByUid,
-        createdAt: serverTimestamp()
-      });
-    }
+    oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
+    newBlocks.forEach((block) => setReservationBlock(batch, block, {
+      storeId: existingLead.storeId,
+      appointmentDate: result.data.appointmentDate,
+      appointmentTime: result.data.appointmentTime,
+      durationMinutes: result.data.appointmentDurationMinutes,
+      leadId: id,
+      capturedByUid: existingLead.capturedByUid
+    }));
     writePromise = batch.commit();
   } else {
     writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });

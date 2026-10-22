@@ -41,10 +41,11 @@ describe('deleteManagementLead', () => {
       id: 'lead-1',
       storeId: 'loja-06',
       appointmentDate: '2026-10-20',
-      appointmentTime: '08:40'
+      appointmentTime: '08:40',
+      appointmentDurationMinutes: 20
     });
 
-    expect(firestoreMocks.batch.delete).toHaveBeenCalledTimes(2);
+    expect(firestoreMocks.batch.delete).toHaveBeenCalledTimes(3);
     expect(firestoreMocks.batch.delete).toHaveBeenNthCalledWith(1, {
       collectionName: 'leads',
       documentId: 'lead-1'
@@ -52,6 +53,10 @@ describe('deleteManagementLead', () => {
     expect(firestoreMocks.batch.delete).toHaveBeenNthCalledWith(2, {
       collectionName: 'appointmentSlots',
       documentId: 'slot-loja-06-2026-10-20-08:40'
+    });
+    expect(firestoreMocks.batch.delete).toHaveBeenNthCalledWith(3, {
+      collectionName: 'appointmentSlots',
+      documentId: 'slot-loja-06-2026-10-20-08:50'
     });
     expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce();
   });

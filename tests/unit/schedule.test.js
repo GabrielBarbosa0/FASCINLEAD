@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { appointmentQuotaStatus, buildAppointmentSlots, normalizeStoreSchedule, validateStoreSchedule } from '../../src/utils/schedule.js';
+import {
+  appointmentBlockTimes,
+  appointmentQuotaStatus,
+  appointmentSlotId,
+  buildAppointmentSlots,
+  normalizeStoreSchedule,
+  validateStoreSchedule
+} from '../../src/utils/schedule.js';
 
 describe('store schedule helpers', () => {
   it('uses controlled twenty-minute appointments by default', () => {
@@ -25,8 +32,8 @@ describe('store schedule helpers', () => {
       openingTime: '08:00',
       closingTime: '09:20'
     });
-    expect(slots.map((slot) => slot.time)).toEqual(['08:00', '08:30']);
-    expect(slots.at(-1).endTime).toBe('09:00');
+    expect(slots.map((slot) => slot.time)).toEqual(['08:00', '08:10', '08:20', '08:30', '08:40', '08:50']);
+    expect(slots.at(-1).endTime).toBe('09:20');
   });
 
   it('marks overlapping appointments as unavailable', () => {
@@ -38,7 +45,9 @@ describe('store schedule helpers', () => {
     }, [{ id: 'lead-1', appointmentTime: '08:10' }]);
     expect(slots.map(({ time, available }) => [time, available])).toEqual([
       ['08:00', false],
+      ['08:10', false],
       ['08:20', false],
+      ['08:30', true],
       ['08:40', true]
     ]);
   });
@@ -60,15 +69,38 @@ describe('store schedule helpers', () => {
   it('uses each saved appointment duration when services have different lengths', () => {
     const slots = buildAppointmentSlots({
       schedulingMode: 'controlled',
-      appointmentDurationMinutes: 15,
+      appointmentDurationMinutes: 10,
       openingTime: '08:00',
       closingTime: '09:00'
     }, [{ id: 'lead-1', appointmentTime: '08:15', appointmentDurationMinutes: 30 }]);
     expect(slots.map(({ time, available }) => [time, available])).toEqual([
       ['08:00', true],
-      ['08:15', false],
+      ['08:10', false],
+      ['08:20', false],
       ['08:30', false],
-      ['08:45', true]
+      ['08:40', false],
+      ['08:50', true]
+    ]);
+  });
+
+  it('reserves every ten-minute block required by a service', () => {
+    expect(appointmentBlockTimes('08:10', 30)).toEqual(['08:10', '08:20', '08:30']);
+    expect(appointmentSlotId('loja-06', '2026-10-22', '08:20')).toBe('slot-loja-06-2026-10-22-08:20');
+  });
+
+  it('uses persisted blocks to prevent partial overlaps', () => {
+    const slots = buildAppointmentSlots({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      openingTime: '08:00',
+      closingTime: '09:00'
+    }, [{ id: 'block-1', leadId: 'lead-1', appointmentTime: '08:00', blockTime: '08:10', durationMinutes: 20 }]);
+    expect(slots.map(({ time, available }) => [time, available])).toEqual([
+      ['08:00', false],
+      ['08:10', false],
+      ['08:20', true],
+      ['08:30', true],
+      ['08:40', true]
     ]);
   });
 
@@ -144,6 +176,25 @@ describe('store schedule helpers', () => {
     ];
     const slots = buildAppointmentSlots(settings, appointments, '', { appointmentDate: '2026-10-21', profile: { uid: 'admin', roleProfileId: 'system-admin' } });
     expect(slots.every((slot) => !slot.available)).toBe(true);
+  });
+
+  it('counts appointment clients instead of their reserved blocks', () => {
+    const appointments = [
+      { id: 'block-1', leadId: 'lead-1', capturedByUid: 'mei-1' },
+      { id: 'block-2', leadId: 'lead-1', capturedByUid: 'mei-1' },
+      { id: 'block-3', leadId: 'lead-2', capturedByUid: 'other' }
+    ];
+    expect(appointmentQuotaStatus({
+      limitedDaysEnabled: true,
+      limitedWeekdays: [3],
+      limitedDayCapacity: 3,
+      meiDailyQuota: 2
+    }, '2026-10-21', appointments, { uid: 'mei-1', roleProfileId: 'system-mei' })).toMatchObject({
+      dailyUsed: 2,
+      dailyRemaining: 1,
+      meiUsed: 1,
+      meiRemaining: 1
+    });
   });
 
   it('validates limited-day capacity and MEI quota', () => {

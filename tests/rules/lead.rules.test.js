@@ -160,6 +160,7 @@ describe('lead correction rules', () => {
       storeId: 'loja-02',
       appointmentDate: '2026-10-20',
       appointmentTime: '10:00',
+      blockTime: '10:00',
       durationMinutes: 20,
       leadId: 'manager-scheduled-lead',
       capturedByUid: 'manager-uid',
@@ -537,7 +538,7 @@ describe('appointment service catalog', () => {
     const reference = doc(db, 'appointmentServices', 'eye-exam');
     await assertSucceeds(setDoc(reference, service));
     await assertSucceeds(updateDoc(reference, {
-      durationMinutes: 45,
+      durationMinutes: 40,
       updatedAt: Timestamp.now(),
       updatedByUid: 'admin-uid'
     }));
@@ -598,6 +599,7 @@ describe('appointment slot reservations', () => {
     storeId: 'loja-06',
     appointmentDate: '2026-10-20',
     appointmentTime: '08:00',
+    blockTime: '08:00',
     durationMinutes: 20,
     leadId: 'lead-slot',
     capturedByUid: 'captor-uid',
@@ -632,6 +634,32 @@ describe('appointment slot reservations', () => {
     }));
   });
 
+  it('rejects a new appointment when any required block is occupied', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await Promise.all([
+        setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot)
+      ]);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const overlappingLead = {
+      ...lead,
+      appointmentTime: '07:50',
+      capturedAtClient: '2026-10-15T13:05:00.000Z'
+    };
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', 'overlapping-lead'), overlappingLead);
+    ['07:50', '08:00'].forEach((blockTime) => {
+      batch.set(doc(db, 'appointmentSlots', `slot-loja-06-2026-10-20-${blockTime}`), {
+        ...slot,
+        appointmentTime: '07:50',
+        blockTime,
+        leadId: 'overlapping-lead'
+      });
+    });
+    await assertFails(batch.commit());
+  });
+
   it('rejects an orphan slot without a matching lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot));
@@ -643,6 +671,7 @@ describe('appointment slot reservations', () => {
       storeId: 'loja-06',
       appointmentDate: '2026-10-15',
       appointmentTime: '09:30',
+      blockTime: '09:30',
       durationMinutes: 20,
       leadId: 'lead-test',
       capturedByUid: 'captor-uid',

@@ -1447,7 +1447,7 @@ function serviceCatalogSettingsView() {
       <header><div><span class="eyebrow">SERVICO DA AGENDA</span><h2 id="service-editor-title">${editing ? 'Editar servico' : 'Novo servico'}</h2><p>A duracao sera usada para calcular os horarios disponiveis.</p></div><button class="icon-button" type="button" data-service-editor-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
       <div class="access-form-body">
         <div class="field service-name-field" data-field="name"><label for="service-name">Nome do servico</label><input id="service-name" name="name" maxlength="80" value="${escapeHtml(editing?.name || '')}" placeholder="Ex.: Exame de vista" required /><small class="field-error"></small></div>
-        <div class="field service-duration-field" data-field="durationMinutes"><label for="service-duration">Duracao</label><div class="number-with-unit"><input id="service-duration" name="durationMinutes" type="number" min="5" max="180" step="5" value="${editing?.durationMinutes || 30}" required /><span>min</span></div><small class="field-error"></small></div>
+        <div class="field service-duration-field" data-field="durationMinutes"><label for="service-duration">Duracao</label><div class="number-with-unit"><input id="service-duration" name="durationMinutes" type="number" min="10" max="180" step="10" value="${editing?.durationMinutes || 30}" required /><span>min</span></div><small class="field-error"></small></div>
         <fieldset class="field access-field-wide service-store-field" data-field="storeIds"><legend>Lojas atendidas</legend><small>Marque todas as unidades que oferecem este servico.</small><div class="service-store-options">${storeOptions}</div><small class="field-error"></small></fieldset>
         <input name="active" type="hidden" value="${editing?.active === false ? 'false' : 'true'}" />
       </div>
@@ -2889,8 +2889,14 @@ function refreshAppointmentTimeControl() {
   const dateField = document.querySelector('[data-field="appointmentDate"]');
   const dateStatus = dateField?.querySelector('.schedule-date-status');
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
+  const service = selectedNewLeadService();
   const slots = appointmentDate && settings.schedulingMode === 'controlled'
-    ? buildAppointmentSlots(settings, appointments, '', { appointmentDate, profile: state.profile })
+    ? buildAppointmentSlots(
+      { ...settings, appointmentDurationMinutes: service.durationMinutes },
+      appointments,
+      '',
+      { appointmentDate, profile: state.profile }
+    )
     : [];
   const fullyBooked = Boolean(appointmentDate && !loading && !error && slots.length && !slots.some((slot) => slot.available));
   dateField?.classList.toggle('is-fully-booked', fullyBooked);

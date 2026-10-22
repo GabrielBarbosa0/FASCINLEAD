@@ -21,12 +21,12 @@ describe('appointment service catalog', () => {
     expect(normalizeAppointmentService({
       name: '  Retorno  ',
       storeIds: ['LOJA-06', 'loja-02', 'loja-06'],
-      durationMinutes: '15',
+      durationMinutes: '20',
       active: 'true'
     })).toEqual({
       name: 'Retorno',
       storeIds: ['loja-06', 'loja-02'],
-      durationMinutes: 15,
+      durationMinutes: 20,
       active: true,
       schemaVersion: 2
     });
@@ -37,6 +37,10 @@ describe('appointment service catalog', () => {
         storeIds: expect.any(String),
         durationMinutes: expect.any(String)
       }
+    });
+    expect(validateAppointmentService({ name: 'Limpeza', storeIds: ['loja-06'], durationMinutes: 15 })).toMatchObject({
+      isValid: false,
+      errors: { durationMinutes: expect.any(String) }
     });
   });
 

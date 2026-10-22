@@ -23,6 +23,7 @@ export const WEEKDAY_OPTIONS = Object.freeze([
 ]);
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const APPOINTMENT_BLOCK_MINUTES = 10;
 
 function timeToMinutes(value) {
   if (!TIME_PATTERN.test(value || '')) return null;
@@ -32,6 +33,20 @@ function timeToMinutes(value) {
 
 function minutesToTime(value) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
+
+export function appointmentBlockTimes(appointmentTime, durationMinutes) {
+  const start = timeToMinutes(appointmentTime);
+  const duration = Number(durationMinutes);
+  if (start === null || !Number.isFinite(duration) || duration <= 0) return [];
+  const blockCount = Math.ceil(duration / APPOINTMENT_BLOCK_MINUTES);
+  return Array.from({ length: blockCount }, (_, index) => (
+    minutesToTime(start + (index * APPOINTMENT_BLOCK_MINUTES))
+  ));
+}
+
+export function appointmentSlotId(storeId, appointmentDate, blockTime) {
+  return `slot-${storeId}-${appointmentDate}-${blockTime}`;
 }
 
 export function normalizeStoreSchedule(value = {}) {
@@ -118,7 +133,13 @@ export function appointmentQuotaStatus(settings, appointmentDate, appointments =
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
   const limited = schedule.limitedDaysEnabled && weekday !== null && schedule.limitedWeekdays.includes(weekday);
-  const activeAppointments = appointments.filter((appointment) => appointment.id !== ignoredLeadId);
+  const uniqueAppointments = new Map();
+  appointments.forEach((appointment) => {
+    const appointmentKey = appointment.leadId || appointment.id;
+    if (!appointmentKey || appointmentKey === ignoredLeadId || appointment.id === ignoredLeadId) return;
+    if (!uniqueAppointments.has(appointmentKey)) uniqueAppointments.set(appointmentKey, appointment);
+  });
+  const activeAppointments = [...uniqueAppointments.values()];
   const dailyUsed = activeAppointments.length;
   const isMei = profile?.roleProfileId === 'system-mei';
   const meiUsed = isMei
@@ -155,8 +176,10 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
     ignoredLeadId
   );
   const occupiedRanges = appointments
-    .filter((appointment) => appointment.id !== ignoredLeadId)
+    .filter((appointment) => appointment.id !== ignoredLeadId && appointment.leadId !== ignoredLeadId)
     .map((appointment) => {
+      const blockStart = timeToMinutes(appointment.blockTime);
+      if (blockStart !== null) return [blockStart, blockStart + APPOINTMENT_BLOCK_MINUTES];
       const appointmentStart = timeToMinutes(appointment.appointmentTime);
       const appointmentDuration = Number(appointment.durationMinutes)
         || Number(appointment.appointmentDurationMinutes)
@@ -166,7 +189,7 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
     .filter(Boolean);
 
   const slots = [];
-  for (let slotStart = start; slotStart + duration <= end; slotStart += duration) {
+  for (let slotStart = start; slotStart + duration <= end; slotStart += APPOINTMENT_BLOCK_MINUTES) {
     const slotEnd = slotStart + duration;
     const occupied = occupiedRanges.some(([appointmentStart, appointmentEnd]) => (
       appointmentStart < slotEnd && appointmentEnd > slotStart

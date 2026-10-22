@@ -34,8 +34,8 @@ export function validateAppointmentService(value = {}) {
   if (!data.storeIds.length || data.storeIds.some((storeId) => !STORE_IDS.has(storeId))) {
     errors.storeIds = 'Escolha pelo menos uma unidade valida.';
   }
-  if (!Number.isInteger(data.durationMinutes) || data.durationMinutes < 5 || data.durationMinutes > 180) {
-    errors.durationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
+  if (!Number.isInteger(data.durationMinutes) || data.durationMinutes < 10 || data.durationMinutes > 180 || data.durationMinutes % 10 !== 0) {
+    errors.durationMinutes = 'Informe uma duracao entre 10 e 180 minutos, em intervalos de 10.';
   }
 
   return { data, errors, isValid: Object.keys(errors).length === 0 };

@@ -214,8 +214,9 @@ service cloud.firestore {
         && data.storeIds.size() <= 4
         && data.storeIds.hasOnly(['loja-02', 'loja-04', 'loja-05', 'loja-06'])
         && data.durationMinutes is int
-        && data.durationMinutes >= 5
+        && data.durationMinutes >= 10
         && data.durationMinutes <= 180
+        && data.durationMinutes % 10 == 0
         && data.active is bool
         && data.schemaVersion == 2
         && data.createdAt is timestamp
@@ -226,7 +227,7 @@ service cloud.firestore {
 
     function validAppointmentSlot(slotId, data) {
       return data.keys().hasOnly([
-          'storeId', 'appointmentDate', 'appointmentTime', 'durationMinutes',
+          'storeId', 'appointmentDate', 'appointmentTime', 'blockTime', 'durationMinutes',
           'leadId', 'capturedByUid', 'createdAt'
         ])
         && data.storeId is string
@@ -234,13 +235,15 @@ service cloud.firestore {
         && data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && data.appointmentTime is string
         && data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$')
+        && data.blockTime is string
+        && data.blockTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$')
         && data.durationMinutes is int
-        && data.durationMinutes >= 5
+        && data.durationMinutes >= 10
         && data.durationMinutes <= 180
         && data.leadId is string
         && data.capturedByUid is string
         && data.createdAt is timestamp
-        && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.appointmentTime;
+        && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.blockTime;
     }
 
     function validCaptorCorrectionData(data) {
@@ -562,7 +565,18 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentDate == request.resource.data.appointmentDate
         && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
         && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
-      allow update: if false;
+      allow update: if activeUser()
+        && resource.data.leadId == request.resource.data.leadId
+        && validAppointmentSlot(slotId, request.resource.data)
+        && (isAdmin() || managerHasStore(request.resource.data.storeId) || (
+          request.resource.data.storeId == userProfile().storeId
+          && request.resource.data.capturedByUid == request.auth.uid
+        ))
+        && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.storeId == request.resource.data.storeId
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentDate == request.resource.data.appointmentDate
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
       allow delete: if isAdmin()
         || (activeUser()
           && resource.data.capturedByUid == request.auth.uid
@@ -570,6 +584,7 @@ service cloud.firestore {
             !existsAfter(/databases/$(database)/documents/leads/$(resource.data.leadId))
             || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDate != resource.data.appointmentDate
             || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentTime != resource.data.appointmentTime
+            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDurationMinutes != resource.data.durationMinutes
           ));
     }
 

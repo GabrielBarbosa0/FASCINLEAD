@@ -943,8 +943,9 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
   const timeSelect = page.getByLabel('Horario disponivel');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:30"]')).toHaveCount(0);
+  await expect(timeSelect.locator('option[value="08:30"]')).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath('available-slots.png'), fullPage: true });
 
   await page.getByLabel('Nome *').fill('Cliente Horario Ocupado');
@@ -954,6 +955,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(0);
+  await expect(page.getByLabel('Horario disponivel').locator('option[value="08:10"]')).toHaveCount(0);
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {
@@ -1071,7 +1073,7 @@ test('creates a service and uses its duration in new appointments', async ({ pag
     expect(serviceFieldsLayout.durationTop).toBeGreaterThanOrEqual(serviceFieldsLayout.nameBottom);
   }
   await dialog.getByLabel('Nome do servico').fill('Avaliacao especializada');
-  await dialog.getByLabel('Duracao').fill('45');
+  await dialog.getByLabel('Duracao').fill('40');
   await expect(dialog.getByText('Loja 02', { exact: true })).toHaveCSS('color', 'rgb(20, 32, 51)');
   await dialog.getByLabel('Loja 02').uncheck();
   await dialog.getByLabel('Loja 06').check();
@@ -1080,19 +1082,19 @@ test('creates a service and uses its duration in new appointments', async ({ pag
 
   const serviceRow = page.locator('.service-catalog-row').filter({ hasText: 'Avaliacao especializada' });
   await expect(serviceRow).toBeVisible();
-  await expect(serviceRow.getByText('45 min')).toBeVisible();
+  await expect(serviceRow.getByText('40 min')).toBeVisible();
   await expect(serviceRow).toContainText('Loja 04 · Loja 06');
   await page.screenshot({ path: testInfo.outputPath('service-catalog.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
-  await page.getByLabel('Servico do agendamento').selectOption({ label: 'Avaliacao especializada - 45 min' });
+  await page.getByLabel('Servico do agendamento').selectOption({ label: 'Avaliacao especializada - 40 min' });
   const date = new Date();
   date.setDate(date.getDate() + 1);
   await page.getByLabel('Data do pre-agendamento').fill(date.toISOString().slice(0, 10));
   const timeSelect = page.getByLabel('Horario disponivel');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:45"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(0);
+  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
 
   await page.evaluate(() => { window.location.hash = '#/settings'; });
   await page.getByRole('tab', { name: 'Servicos' }).click();

@@ -13,6 +13,7 @@ import {
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadUpdate } from '../utils/lead.js';
 import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
+import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
 
 export const MANAGEMENT_QUERY_LIMIT = 300;
 
@@ -72,6 +73,13 @@ function assertAdmin(profile) {
   }
 }
 
+function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
+  return appointmentBlockTimes(appointmentTime, durationMinutes).map((blockTime) => ({
+    id: appointmentSlotId(storeId, appointmentDate, blockTime),
+    blockTime
+  }));
+}
+
 export async function updateManagementLead(profile, lead, input) {
   assertCanUpdate(profile, lead);
   const validation = createLeadUpdate(input);
@@ -80,8 +88,15 @@ export async function updateManagementLead(profile, lead, input) {
   const oldControlled = lead.appointmentSchedulingMode === 'controlled' && lead.appointmentDate && lead.appointmentTime;
   const newControlled = validation.data.appointmentSchedulingMode === 'controlled'
     && validation.data.appointmentDate && validation.data.appointmentTime;
-  const oldSlotId = oldControlled ? `slot-${lead.storeId}-${lead.appointmentDate}-${lead.appointmentTime}` : '';
-  const newSlotId = newControlled ? `slot-${lead.storeId}-${validation.data.appointmentDate}-${validation.data.appointmentTime}` : '';
+  const oldBlocks = oldControlled
+    ? reservationBlocks(lead.storeId, lead.appointmentDate, lead.appointmentTime, lead.appointmentDurationMinutes || 20)
+    : [];
+  const newBlocks = newControlled
+    ? reservationBlocks(lead.storeId, validation.data.appointmentDate, validation.data.appointmentTime, validation.data.appointmentDurationMinutes || 20)
+    : [];
+  const newIds = new Set(newBlocks.map((block) => block.id));
+  const reservationChanged = oldBlocks.length !== newBlocks.length
+    || oldBlocks.some((block) => !newIds.has(block.id));
   const update = {
     ...validation.data,
     ...((lead.appointmentDate !== validation.data.appointmentDate
@@ -91,19 +106,20 @@ export async function updateManagementLead(profile, lead, input) {
       : {}),
     updatedAtServer: serverTimestamp()
   };
-  if (oldSlotId !== newSlotId && (oldSlotId || newSlotId)) {
+  if (reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', lead.id), update, { merge: true });
-    if (oldSlotId) batch.delete(doc(db, 'appointmentSlots', oldSlotId));
-    if (newSlotId) batch.set(doc(db, 'appointmentSlots', newSlotId), {
+    oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
+    newBlocks.forEach((block) => batch.set(doc(db, 'appointmentSlots', block.id), {
       storeId: lead.storeId,
       appointmentDate: validation.data.appointmentDate,
       appointmentTime: validation.data.appointmentTime,
+      blockTime: block.blockTime,
       durationMinutes: validation.data.appointmentDurationMinutes,
       leadId: lead.id,
       capturedByUid: lead.capturedByUid,
       createdAt: serverTimestamp()
-    });
+    }));
     await batch.commit();
   } else {
     await setDoc(doc(db, 'leads', lead.id), update, { merge: true });
@@ -116,7 +132,8 @@ export async function deleteManagementLead(profile, lead) {
   const batch = writeBatch(db);
   batch.delete(doc(db, 'leads', lead.id));
   if (lead.appointmentDate && lead.appointmentTime) {
-    batch.delete(doc(db, 'appointmentSlots', `slot-${lead.storeId}-${lead.appointmentDate}-${lead.appointmentTime}`));
+    reservationBlocks(lead.storeId, lead.appointmentDate, lead.appointmentTime, lead.appointmentDurationMinutes || 20)
+      .forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
   }
   await batch.commit();
 }
