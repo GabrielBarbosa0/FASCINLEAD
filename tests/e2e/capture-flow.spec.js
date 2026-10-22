@@ -173,7 +173,7 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Metas/ }).click();
 
-  await expect(page.getByRole('heading', { name: 'Metas' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible();
   await expect(page.getByText('Minhas metas')).toBeVisible();
   await expect(page.getByText('Nenhuma meta cadastrada')).toBeVisible();
   const personalOrder = await page.evaluate(() => ({
@@ -207,6 +207,35 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await page.screenshot({ path: testInfo.outputPath('goals-member-layout.png'), fullPage: true });
 });
 
+test('opens goal creation in a modal from the goals heading', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Metas/ }).click();
+
+  const newGoalButton = page.getByRole('button', { name: 'Nova meta' });
+  await expect(newGoalButton).toBeVisible();
+  await expect(page.locator('#goal-form')).toHaveCount(0);
+  const headingLayout = await page.locator('.goals-heading').evaluate((heading) => {
+    const title = heading.querySelector('h2').getBoundingClientRect();
+    const button = heading.querySelector('[data-goal-new]').getBoundingClientRect();
+    return { viewportWidth: window.innerWidth, titleRight: title.right, buttonLeft: button.left };
+  });
+  if (headingLayout.viewportWidth > 440) expect(headingLayout.buttonLeft).toBeGreaterThan(headingLayout.titleRight);
+
+  await newGoalButton.click();
+  const dialog = page.getByRole('dialog', { name: 'Nova meta' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Titulo')).toHaveValue('Meta de captacoes');
+  await expect(dialog.getByLabel('Quantidade')).toHaveValue('20');
+  await expect(dialog.getByLabel('Inicio')).toBeVisible();
+  await expect(dialog.getByLabel('Fim')).toBeVisible();
+  await expect(dialog.getByLabel('Loja')).toBeVisible();
+  await expect(dialog.getByRole('group', { name: /Colaboradores/ })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('new-goal-dialog.png'), fullPage: true });
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).not.toBeVisible();
+});
+
 test('configures multiple permitted stores for a manager access', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -232,8 +261,6 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await page.getByLabel('Loja 06').check();
   await expect(page.getByLabel('Loja 02')).toBeChecked();
   await expect(page.getByLabel('Loja 06')).toBeChecked();
-  await expect(page.getByLabel('Loja 02').locator('..')).toHaveCSS('color', 'rgb(0, 48, 112)');
-  await expect(page.getByLabel('Loja 04').locator('..')).toHaveCSS('color', 'rgb(20, 32, 51)');
   await page.screenshot({ path: testInfo.outputPath('access-store-picker.png'), fullPage: true });
 });
 

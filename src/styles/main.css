@@ -4417,6 +4417,21 @@ svg {
   margin-bottom: 20px;
 }
 
+.goals-heading {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.goals-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .goal-metrics > div {
   min-height: 92px;
   display: flex;
@@ -4461,16 +4476,27 @@ svg {
 }
 
 .goal-form {
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
-.goal-form.is-duplicating {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px var(--brand-soft), var(--shadow);
+.goal-editor-dialog[open] {
+  display: block;
+}
+
+.access-editor-dialog .goal-form {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(90vh, 760px);
+}
+
+.goal-editor-dialog .goal-editor-body {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.goal-editor-dialog .goal-members {
+  margin-bottom: 0;
 }
 
 .goal-form-heading,
@@ -5365,6 +5391,27 @@ svg {
 
   .access-editor-dialog .access-form {
     max-height: 94vh;
+  }
+
+  .access-editor-dialog .goal-form {
+    max-height: 94vh;
+  }
+
+  .goals-heading {
+    align-items: stretch;
+  }
+
+  .goals-heading-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .goals-heading-actions .button-primary {
+    width: 100%;
+  }
+
+  .goal-editor-dialog .goal-editor-body {
+    padding: 16px;
   }
 
   .access-form-body {

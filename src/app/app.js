@@ -238,6 +238,7 @@ const state = {
     records: [],
     members: [],
     truncated: false,
+    editorOpen: false,
     editingGroupId: '',
     duplicatingGroupId: '',
     pendingDeleteGroupId: '',
@@ -2027,7 +2028,7 @@ function groupGoalRecords(records) {
 }
 
 function goalsView() {
-  const { records, members, loading, saving, error, truncated, draft, editingGroupId, duplicatingGroupId, pendingDeleteGroupId } = state.goals;
+  const { records, members, loading, saving, error, truncated, draft, editorOpen, editingGroupId, duplicatingGroupId, pendingDeleteGroupId } = state.goals;
   const groups = groupGoalRecords(records);
   const goalManagerView = canManageGoals();
   const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
@@ -2072,38 +2073,43 @@ function goalsView() {
       }).join('')
     : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
 
-  const creator = goalManagerView ? `<form id="goal-form" class="goal-form ${duplicatingGroupId ? 'is-duplicating' : ''}" novalidate>
-      <div class="goal-form-heading"><div class="filter-title"><i data-lucide="${editingGroupId ? 'pencil' : duplicatingGroupId ? 'copy' : 'target'}"></i><div><strong>${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</strong><span>${duplicatingGroupId ? 'Revise os dados da copia antes de criar.' : 'Quantidade de leads por colaborador no periodo.'}</span></div></div>${editingGroupId || duplicatingGroupId ? '<button class="icon-button" type="button" data-cancel-goal-edit title="Cancelar" aria-label="Cancelar"><i data-lucide="x"></i></button>' : ''}</div>
-      <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
-      <div class="goal-form-grid">
-        <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
-        <div class="field" data-field="startDate"><label for="goal-start">Inicio</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
-        <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
+  const creator = goalManagerView && editorOpen ? `<dialog id="goal-editor-dialog" class="access-editor-dialog goal-editor-dialog" aria-labelledby="goal-editor-title">
+    <form id="goal-form" class="goal-form ${duplicatingGroupId ? 'is-duplicating' : ''}" novalidate>
+      <header><div><span class="eyebrow">META DA EQUIPE</span><h2 id="goal-editor-title">${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</h2><p>${duplicatingGroupId ? 'Revise os dados da copia antes de criar.' : 'Defina a quantidade de leads por colaborador no periodo.'}</p></div><button class="icon-button" type="button" data-cancel-goal-edit aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <div class="goal-editor-body">
+        <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
+        <div class="goal-form-grid">
+          <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
+          <div class="field" data-field="startDate"><label for="goal-start">Inicio</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
+          <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
+        </div>
+        <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin() || goalStores.length > 1
+          ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
+          : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
+        <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span data-goal-selected-count>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
       </div>
-      <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin() || goalStores.length > 1
-        ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
-        : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
-      <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
-      <button class="button button-primary button-block" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : duplicatingGroupId ? 'Criar copia' : 'Criar metas'}</span></button>
-    </form>` : '';
+      <footer><button class="button button-secondary" type="button" data-cancel-goal-edit>Cancelar</button><button class="button button-primary" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : duplicatingGroupId ? 'Criar copia' : 'Criar metas'}</span></button></footer>
+    </form>
+  </dialog>` : '';
   const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
       <div><span>Metas</span><strong>${groups.length}</strong></div>
       <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
       <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
     </section>`;
   const results = `<section class="goals-results" aria-busy="${loading}">
-      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Minhas metas'}</strong><span>${groups.length} meta(s)</span></div></div>
+      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Objetivos atribuidos'}</strong><span>${groups.length} meta(s)</span></div></div>
       ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
     </section>`;
 
   return `
-    <section class="management-heading page-actions-only goals-heading">
-      <button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>
+    <section class="service-catalog-heading goals-heading">
+      <div><span class="eyebrow">METAS</span><h2>${goalManagerView ? 'Metas da equipe' : 'Minhas metas'}</h2><p>${goalManagerView ? 'Defina objetivos de captacao e acompanhe o desempenho da equipe.' : 'Acompanhe seus objetivos e o progresso das captacoes.'}</p></div>
+      <div class="goals-heading-actions"><button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>${goalManagerView ? '<button class="button button-primary" type="button" data-goal-new><i data-lucide="circle-plus"></i><span>Nova meta</span></button>' : ''}</div>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
     ${goalManagerView
-      ? `${metrics}<section class="goals-layout">${creator}${results}</section>`
+      ? `${metrics}${results}${creator}`
       : `<section class="personal-goals">${results}<h2 class="personal-goals-summary">Resumo</h2>${metrics}</section>`}
     ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
@@ -3391,6 +3397,12 @@ function bindPageEvents() {
 
   const goalForm = document.querySelector('#goal-form');
   if (goalForm) {
+    const goalEditorDialog = document.querySelector('#goal-editor-dialog');
+    const reopenGoalEditor = (focusTitle = false) => requestAnimationFrame(() => {
+      const dialog = document.querySelector('#goal-editor-dialog');
+      dialog?.showModal();
+      if (focusTitle) document.querySelector('#goal-title')?.focus();
+    });
     const readDraft = () => ({
       title: goalForm.elements.title.value,
       targetCount: Number(goalForm.elements.targetCount.value),
@@ -3403,13 +3415,26 @@ function bindPageEvents() {
     goalForm.elements.storeId.addEventListener('change', () => {
       state.goals.draft = { ...readDraft(), assigneeUids: [] };
       render();
+      reopenGoalEditor();
     });
 
     goalForm.querySelectorAll('[name="assigneeUids"]').forEach((input) => {
       input.addEventListener('change', () => {
         state.goals.draft = readDraft();
-        render();
+        const selectedCount = state.goals.draft.assigneeUids.length;
+        const count = goalForm.querySelector('[data-goal-selected-count]');
+        if (count) count.textContent = `${selectedCount} selecionado(s)`;
       });
+    });
+
+    goalEditorDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
+      state.goals.editorOpen = false;
+      state.goals.editingGroupId = '';
+      state.goals.duplicatingGroupId = '';
+      state.goals.draft = createDefaultGoalDraft(storeId);
+      render();
     });
 
     goalForm.addEventListener('submit', async (event) => {
@@ -3432,6 +3457,7 @@ function bindPageEvents() {
         }
         const createdCount = state.goals.draft.assigneeUids.length;
         state.goals.draft = createDefaultGoalDraft(state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId);
+        state.goals.editorOpen = false;
         state.goals.editingGroupId = '';
         state.goals.duplicatingGroupId = '';
         state.goals.loaded = false;
@@ -3443,6 +3469,7 @@ function bindPageEvents() {
           ? 'Seu perfil nao possui permissao para salvar esta meta.'
           : 'Nao foi possivel salvar a meta. Verifique a conexao e tente novamente.';
         render();
+        reopenGoalEditor();
       }
     });
   }
@@ -3982,7 +4009,7 @@ async function loadAccessData() {
 }
 
 function ensureAccessData() {
-  if (state.route === 'access' && isAdmin() && !state.access.loaded) {
+  if (state.route === 'access' && isAdmin() && !state.demoMode && !state.access.loaded) {
     loadAccessData();
   }
 }
@@ -4199,6 +4226,7 @@ async function handleAction(action) {
       records: [],
       members: [],
       truncated: false,
+      editorOpen: false,
       editingGroupId: '',
       duplicatingGroupId: '',
       pendingDeleteGroupId: '',
@@ -4740,10 +4768,24 @@ export async function startApp() {
         showToast(error?.message || 'Nao foi possivel excluir o acesso.', 'danger', 'circle-alert');
       }
     }
+    const newGoalButton = event.target.closest('[data-goal-new]');
+    if (newGoalButton && !newGoalButton.disabled) {
+      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId || state.profile.storeId;
+      state.goals.editorOpen = true;
+      state.goals.editingGroupId = '';
+      state.goals.duplicatingGroupId = '';
+      state.goals.draft = createDefaultGoalDraft(storeId);
+      render();
+      requestAnimationFrame(() => {
+        document.querySelector('#goal-editor-dialog')?.showModal();
+        document.querySelector('#goal-title')?.focus();
+      });
+    }
     const editGoalButton = event.target.closest('[data-edit-goal]');
     if (editGoalButton && !editGoalButton.disabled) {
       const group = groupGoalRecords(state.goals.records).find((item) => item.id === editGoalButton.dataset.editGoal);
       if (!group) return;
+      state.goals.editorOpen = true;
       state.goals.editingGroupId = group.id;
       state.goals.duplicatingGroupId = '';
       state.goals.draft = {
@@ -4755,19 +4797,22 @@ export async function startApp() {
         assigneeUids: group.goals.map((goal) => goal.assigneeUid)
       };
       render();
-      document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.querySelector('#goal-title')?.focus();
+      requestAnimationFrame(() => {
+        document.querySelector('#goal-editor-dialog')?.showModal();
+        document.querySelector('#goal-title')?.focus();
+      });
     }
     const duplicateGoalButton = event.target.closest('[data-duplicate-goal]');
     if (duplicateGoalButton && !duplicateGoalButton.disabled) {
       const group = groupGoalRecords(state.goals.records).find((item) => item.id === duplicateGoalButton.dataset.duplicateGoal);
       if (!group) return;
+      state.goals.editorOpen = true;
       state.goals.editingGroupId = '';
       state.goals.duplicatingGroupId = group.id;
       state.goals.draft = duplicateGoalDraft(group);
       showToast('Meta duplicada no formulario. Revise e salve.');
       requestAnimationFrame(() => {
-        document.querySelector('#goal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelector('#goal-editor-dialog')?.showModal();
         const titleInput = document.querySelector('#goal-title');
         titleInput?.focus({ preventScroll: true });
         titleInput?.select();
@@ -4777,6 +4822,8 @@ export async function startApp() {
     const cancelGoalEditButton = event.target.closest('[data-cancel-goal-edit]');
     if (cancelGoalEditButton) {
       const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
+      document.querySelector('#goal-editor-dialog')?.close();
+      state.goals.editorOpen = false;
       state.goals.editingGroupId = '';
       state.goals.duplicatingGroupId = '';
       state.goals.draft = createDefaultGoalDraft(storeId);
