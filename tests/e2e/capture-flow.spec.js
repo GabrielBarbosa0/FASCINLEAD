@@ -50,6 +50,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Cadastro' })).toBeVisible();
+  await expect(page.getByLabel('RG', { exact: true })).toHaveAttribute('placeholder', '0.000.000');
   const standardContactLayout = await page.locator('#lead-form').evaluate((form) => {
     const phone = form.elements.phone.getBoundingClientRect();
     const rg = form.elements.customerRg.getBoundingClientRect();
@@ -566,6 +567,7 @@ test('keeps new registration beside the management return action', async ({ page
   await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
   await expect(dialog.getByLabel('Sexo')).toBeVisible();
+  await expect(dialog.getByLabel('RG', { exact: true })).toHaveAttribute('placeholder', '0.000.000');
   const modalContactLayout = await dialog.evaluate((element) => {
     const phone = element.querySelector('[name="phone"]').getBoundingClientRect();
     const rg = element.querySelector('[name="customerRg"]').getBoundingClientRect();
