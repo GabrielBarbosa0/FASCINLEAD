@@ -10,6 +10,9 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   ophthalmologyWeekdays: Object.freeze([6]),
   ophthalmologyOpeningTime: '08:00',
   ophthalmologyClosingTime: '12:00',
+  ophthalmologyHoursRules: Object.freeze([
+    Object.freeze({ weekday: 6, openingTime: '08:00', closingTime: '12:00' })
+  ]),
   ophthalmologyPathologyIds: Object.freeze(['cataract']),
   ophthalmologySurgeryIds: Object.freeze(['cataract']),
   limitedDaysEnabled: false,
@@ -29,7 +32,16 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
     Object.freeze({ weekday: 6, morningQuota: 1, afternoonQuota: 1 })
   ]),
   openingTime: '08:00',
-  closingTime: '18:00'
+  closingTime: '18:00',
+  storeHoursRules: Object.freeze([
+    Object.freeze({ weekday: 0, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 1, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 2, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 3, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 4, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 5, openingTime: '08:00', closingTime: '18:00' }),
+    Object.freeze({ weekday: 6, openingTime: '08:00', closingTime: '18:00' })
+  ])
 });
 
 export const WEEKDAY_OPTIONS = Object.freeze([
@@ -53,6 +65,28 @@ function timeToMinutes(value) {
 
 function minutesToTime(value) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
+
+function normalizeHoursRules(value, legacyWeekdays, legacyOpeningTime, legacyClosingTime) {
+  const source = Array.isArray(value)
+    ? value
+    : legacyWeekdays.map((weekday) => ({
+      weekday,
+      openingTime: legacyOpeningTime,
+      closingTime: legacyClosingTime
+    }));
+  const byWeekday = new Map();
+  source.forEach((rule) => {
+    const weekday = Number(rule?.weekday);
+    const openingTime = String(rule?.openingTime || '');
+    const closingTime = String(rule?.closingTime || '');
+    const opening = timeToMinutes(openingTime);
+    const closing = timeToMinutes(closingTime);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return;
+    if (opening === null || closing === null || opening >= closing) return;
+    byWeekday.set(weekday, { weekday, openingTime, closingTime });
+  });
+  return [...byWeekday.values()].sort((a, b) => a.weekday - b.weekday);
 }
 
 export function appointmentBlockTimes(appointmentTime, durationMinutes) {
@@ -157,6 +191,20 @@ export function normalizeStoreSchedule(value = {}) {
   const ophthalmologyClosingTime = TIME_PATTERN.test(value.ophthalmologyClosingTime || '')
     ? value.ophthalmologyClosingTime
     : DEFAULT_STORE_SCHEDULE.ophthalmologyClosingTime;
+  const storeHoursRules = normalizeHoursRules(
+    value.storeHoursRules,
+    WEEKDAY_OPTIONS.map((day) => day.id),
+    opening,
+    closing
+  );
+  const ophthalmologyHoursRules = normalizeHoursRules(
+    value.ophthalmologyHoursRules,
+    ophthalmologyWeekdays,
+    ophthalmologyOpeningTime,
+    ophthalmologyClosingTime
+  );
+  const primaryStoreHours = storeHoursRules[0];
+  const primaryOphthalmologyHours = ophthalmologyHoursRules[0];
   return {
     schedulingMode: value.schedulingMode === 'free' ? 'free' : 'controlled',
     appointmentDurationMinutes: Number.isInteger(duration) && duration >= 5 && duration <= 180
@@ -172,9 +220,10 @@ export function normalizeStoreSchedule(value = {}) {
     ophthalmologyMinimumAge: Number.isInteger(ophthalmologyMinimumAge) && ophthalmologyMinimumAge >= 0 && ophthalmologyMinimumAge <= 120
       ? ophthalmologyMinimumAge
       : DEFAULT_STORE_SCHEDULE.ophthalmologyMinimumAge,
-    ophthalmologyWeekdays,
-    ophthalmologyOpeningTime,
-    ophthalmologyClosingTime,
+    ophthalmologyWeekdays: ophthalmologyHoursRules.map((rule) => rule.weekday),
+    ophthalmologyOpeningTime: primaryOphthalmologyHours?.openingTime || ophthalmologyOpeningTime,
+    ophthalmologyClosingTime: primaryOphthalmologyHours?.closingTime || ophthalmologyClosingTime,
+    ophthalmologyHoursRules,
     ophthalmologyPathologyIds: Array.isArray(value.ophthalmologyPathologyIds)
       ? [...new Set(value.ophthalmologyPathologyIds.map(String).filter(Boolean))]
       : [...DEFAULT_STORE_SCHEDULE.ophthalmologyPathologyIds],
@@ -195,8 +244,9 @@ export function normalizeStoreSchedule(value = {}) {
     meiQuotaWeekdays: meiQuotaRules.map((rule) => rule.weekday),
     meiMorningQuota: primaryMeiRule?.morningQuota ?? normalizedMeiMorningQuota,
     meiAfternoonQuota: primaryMeiRule?.afternoonQuota ?? normalizedMeiAfternoonQuota,
-    openingTime: opening,
-    closingTime: closing
+    openingTime: primaryStoreHours?.openingTime || opening,
+    closingTime: primaryStoreHours?.closingTime || closing,
+    storeHoursRules
   };
 }
 
@@ -232,6 +282,18 @@ export function validateStoreSchedule(value) {
   const ophthalmologyWeekdays = Array.isArray(value.ophthalmologyWeekdays)
     ? value.ophthalmologyWeekdays.map(Number)
     : [];
+  const rawStoreHoursRules = Array.isArray(value.storeHoursRules)
+    ? value.storeHoursRules
+    : WEEKDAY_OPTIONS.map((day) => ({ weekday: day.id, openingTime: value.openingTime, closingTime: value.closingTime }));
+  const rawOphthalmologyHoursRules = Array.isArray(value.ophthalmologyHoursRules)
+    ? value.ophthalmologyHoursRules
+    : ophthalmologyWeekdays.map((weekday) => ({
+      weekday,
+      openingTime: value.ophthalmologyOpeningTime,
+      closingTime: value.ophthalmologyClosingTime
+    }));
+  const validStoreHoursRules = normalizeHoursRules(rawStoreHoursRules, [], '', '');
+  const validOphthalmologyHoursRules = normalizeHoursRules(rawOphthalmologyHoursRules, [], '', '');
 
   if (!Number.isInteger(rawDuration) || rawDuration < 5 || rawDuration > 180) {
     errors.appointmentDurationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
@@ -253,6 +315,15 @@ export function validateStoreSchedule(value) {
   if (opening !== null && closing !== null && closing - opening < schedule.appointmentDurationMinutes) {
     errors.closingTime = 'O expediente precisa comportar pelo menos uma consulta.';
   }
+  if (schedule.schedulingMode === 'controlled'
+    && (!rawStoreHoursRules.length || validStoreHoursRules.length !== rawStoreHoursRules.length)) {
+    errors.storeHoursRules = 'Configure ao menos um dia com horarios validos para a loja.';
+  }
+  if (schedule.schedulingMode === 'controlled' && validStoreHoursRules.some((rule) => (
+    timeToMinutes(rule.closingTime) - timeToMinutes(rule.openingTime) < schedule.appointmentDurationMinutes
+  ))) {
+    errors.storeHoursRules = 'Cada expediente deve comportar pelo menos um atendimento.';
+  }
   const validLimitedRules = normalizeLimitedDayRules(limitedDayRules, [], 0);
   const validMeiRules = normalizeMeiQuotaRules(meiQuotaRules, [], 0, 0);
   if (limitedDaysEnabled && (!limitedDayRules.length || validLimitedRules.length !== limitedDayRules.length)) {
@@ -264,9 +335,9 @@ export function validateStoreSchedule(value) {
   if (ophthalmologyEnabled && (!Number.isInteger(ophthalmologyMinimumAge) || ophthalmologyMinimumAge < 0 || ophthalmologyMinimumAge > 120)) {
     errors.ophthalmologyMinimumAge = 'Informe uma idade entre 0 e 120 anos.';
   }
-  if (ophthalmologyEnabled && (!ophthalmologyWeekdays.length
-    || ophthalmologyWeekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6))) {
-    errors.ophthalmologyWeekdays = 'Selecione pelo menos um dia de atendimento.';
+  if (ophthalmologyEnabled
+    && (!rawOphthalmologyHoursRules.length || validOphthalmologyHoursRules.length !== rawOphthalmologyHoursRules.length)) {
+    errors.ophthalmologyHoursRules = 'Configure ao menos um dia com horarios validos para o oftalmologista.';
   }
   if (ophthalmologyEnabled && ophthalmologyOpening === null) errors.ophthalmologyOpeningTime = 'Informe um horario inicial valido.';
   if (ophthalmologyEnabled && ophthalmologyClosing === null) errors.ophthalmologyClosingTime = 'Informe um horario final valido.';
@@ -282,7 +353,13 @@ export function isOphthalmologyDateAllowed(settings, appointmentDate) {
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
   return !schedule.ophthalmologyRoutingEnabled
-    || (weekday !== null && schedule.ophthalmologyWeekdays.includes(weekday));
+    || (weekday !== null && schedule.ophthalmologyHoursRules.some((rule) => rule.weekday === weekday));
+}
+
+export function isStoreDateAllowed(settings, appointmentDate) {
+  const schedule = normalizeStoreSchedule(settings);
+  const weekday = weekdayFromDate(appointmentDate);
+  return weekday !== null && schedule.storeHoursRules.some((rule) => rule.weekday === weekday);
 }
 
 export function ophthalmologyAppointmentSchedule(settings) {
@@ -290,7 +367,8 @@ export function ophthalmologyAppointmentSchedule(settings) {
   return {
     ...schedule,
     openingTime: schedule.ophthalmologyOpeningTime,
-    closingTime: schedule.ophthalmologyClosingTime
+    closingTime: schedule.ophthalmologyClosingTime,
+    storeHoursRules: schedule.ophthalmologyHoursRules
   };
 }
 
@@ -360,8 +438,13 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
   const schedule = normalizeStoreSchedule(settings);
   if (schedule.schedulingMode === 'free') return [];
 
-  const start = timeToMinutes(schedule.openingTime);
-  const end = timeToMinutes(schedule.closingTime);
+  const weekday = weekdayFromDate(context.appointmentDate);
+  const hoursRule = weekday === null
+    ? { openingTime: schedule.openingTime, closingTime: schedule.closingTime }
+    : schedule.storeHoursRules.find((rule) => rule.weekday === weekday);
+  if (!hoursRule) return [];
+  const start = timeToMinutes(hoursRule.openingTime);
+  const end = timeToMinutes(hoursRule.closingTime);
   const duration = schedule.appointmentDurationMinutes;
   const occupiedRanges = appointments
     .filter((appointment) => appointment.id !== ignoredLeadId && appointment.leadId !== ignoredLeadId)

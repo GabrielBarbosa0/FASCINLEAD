@@ -5,6 +5,7 @@ import {
   appointmentSlotId,
   buildAppointmentSlots,
   isOphthalmologyDateAllowed,
+  isStoreDateAllowed,
   normalizeStoreSchedule,
   ophthalmologyAppointmentSchedule,
   validateStoreSchedule
@@ -24,6 +25,9 @@ describe('store schedule helpers', () => {
       ophthalmologyWeekdays: [6],
       ophthalmologyOpeningTime: '08:00',
       ophthalmologyClosingTime: '12:00',
+      ophthalmologyHoursRules: [
+        { weekday: 6, openingTime: '08:00', closingTime: '12:00' }
+      ],
       ophthalmologyPathologyIds: ['cataract'],
       ophthalmologySurgeryIds: ['cataract'],
       limitedDaysEnabled: false,
@@ -43,7 +47,16 @@ describe('store schedule helpers', () => {
         { weekday: 6, morningQuota: 1, afternoonQuota: 1 }
       ],
       openingTime: '08:00',
-      closingTime: '18:00'
+      closingTime: '18:00',
+      storeHoursRules: [
+        { weekday: 0, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 1, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 2, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 3, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 4, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 5, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 6, openingTime: '08:00', closingTime: '18:00' }
+      ]
     });
   });
 
@@ -169,26 +182,46 @@ describe('store schedule helpers', () => {
 
   it('limits ophthalmology availability to configured days and hours', () => {
     const settings = normalizeStoreSchedule({
-      ophthalmologyWeekdays: [3, 6],
-      ophthalmologyOpeningTime: '09:00',
-      ophthalmologyClosingTime: '13:00'
+      ophthalmologyHoursRules: [
+        { weekday: 4, openingTime: '08:00', closingTime: '18:00' },
+        { weekday: 6, openingTime: '08:00', closingTime: '12:00' }
+      ]
     });
 
-    expect(isOphthalmologyDateAllowed(settings, '2026-10-21')).toBe(true);
-    expect(isOphthalmologyDateAllowed(settings, '2026-10-22')).toBe(false);
-    expect(ophthalmologyAppointmentSchedule(settings)).toMatchObject({ openingTime: '09:00', closingTime: '13:00' });
+    expect(isOphthalmologyDateAllowed(settings, '2026-10-22')).toBe(true);
+    expect(isOphthalmologyDateAllowed(settings, '2026-10-23')).toBe(false);
+    expect(isOphthalmologyDateAllowed(settings, '2026-10-24')).toBe(true);
+
+    const ophthalmologySchedule = ophthalmologyAppointmentSchedule(settings);
+    expect(buildAppointmentSlots(ophthalmologySchedule, [], '', { appointmentDate: '2026-10-22' }).at(-1).time).toBe('17:40');
+    expect(buildAppointmentSlots(ophthalmologySchedule, [], '', { appointmentDate: '2026-10-24' }).at(-1).time).toBe('11:40');
+  });
+
+  it('uses the operating hours configured for each store weekday', () => {
+    const settings = normalizeStoreSchedule({
+      storeHoursRules: [
+        { weekday: 4, openingTime: '09:00', closingTime: '17:00' },
+        { weekday: 6, openingTime: '08:00', closingTime: '12:00' }
+      ]
+    });
+
+    expect(isStoreDateAllowed(settings, '2026-10-22')).toBe(true);
+    expect(isStoreDateAllowed(settings, '2026-10-23')).toBe(false);
+    expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-22' }).at(-1).time).toBe('16:40');
+    expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-24' }).at(-1).time).toBe('11:40');
+    expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-23' })).toEqual([]);
   });
 
   it('validates enabled ophthalmology settings', () => {
     expect(validateStoreSchedule({
       ...normalizeStoreSchedule({}),
-      ophthalmologyWeekdays: [],
+      ophthalmologyHoursRules: [],
       ophthalmologyOpeningTime: '13:00',
       ophthalmologyClosingTime: '09:00'
     })).toMatchObject({
       isValid: false,
       errors: {
-        ophthalmologyWeekdays: expect.any(String),
+        ophthalmologyHoursRules: expect.any(String),
         ophthalmologyClosingTime: expect.any(String)
       }
     });
