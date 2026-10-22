@@ -730,7 +730,7 @@ test('alerts the captor about a missed appointment and prepares WhatsApp follow-
     element.addEventListener('click', (event) => event.preventDefault(), { once: true });
     element.click();
   });
-  await expect(page.getByText('Contato iniciado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Reagendamento recomendado', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('missed-follow-up.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Reagendar' }).click();
@@ -812,8 +812,8 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('display', 'grid');
   await expect(page.locator('.follow-up-team-heading .avatar').first()).toHaveCSS('place-items', 'center');
   await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
-  await expect(page.locator('.status-badge', { hasText: 'Aguardando contato' })).toBeVisible();
-  await expect(page.locator('.status-badge', { hasText: 'Contato iniciado' })).toBeVisible();
+  await expect(page.locator('.status-badge', { hasText: 'Reagendamento recomendado' }).first()).toBeVisible();
+  await expect(page.getByText('Oferecer uma nova data', { exact: true }).first()).toBeVisible();
   await page.locator('[data-follow-up-filter="contacted"]').click();
   await expect(page.getByText('Cliente Contatado', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Aguardando', { exact: true })).not.toBeVisible();
@@ -828,7 +828,7 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
     element.addEventListener('click', (event) => event.preventDefault(), { once: true });
     element.click();
   });
-  await expect(awaitingCard.getByText('Contato iniciado', { exact: true })).toBeVisible();
+  await expect(awaitingCard.getByText('Reagendamento recomendado', { exact: true })).toBeVisible();
   await expect(awaitingCard.getByText('Gestor de Teste', { exact: true })).toBeVisible();
   await page.locator('[data-follow-up-filter="contacted"]').click();
   await expect(page.getByText('Cliente Aguardando', { exact: true })).toBeVisible();
@@ -912,7 +912,8 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   const generalScheduleDialog = page.getByRole('dialog', { name: 'Configuracoes gerais' });
   await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
   await generalScheduleDialog.getByLabel('Exibir ametropias no cadastro').check();
-  await generalScheduleDialog.getByLabel('Tolerancia apos o horario').fill('45');
+  await generalScheduleDialog.getByLabel('Alertar atraso apos').fill('5');
+  await generalScheduleDialog.getByLabel('Sugerir reagendamento apos').fill('30');
   const graceLayout = await generalScheduleDialog.evaluate((dialog) => {
     const help = dialog.querySelector('#settings-no-show-help').getBoundingClientRect();
     const input = dialog.querySelector('#settings-no-show-grace').getBoundingClientRect();
@@ -957,7 +958,8 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   if (!testInfo.project.name.includes('mobile')) {
     await page.getByRole('button', { name: 'Configurar agenda' }).click();
-    await expect(generalScheduleDialog.getByLabel('Tolerancia apos o horario')).toHaveValue('45');
+    await expect(generalScheduleDialog.getByLabel('Alertar atraso apos')).toHaveValue('5');
+    await expect(generalScheduleDialog.getByLabel('Sugerir reagendamento apos')).toHaveValue('30');
     await expect(generalScheduleDialog.getByLabel('Gerar retorno automaticamente')).toBeChecked();
     await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
     await generalScheduleDialog.getByRole('button', { name: 'Cancelar' }).click();

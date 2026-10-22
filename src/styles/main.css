@@ -2401,10 +2401,17 @@ svg {
   display: none;
 }
 
-.schedule-grace-field {
+.schedule-follow-up-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   margin-top: 2px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+}
+
+.schedule-grace-field {
+  min-width: 0;
 }
 
 .schedule-grace-field .field-help {
@@ -4930,6 +4937,10 @@ svg {
   .schedule-config-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .schedule-follow-up-times {
+    grid-template-columns: 1fr;
   }
 
   .schedule-config-launch {

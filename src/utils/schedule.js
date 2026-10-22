@@ -1,7 +1,8 @@
 export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   schedulingMode: 'controlled',
   appointmentDurationMinutes: 20,
-  noShowGraceMinutes: 30,
+  noShowGraceMinutes: 5,
+  rescheduleAfterMinutes: 30,
   automaticPendingFollowUp: false,
   showAmetropiaFields: false,
   limitedDaysEnabled: false,
@@ -96,6 +97,15 @@ function normalizeMeiQuotaRules(value, legacyWeekdays, morningQuota, afternoonQu
 export function normalizeStoreSchedule(value = {}) {
   const duration = Number(value.appointmentDurationMinutes);
   const noShowGrace = Number(value.noShowGraceMinutes);
+  const normalizedNoShowGrace = Number.isInteger(noShowGrace) && noShowGrace >= 0 && noShowGrace <= 240
+    ? noShowGrace
+    : DEFAULT_STORE_SCHEDULE.noShowGraceMinutes;
+  const rescheduleAfter = Number(value.rescheduleAfterMinutes);
+  const normalizedRescheduleAfter = Number.isInteger(rescheduleAfter)
+    && rescheduleAfter > normalizedNoShowGrace
+    && rescheduleAfter <= 1440
+    ? rescheduleAfter
+    : Math.max(DEFAULT_STORE_SCHEDULE.rescheduleAfterMinutes, normalizedNoShowGrace + 5);
   const limitedDayCapacity = Number(value.limitedDayCapacity);
   const meiDailyQuota = Number(value.meiDailyQuota);
   const legacyMeiQuota = Number.isInteger(meiDailyQuota) && meiDailyQuota >= 1 && meiDailyQuota <= 100
@@ -135,9 +145,8 @@ export function normalizeStoreSchedule(value = {}) {
     appointmentDurationMinutes: Number.isInteger(duration) && duration >= 5 && duration <= 180
       ? duration
       : DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes,
-    noShowGraceMinutes: Number.isInteger(noShowGrace) && noShowGrace >= 0 && noShowGrace <= 240
-      ? noShowGrace
-      : DEFAULT_STORE_SCHEDULE.noShowGraceMinutes,
+    noShowGraceMinutes: normalizedNoShowGrace,
+    rescheduleAfterMinutes: normalizedRescheduleAfter,
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
     limitedDaysEnabled: value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true',
@@ -166,6 +175,9 @@ export function validateStoreSchedule(value) {
   const rawNoShowGrace = value.noShowGraceMinutes === undefined
     ? DEFAULT_STORE_SCHEDULE.noShowGraceMinutes
     : Number(value.noShowGraceMinutes);
+  const rawRescheduleAfter = value.rescheduleAfterMinutes === undefined
+    ? schedule.rescheduleAfterMinutes
+    : Number(value.rescheduleAfterMinutes);
   const limitedDaysEnabled = value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true';
   const limitedDayRules = Array.isArray(value.limitedDayRules)
     ? value.limitedDayRules
@@ -186,7 +198,13 @@ export function validateStoreSchedule(value) {
     errors.appointmentDurationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
   }
   if (!Number.isInteger(rawNoShowGrace) || rawNoShowGrace < 0 || rawNoShowGrace > 240) {
-    errors.noShowGraceMinutes = 'Informe uma tolerancia entre 0 e 240 minutos.';
+    errors.noShowGraceMinutes = 'Informe um alerta entre 0 e 240 minutos.';
+  }
+  if (!Number.isInteger(rawRescheduleAfter) || rawRescheduleAfter < 1 || rawRescheduleAfter > 1440) {
+    errors.rescheduleAfterMinutes = 'Informe um prazo entre 1 e 1440 minutos.';
+  } else if (Number.isInteger(rawNoShowGrace) && rawNoShowGrace >= 0 && rawNoShowGrace <= 240
+    && rawRescheduleAfter <= rawNoShowGrace) {
+    errors.rescheduleAfterMinutes = 'O reagendamento deve ser sugerido depois do alerta de atraso.';
   }
   if (opening === null) errors.openingTime = 'Informe um horario inicial valido.';
   if (closing === null) errors.closingTime = 'Informe um horario final valido.';

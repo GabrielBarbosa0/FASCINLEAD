@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../../src/utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../../src/utils/follow-up.js';
 
 const profile = { uid: 'captor-1', role: 'captor' };
 const lead = {
@@ -82,5 +82,15 @@ describe('missed appointment follow-ups', () => {
     expect(url.pathname).toBe('/5581999991234');
     expect(url.searchParams.get('text')).toContain('Ola, Clara!');
     expect(url.searchParams.get('text')).toContain('reagendar');
+  });
+
+  it('changes the return stage and message after the rescheduling threshold', () => {
+    const settings = { rescheduleAfterMinutes: 30 };
+    expect(followUpStage(lead, settings, new Date('2026-10-15T09:29:59'))).toBe('late');
+    expect(followUpStage(lead, settings, new Date('2026-10-15T09:30:00'))).toBe('reschedule');
+
+    const lateMessage = new URL(buildWhatsAppFollowUpUrl(lead, 'late')).searchParams.get('text');
+    expect(lateMessage).toContain('Voce esta a caminho?');
+    expect(lateMessage).not.toContain('reagendar');
   });
 });

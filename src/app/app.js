@@ -61,7 +61,7 @@ import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, m
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge } from '../utils/lead.js';
 import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
-import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, isFollowUpContacted } from '../utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { formatAccessStoreSummary } from '../utils/access.js';
@@ -870,18 +870,22 @@ function followUpsView() {
       ? allRecords.filter(isFollowUpContacted)
       : allRecords;
   const renderItem = (lead) => {
-      const whatsAppUrl = buildWhatsAppFollowUpUrl(lead);
+      const followUpSettings = state.followUps.settingsByStore[lead.storeId] || state.followUps.settings;
+      const stage = followUpStage(lead, followUpSettings);
+      const rescheduleRecommended = stage === 'reschedule';
+      const whatsAppUrl = buildWhatsAppFollowUpUrl(lead, stage);
       const manuallyMissed = lead.appointmentAttendance === 'missed';
       const contacted = isFollowUpContacted(lead);
       return `<article class="follow-up-item">
         <div class="follow-up-heading">
           <span class="follow-up-icon"><i data-lucide="bell-ring"></i></span>
           <div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div>
-          <span class="status-badge ${contacted ? 'status-success' : 'status-warning'}">${contacted ? 'Contato iniciado' : 'Aguardando contato'}</span>
+          <span class="status-badge ${rescheduleRecommended ? 'status-danger' : contacted ? 'status-success' : 'status-warning'}">${rescheduleRecommended ? 'Reagendamento recomendado' : contacted ? 'Contato iniciado' : 'Cliente atrasado'}</span>
         </div>
         <dl class="follow-up-details">
           <div><dt>Agendamento</dt><dd>${escapeHtml(formatAppointmentDate(lead.appointmentDate))}, ${escapeHtml(lead.appointmentTime)}</dd></div>
           <div><dt>Retorno liberado</dt><dd>${escapeHtml(formatFollowUpAvailableAt(lead))}</dd></div>
+          <div><dt>Acao sugerida</dt><dd>${rescheduleRecommended ? 'Oferecer uma nova data' : 'Confirmar se esta a caminho'}</dd></div>
           ${managerView ? `<div><dt>Situacao</dt><dd>${manuallyMissed ? 'Nao compareceu' : 'Sem confirmacao'}</dd></div>
           <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>
           ${contacted ? `<div><dt>Contato por</dt><dd>${escapeHtml(lead.followUpContactedByName || 'Nao informado')}</dd></div>` : ''}
@@ -889,7 +893,7 @@ function followUpsView() {
         </dl>
         <div class="follow-up-actions">
           <a class="button button-whatsapp" data-follow-up-whatsapp="${escapeHtml(lead.id)}" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a>
-          <button class="button button-secondary" type="button" ${managerView ? `data-follow-up-reschedule="${escapeHtml(lead.id)}"` : `data-open-lead-id="${escapeHtml(lead.id)}"`}><i data-lucide="calendar-days"></i><span>Reagendar</span></button>
+          <button class="button button-secondary" type="button" ${managerView ? `data-follow-up-reschedule="${escapeHtml(lead.id)}"` : `data-open-lead-id="${escapeHtml(lead.id)}"`}><i data-lucide="${rescheduleRecommended ? 'calendar-days' : 'clipboard-list'}"></i><span>${rescheduleRecommended ? 'Reagendar' : 'Ver cadastro'}</span></button>
         </div>
       </article>`;
   };
@@ -919,7 +923,7 @@ function followUpsView() {
           <div class="follow-up-list">${group.records.map(renderItem).join('')}</div>
         </section>`).join('')
       : records.map(renderItem).join(''))
-    : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>${activeFilter === 'all' ? 'Nenhum retorno pendente' : 'Nenhum retorno nesta categoria'}</strong><p>${activeFilter === 'all' ? 'As faltas registradas pela loja aparecerao aqui depois do tempo de tolerancia.' : 'Selecione outro indicador para consultar os contatos.'}</p></div>`;
+    : `<div class="empty-state"><i data-lucide="circle-check"></i><strong>${activeFilter === 'all' ? 'Nenhum retorno pendente' : 'Nenhum retorno nesta categoria'}</strong><p>${activeFilter === 'all' ? 'Os clientes atrasados aparecerao aqui depois do tempo de alerta.' : 'Selecione outro indicador para consultar os contatos.'}</p></div>`;
 
   return `${state.followUps.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>${escapeHtml(state.followUps.error)}</span></div>` : ''}
     ${state.followUps.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de 500 registros.</span></div>` : ''}
@@ -1513,10 +1517,13 @@ function scheduleSettingsView() {
                 <div class="field" data-field="closingTime"><label for="settings-closing">Fim</label><input id="settings-closing" name="closingTime" type="time" value="${selected.closingTime}" ${selected.schedulingMode === 'free' ? 'disabled' : ''} /><small class="field-error"></small></div>
               </div>
             </div>
-            <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Tolerancia apos o horario</label><small id="settings-no-show-help" class="field-help">Tempo para liberar o retorno ao captador quando houver falta.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
+            <div class="schedule-follow-up-times">
+              <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Alertar atraso apos</label><small id="settings-no-show-help" class="field-help">Libera o retorno para perguntar se o cliente esta a caminho.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
+              <div class="field schedule-grace-field" data-field="rescheduleAfterMinutes"><label for="settings-reschedule-after">Sugerir reagendamento apos</label><small id="settings-reschedule-help" class="field-help">Muda o retorno e a mensagem para oferecer uma nova data.</small><div class="number-with-unit"><input id="settings-reschedule-after" name="rescheduleAfterMinutes" type="number" min="1" max="1440" step="5" value="${selected.rescheduleAfterMinutes}" aria-describedby="settings-reschedule-help" /><span>min</span></div><small class="field-error"></small></div>
+            </div>
             <input name="automaticPendingFollowUp" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-automatic-follow-up">
-              <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois da tolerancia.</small></span>
+              <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois do alerta de atraso.</small></span>
               <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
@@ -2514,6 +2521,7 @@ function bindPageEvents() {
       scheduleSettingsForm.elements.openingTime.value = record.openingTime;
       scheduleSettingsForm.elements.closingTime.value = record.closingTime;
       scheduleSettingsForm.elements.noShowGraceMinutes.value = record.noShowGraceMinutes;
+      scheduleSettingsForm.elements.rescheduleAfterMinutes.value = record.rescheduleAfterMinutes;
       document.querySelector('#settings-automatic-follow-up').checked = record.automaticPendingFollowUp;
       document.querySelector('#settings-show-ametropias').checked = record.showAmetropiaFields;
       setGeneralScheduleMode();
@@ -2549,12 +2557,13 @@ function bindPageEvents() {
         openingTime: schedulingMode === 'free' ? record.openingTime : scheduleSettingsForm.elements.openingTime.value,
         closingTime: schedulingMode === 'free' ? record.closingTime : scheduleSettingsForm.elements.closingTime.value,
         noShowGraceMinutes: Number(scheduleSettingsForm.elements.noShowGraceMinutes.value),
+        rescheduleAfterMinutes: Number(scheduleSettingsForm.elements.rescheduleAfterMinutes.value),
         automaticPendingFollowUp: document.querySelector('#settings-automatic-follow-up').checked,
         showAmetropiaFields: document.querySelector('#settings-show-ametropias').checked
       };
       const validation = validateStoreSchedule(candidate);
       const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => (
-        ['openingTime', 'closingTime', 'noShowGraceMinutes'].includes(name)
+        ['openingTime', 'closingTime', 'noShowGraceMinutes', 'rescheduleAfterMinutes'].includes(name)
       )));
       setFieldErrors(generalScheduleDialog, errors);
       if (Object.keys(errors).length) return;
@@ -2786,6 +2795,7 @@ function bindPageEvents() {
           Object.assign(record, values, {
             appointmentDurationMinutes: Number(values.appointmentDurationMinutes),
             noShowGraceMinutes: Number(values.noShowGraceMinutes),
+            rescheduleAfterMinutes: Number(values.rescheduleAfterMinutes),
             automaticPendingFollowUp: values.automaticPendingFollowUp,
             showAmetropiaFields: values.showAmetropiaFields,
             limitedDaysEnabled: values.limitedDaysEnabled,

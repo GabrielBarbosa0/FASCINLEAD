@@ -13,7 +13,8 @@ describe('store schedule helpers', () => {
     expect(normalizeStoreSchedule({})).toEqual({
       schedulingMode: 'controlled',
       appointmentDurationMinutes: 20,
-      noShowGraceMinutes: 30,
+      noShowGraceMinutes: 5,
+      rescheduleAfterMinutes: 30,
       automaticPendingFollowUp: false,
       showAmetropiaFields: false,
       limitedDaysEnabled: false,
@@ -133,6 +134,17 @@ describe('store schedule helpers', () => {
       openingTime: '08:00',
       closingTime: '18:00'
     })).toMatchObject({ isValid: false, errors: { noShowGraceMinutes: expect.any(String) } });
+  });
+
+  it('requires the rescheduling suggestion after the late alert', () => {
+    expect(validateStoreSchedule({
+      schedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      noShowGraceMinutes: 5,
+      rescheduleAfterMinutes: 5,
+      openingTime: '08:00',
+      closingTime: '18:00'
+    })).toMatchObject({ isValid: false, errors: { rescheduleAfterMinutes: expect.any(String) } });
   });
 
   it('normalizes the automatic follow-up switch from form values', () => {
