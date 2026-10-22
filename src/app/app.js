@@ -1312,6 +1312,62 @@ function reportGroupRows(records, keyFor, labelFor) {
   }).join('');
 }
 
+function reportAppointmentDistribution(records) {
+  const appointments = records.filter((lead) => lead.appointmentDate && lead.appointmentTime);
+  const weekdays = [
+    { index: 1, label: 'Segunda' },
+    { index: 2, label: 'Terca' },
+    { index: 3, label: 'Quarta' },
+    { index: 4, label: 'Quinta' },
+    { index: 5, label: 'Sexta' },
+    { index: 6, label: 'Sabado' },
+    { index: 0, label: 'Domingo' }
+  ].map((day) => ({
+    label: day.label,
+    count: appointments.filter((lead) => new Date(`${lead.appointmentDate}T12:00:00`).getDay() === day.index).length
+  }));
+  const periods = [
+    { label: 'Madrugada', start: 0, end: 6 },
+    { label: 'Manha', start: 6, end: 12 },
+    { label: 'Tarde', start: 12, end: 18 },
+    { label: 'Noite', start: 18, end: 24 }
+  ].map((period) => ({
+    label: period.label,
+    count: appointments.filter((lead) => {
+      const hour = Number(String(lead.appointmentTime).slice(0, 2));
+      return Number.isFinite(hour) && hour >= period.start && hour < period.end;
+    }).length
+  }));
+  const highestCount = Math.max(0, ...periods.map((period) => period.count));
+  const leaders = periods.filter((period) => period.count === highestCount && highestCount > 0);
+
+  return {
+    appointments,
+    weekdays,
+    periods,
+    predominantPeriod: leaders.length === 1 ? leaders[0].label : ''
+  };
+}
+
+function reportDistributionPanel(title, description, icon, items, total, highlightLabel = '') {
+  const highestCount = Math.max(1, ...items.map((item) => item.count));
+  const rows = items.map((item) => {
+    const percentage = total ? Math.round((item.count / total) * 100) : 0;
+    const width = item.count ? Math.max(5, Math.round((item.count / highestCount) * 100)) : 0;
+    const highlighted = item.label === highlightLabel;
+    return `<div class="report-distribution-row ${highlighted ? 'is-predominant' : ''}">
+      <div><strong>${escapeHtml(item.label)}</strong><span>${item.count} agendamento(s)</span></div>
+      <div class="report-distribution-bar"><i style="width:${width}%"></i></div>
+      <strong>${percentage}%</strong>
+    </div>`;
+  }).join('');
+
+  return `<article class="report-analysis-panel">
+    <header><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${description}</span></div></header>
+    <div class="report-distribution-list">${rows}</div>
+  </article>`;
+}
+
 function reportsView() {
   if (!hasAccess('reports.view')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos relatorios.</span></div>`;
@@ -1324,15 +1380,26 @@ function reportsView() {
   const attendanceRate = decided ? Math.round((attended / decided) * 100) : 0;
   const storeRows = reportGroupRows(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId));
   const captorRows = reportGroupRows(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Nao informado');
+  const appointmentDistribution = reportAppointmentDistribution(records);
+  const periodSummary = appointmentDistribution.predominantPeriod
+    ? `Predominio: ${appointmentDistribution.predominantPeriod}`
+    : (scheduled ? 'Sem predominio no periodo' : 'Nenhum agendamento no periodo');
+  const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${scheduled} agendamento(s) distribuidos por dia`, 'calendar-days', appointmentDistribution.weekdays, scheduled)}
+    ${reportDistributionPanel('Agendamentos por horario', periodSummary, 'clock-3', appointmentDistribution.periods, scheduled, appointmentDistribution.predominantPeriod)}`;
   const { filters, loading, error, truncated } = state.management;
   const table = (title, icon, rows) => `<section class="report-panel"><div class="report-panel-heading"><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${records.length} cadastro(s) no periodo</span></div></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
   return `<section class="reports-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></section>
-    <section class="report-period"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>${formatGoalDate(filters.startDate)} a ${formatGoalDate(filters.endDate)}</strong></div></section>
+    <form id="reports-period" class="dashboard-period-filter">
+      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>Defina o intervalo do relatorio</strong></div></div>
+      <div class="field"><label for="reports-start">Data inicial</label><input id="reports-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
+      <div class="field"><label for="reports-end">Data final</label><input id="reports-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
+      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar periodo'}</span></button>
+    </form>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatorio atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
     <section class="report-metrics" aria-label="Indicadores do periodo"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
-    ${records.length ? `<section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no periodo</strong><p>Volte para a gestao e ajuste os filtros da consulta.</p></div>`}`;
+    ${records.length ? `<section class="report-analysis-grid">${appointmentAnalysis}</section><section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no periodo</strong><p>Ajuste o periodo analisado para ampliar a busca.</p></div>`}`;
 }
 
 function dashboardGroupStats(records, keyFor, labelFor) {
@@ -2462,7 +2529,7 @@ function bindPageEvents() {
     });
   }
 
-  const dashboardPeriodForm = document.querySelector('#dashboard-period');
+  const dashboardPeriodForm = document.querySelector('#dashboard-period, #reports-period');
   dashboardPeriodForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(dashboardPeriodForm));

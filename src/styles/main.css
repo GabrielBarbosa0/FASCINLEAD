@@ -1595,6 +1595,106 @@ svg {
   color: var(--brand);
 }
 
+.report-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.report-analysis-panel {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.report-analysis-panel > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.report-analysis-panel > header > svg {
+  flex: 0 0 auto;
+  width: 20px;
+  color: var(--brand);
+}
+
+.report-analysis-panel h2,
+.report-analysis-panel header span {
+  margin: 0;
+}
+
+.report-analysis-panel h2 {
+  font-size: 0.95rem;
+}
+
+.report-analysis-panel header span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.report-distribution-list {
+  padding: 8px 18px 12px;
+}
+
+.report-distribution-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.55fr) minmax(120px, 1fr) 42px;
+  align-items: center;
+  gap: 12px;
+  min-height: 45px;
+  border-bottom: 1px solid var(--line);
+}
+
+.report-distribution-row:last-child {
+  border-bottom: 0;
+}
+
+.report-distribution-row > div:first-child strong,
+.report-distribution-row > div:first-child span {
+  display: block;
+}
+
+.report-distribution-row > div:first-child strong,
+.report-distribution-row > strong {
+  font-size: 0.78rem;
+}
+
+.report-distribution-row > div:first-child span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.report-distribution-row > strong {
+  text-align: right;
+}
+
+.report-distribution-row.is-predominant > div:first-child strong,
+.report-distribution-row.is-predominant > strong {
+  color: var(--brand);
+}
+
+.report-distribution-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-muted);
+}
+
+.report-distribution-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+
 .reports-grid {
   display: grid;
   gap: 18px;
@@ -4966,6 +5066,10 @@ svg {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-analysis-grid {
     grid-template-columns: 1fr;
   }
 

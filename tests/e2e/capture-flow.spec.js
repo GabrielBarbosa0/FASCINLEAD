@@ -433,6 +433,9 @@ test('shows management reports and dashboard grouped by store and captor', async
   await page.getByRole('button', { name: 'Relatorios' }).click();
 
   await expect(page.getByRole('heading', { name: 'Relatorios' })).toBeVisible();
+  await expect(page.getByText('Defina o intervalo do relatorio')).toBeVisible();
+  await expect(page.getByLabel('Data inicial')).toBeVisible();
+  await expect(page.getByLabel('Data final')).toBeVisible();
   const metrics = page.getByRole('region', { name: 'Indicadores do periodo' });
   await expect(metrics.locator('div', { hasText: 'Cadastros' }).locator('strong')).toHaveText('3');
   await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
@@ -440,6 +443,15 @@ test('shows management reports and dashboard grouped by store and captor', async
   await expect(metrics.locator('div', { hasText: 'Taxa de comparecimento' }).locator('strong')).toHaveText('50%');
   await expect(page.getByRole('heading', { name: 'Resultados por unidade' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agendamentos por dia da semana' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agendamentos por horario' })).toBeVisible();
+  await expect(page.getByText('Quinta', { exact: true })).toBeVisible();
+  await expect(page.getByText('Predominio: Manha')).toBeVisible();
+  const reportDate = capturedAtClient.slice(0, 10);
+  await page.getByLabel('Data inicial').fill(reportDate);
+  await page.getByLabel('Data final').fill(reportDate);
+  await page.getByRole('button', { name: 'Aplicar periodo' }).click();
+  await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
   await expect(page.getByText('Loja 02', { exact: true })).toBeVisible();
   await expect(page.getByText('Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByText('Captador Loja 06', { exact: true })).toBeVisible();
@@ -455,7 +467,6 @@ test('shows management reports and dashboard grouped by store and captor', async
   await expect(page.getByRole('heading', { name: 'Desempenho por loja' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
   await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
-  const reportDate = capturedAtClient.slice(0, 10);
   await page.getByLabel('Data inicial').fill(reportDate);
   await page.getByLabel('Data final').fill(reportDate);
   await page.getByRole('button', { name: 'Aplicar periodo' }).click();
