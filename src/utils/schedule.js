@@ -15,6 +15,8 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   ]),
   ophthalmologyPathologyIds: Object.freeze(['cataract']),
   ophthalmologySurgeryIds: Object.freeze(['cataract']),
+  transportEnabled: false,
+  transportHoursRules: Object.freeze([]),
   limitedDaysEnabled: false,
   limitedWeekdays: Object.freeze([3, 6]),
   limitedDayCapacity: 10,
@@ -203,6 +205,7 @@ export function normalizeStoreSchedule(value = {}) {
     ophthalmologyOpeningTime,
     ophthalmologyClosingTime
   );
+  const transportHoursRules = normalizeHoursRules(value.transportHoursRules, [], '', '');
   const primaryStoreHours = storeHoursRules[0];
   const primaryOphthalmologyHours = ophthalmologyHoursRules[0];
   return {
@@ -230,6 +233,8 @@ export function normalizeStoreSchedule(value = {}) {
     ophthalmologySurgeryIds: Array.isArray(value.ophthalmologySurgeryIds)
       ? [...new Set(value.ophthalmologySurgeryIds.map(String).filter(Boolean))]
       : [...DEFAULT_STORE_SCHEDULE.ophthalmologySurgeryIds],
+    transportEnabled: value.transportEnabled === true || value.transportEnabled === 'true',
+    transportHoursRules,
     limitedDaysEnabled: value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true',
     limitedDayRules,
     limitedWeekdays: limitedDayRules.map((rule) => rule.weekday),
@@ -292,8 +297,11 @@ export function validateStoreSchedule(value) {
       openingTime: value.ophthalmologyOpeningTime,
       closingTime: value.ophthalmologyClosingTime
     }));
+  const transportEnabled = value.transportEnabled === true || value.transportEnabled === 'true';
+  const rawTransportHoursRules = Array.isArray(value.transportHoursRules) ? value.transportHoursRules : [];
   const validStoreHoursRules = normalizeHoursRules(rawStoreHoursRules, [], '', '');
   const validOphthalmologyHoursRules = normalizeHoursRules(rawOphthalmologyHoursRules, [], '', '');
+  const validTransportHoursRules = normalizeHoursRules(rawTransportHoursRules, [], '', '');
 
   if (!Number.isInteger(rawDuration) || rawDuration < 5 || rawDuration > 180) {
     errors.appointmentDurationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
@@ -345,6 +353,9 @@ export function validateStoreSchedule(value) {
     && ophthalmologyOpening >= ophthalmologyClosing) {
     errors.ophthalmologyClosingTime = 'O encerramento deve ser depois do inicio.';
   }
+  if (transportEnabled && (!rawTransportHoursRules.length || validTransportHoursRules.length !== rawTransportHoursRules.length)) {
+    errors.transportHoursRules = 'Configure ao menos um dia com horarios validos para o transporte.';
+  }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };
 }
@@ -360,6 +371,35 @@ export function isStoreDateAllowed(settings, appointmentDate) {
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
   return weekday !== null && schedule.storeHoursRules.some((rule) => rule.weekday === weekday);
+}
+
+export function transportHoursForDate(settings, appointmentDate) {
+  const schedule = normalizeStoreSchedule(settings);
+  const weekday = weekdayFromDate(appointmentDate);
+  return weekday === null ? null : schedule.transportHoursRules.find((rule) => rule.weekday === weekday) || null;
+}
+
+export function isTransportDateAllowed(settings, appointmentDate) {
+  const schedule = normalizeStoreSchedule(settings);
+  return schedule.transportEnabled && Boolean(transportHoursForDate(schedule, appointmentDate));
+}
+
+export function isTransportAppointmentAllowed(settings, appointmentDate, appointmentTime, durationMinutes = APPOINTMENT_BLOCK_MINUTES) {
+  const hours = transportHoursForDate(settings, appointmentDate);
+  const start = timeToMinutes(appointmentTime);
+  const opening = timeToMinutes(hours?.openingTime);
+  const closing = timeToMinutes(hours?.closingTime);
+  const duration = Number(durationMinutes);
+  return Boolean(
+    normalizeStoreSchedule(settings).transportEnabled
+    && start !== null
+    && opening !== null
+    && closing !== null
+    && Number.isFinite(duration)
+    && duration > 0
+    && start >= opening
+    && start + duration <= closing
+  );
 }
 
 export function ophthalmologyAppointmentSchedule(settings) {

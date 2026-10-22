@@ -1,5 +1,6 @@
 import { normalizeBrazilianPhone } from './phone.js';
 import { isValidCpf, normalizeCpf } from './savwin-matching.js';
+import { isTransportAppointmentAllowed } from './schedule.js';
 
 export const INTERESTS = [
   { id: '', label: 'Nao informado' },
@@ -180,6 +181,8 @@ export function validateLeadInput(input) {
   const customerRg = normalizeRg(input.customerRg);
   const birthDate = String(input.birthDate || '').trim();
   const sex = String(input.sex || '').trim();
+  const needsTransport = booleanValue(input.needsTransport);
+  const hasCompanion = needsTransport && booleanValue(input.hasCompanion);
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
   if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
@@ -223,6 +226,22 @@ export function validateLeadInput(input) {
   if (input.appointmentServiceId && String(input.appointmentServiceId).length > 120) {
     errors.appointmentServiceId = 'Selecione um servico valido.';
   }
+  const transportAllowedWeekdays = Array.isArray(input.transportAllowedWeekdays)
+    ? input.transportAllowedWeekdays.map(Number)
+    : [];
+  if (needsTransport && !booleanValue(input.transportEnabled)) {
+    errors.needsTransport = 'O transporte ainda nao esta configurado para esta loja.';
+  }
+  if (needsTransport && appointmentDate && !transportAllowedWeekdays.includes(weekdayFromDate(appointmentDate))) {
+    errors.appointmentDate = 'Escolha um dia com transporte disponivel.';
+  }
+  if (needsTransport && appointmentDate && appointmentTime && Array.isArray(input.transportHoursRules)
+    && !isTransportAppointmentAllowed({
+      transportEnabled: booleanValue(input.transportEnabled),
+      transportHoursRules: input.transportHoursRules
+    }, appointmentDate, appointmentTime, Number(input.appointmentDurationMinutes) || 20)) {
+    errors.appointmentTime = 'Escolha um horario dentro da disponibilidade do transporte.';
+  }
   const allowedWeekdays = Array.isArray(input.ophthalmologyAllowedWeekdays)
     ? input.ophthalmologyAllowedWeekdays.map(Number)
     : [];
@@ -231,7 +250,19 @@ export function validateLeadInput(input) {
     errors.appointmentDate = 'Escolha um dia de atendimento do oftalmologista.';
   }
 
-  return { errors, isValid: Object.keys(errors).length === 0, phone, customerCpf, customerRg, birthDate, sex, triage };
+  return {
+    errors,
+    isValid: Object.keys(errors).length === 0,
+    phone,
+    customerCpf,
+    customerRg,
+    birthDate,
+    sex,
+    needsTransport,
+    hasCompanion,
+    transportSeats: needsTransport ? (hasCompanion ? 2 : 1) : 0,
+    triage
+  };
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
@@ -267,6 +298,9 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       careRoute: validation.triage.careRoute,
       careRouteOverride: validation.triage.careRouteOverride,
       careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
+      needsTransport: validation.needsTransport,
+      hasCompanion: validation.hasCompanion,
+      transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() ? {
@@ -323,6 +357,9 @@ export function createLeadUpdate(input) {
       careRoute: validation.triage.careRoute,
       careRouteOverride: validation.triage.careRouteOverride,
       careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
+      needsTransport: validation.needsTransport,
+      hasCompanion: validation.hasCompanion,
+      transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
       ...(input.appointmentDate?.trim() && input.schedulingMode ? {

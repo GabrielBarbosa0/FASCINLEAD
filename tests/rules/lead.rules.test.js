@@ -182,6 +182,22 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('accepts a transport request with at most one companion', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      needsTransport: true,
+      hasCompanion: true,
+      transportSeats: 2,
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      needsTransport: true,
+      hasCompanion: true,
+      transportSeats: 3,
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('rejects an RG longer than the supported field', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {

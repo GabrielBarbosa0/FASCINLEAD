@@ -924,7 +924,8 @@ svg {
 }
 
 .eye-route-override {
-  max-width: 360px;
+  width: 100%;
+  max-width: none;
 }
 
 .eye-route-status {
@@ -945,6 +946,70 @@ svg {
   flex: 0 0 19px;
   width: 19px;
   height: 19px;
+}
+
+.transport-section {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.transport-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.transport-section .field {
+  margin-bottom: 0;
+}
+
+.transport-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid #9abbe5;
+  border-radius: 8px;
+  background: #e7f0fb;
+  color: var(--brand);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.transport-status[hidden] {
+  display: none;
+}
+
+.transport-status svg {
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+}
+
+.transport-day-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--brand);
+  font-size: 0.76rem;
+}
+
+.transport-day-summary svg,
+.appointment-transport svg {
+  width: 16px;
+  height: 16px;
+}
+
+.transport-day-summary span {
+  white-space: nowrap;
+}
+
+.appointment-person .appointment-transport {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand);
+  font-weight: 700;
 }
 
 .field .ametropia-option input {
@@ -4747,6 +4812,14 @@ svg {
   }
 
   .field-row .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .transport-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .transport-fields .field {
     grid-column: 1 / -1;
   }
 

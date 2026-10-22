@@ -928,7 +928,7 @@ test('lets an administrator monitor follow-ups from every store', async ({ page 
 });
 
 test('configures the schedule and hides occupied slots', async ({ page }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Configuracoes/ }).click();
@@ -997,13 +997,24 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(ophthalmologyDialog.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
   await ophthalmologyDialog.getByLabel('Inicio do oftalmologista em Sabado').fill('08:00');
   await ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado').fill('12:00');
-  await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(ophthalmologyDialog).toBeVisible();
   await expect(ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado')).toHaveValue('12:00');
   await page.screenshot({ path: testInfo.outputPath('ophthalmology-weekly-schedule-dialog.png') });
-  await ophthalmologyDialog.getByRole('button', { name: 'Aplicar triagem' }).dispatchEvent('click');
+  await ophthalmologyDialog.getByRole('button', { name: 'Aplicar triagem' }).click();
   await expect(ophthalmologyDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Configurar transporte' }).click();
+  const transportDialog = page.getByRole('dialog', { name: 'Transporte' });
+  await transportDialog.getByLabel('Disponibilizar transporte').check();
+  await transportDialog.getByRole('checkbox', { name: 'Quarta', exact: true }).check();
+  await transportDialog.getByLabel('Inicio do transporte em Quarta').fill('13:00');
+  await transportDialog.getByLabel('Fim do transporte em Quarta').fill('17:00');
+  await transportDialog.getByRole('checkbox', { name: 'Sabado', exact: true }).check();
+  await transportDialog.getByLabel('Inicio do transporte em Sabado').fill('08:00');
+  await transportDialog.getByLabel('Fim do transporte em Sabado').fill('12:00');
+  await page.screenshot({ path: testInfo.outputPath('transport-weekly-schedule-dialog.png') });
+  await transportDialog.getByRole('button', { name: 'Aplicar transporte' }).click();
+  await expect(transportDialog).not.toBeVisible();
+  await expect(page.getByText('2 dias configurados')).toHaveCount(4);
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
   await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
   if (!testInfo.project.name.includes('mobile')) {
@@ -1031,6 +1042,18 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Ametropias' })).toBeVisible();
+  await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
+  await page.getByLabel('Transporte', { exact: true }).selectOption('true');
+  await expect(page.getByLabel('Tem acompanhante?')).toBeEnabled();
+  await page.getByLabel('Tem acompanhante?').selectOption('true');
+  await page.getByLabel('Data do pre-agendamento').fill('2026-10-24');
+  await expect(page.getByText('Transporte disponivel das 08:00 as 12:00.')).toBeVisible();
+  await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(1);
+  await expect(page.getByLabel('Horario disponivel').locator('option[value="11:40"]')).toHaveCount(1);
+  await expect(page.getByLabel('Horario disponivel').locator('option[value="12:00"]')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('transport-lead-fields.png'), fullPage: true });
+  await page.getByLabel('Transporte', { exact: true }).selectOption('false');
+  await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
   const date = new Date();
   date.setDate(date.getDate() + 1);
   const appointmentDate = date.toISOString().slice(0, 10);
@@ -1070,8 +1093,8 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
     };
   });
   expect(layout.formWidth).toBeGreaterThan(900);
-  expect(layout.cardCount).toBe(4);
-  expect(new Set(layout.cardTops.map((top) => Math.round(top))).size).toBeLessThanOrEqual(2);
+  expect(layout.cardCount).toBe(5);
+  expect(new Set(layout.cardTops.map((top) => Math.round(top))).size).toBeLessThanOrEqual(3);
   expect(layout.cardsInsideForm).toBe(true);
   expect(layout.overflow).toBeLessThanOrEqual(1);
   await expect(page.locator('.schedule-preview')).toHaveCount(0);

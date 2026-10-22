@@ -6,8 +6,11 @@ import {
   buildAppointmentSlots,
   isOphthalmologyDateAllowed,
   isStoreDateAllowed,
+  isTransportAppointmentAllowed,
+  isTransportDateAllowed,
   normalizeStoreSchedule,
   ophthalmologyAppointmentSchedule,
+  transportHoursForDate,
   validateStoreSchedule
 } from '../../src/utils/schedule.js';
 
@@ -30,6 +33,8 @@ describe('store schedule helpers', () => {
       ],
       ophthalmologyPathologyIds: ['cataract'],
       ophthalmologySurgeryIds: ['cataract'],
+      transportEnabled: false,
+      transportHoursRules: [],
       limitedDaysEnabled: false,
       limitedWeekdays: [3, 6],
       limitedDayCapacity: 10,
@@ -210,6 +215,27 @@ describe('store schedule helpers', () => {
     expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-22' }).at(-1).time).toBe('16:40');
     expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-24' }).at(-1).time).toBe('11:40');
     expect(buildAppointmentSlots(settings, [], '', { appointmentDate: '2026-10-23' })).toEqual([]);
+  });
+
+  it('uses the transport availability configured for each weekday', () => {
+    const settings = normalizeStoreSchedule({
+      transportEnabled: true,
+      transportHoursRules: [
+        { weekday: 1, openingTime: '08:00', closingTime: '12:00' },
+        { weekday: 3, openingTime: '13:00', closingTime: '17:00' }
+      ]
+    });
+
+    expect(isTransportDateAllowed(settings, '2026-10-19')).toBe(true);
+    expect(isTransportDateAllowed(settings, '2026-10-20')).toBe(false);
+    expect(transportHoursForDate(settings, '2026-10-21')).toEqual({
+      weekday: 3,
+      openingTime: '13:00',
+      closingTime: '17:00'
+    });
+    expect(isTransportAppointmentAllowed(settings, '2026-10-21', '13:00', 20)).toBe(true);
+    expect(isTransportAppointmentAllowed(settings, '2026-10-21', '16:50', 20)).toBe(false);
+    expect(isTransportAppointmentAllowed(settings, '2026-10-20', '13:00', 20)).toBe(false);
   });
 
   it('validates enabled ophthalmology settings', () => {

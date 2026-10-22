@@ -119,6 +119,48 @@ describe('lead validation', () => {
     expect(result.data).not.toHaveProperty('consentAtClient');
   });
 
+  it('stores transport customers and companions as separate seat counts', () => {
+    const result = createLeadDocument({
+      ...validInput,
+      needsTransport: 'true',
+      hasCompanion: 'true',
+      transportEnabled: true,
+      transportAllowedWeekdays: [5]
+    }, profile, 'installation-test');
+
+    expect(result.isValid).toBe(true);
+    expect(result.data).toMatchObject({
+      needsTransport: true,
+      hasCompanion: true,
+      transportSeats: 2
+    });
+  });
+
+  it('blocks transport on dates without configured availability', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      needsTransport: 'true',
+      hasCompanion: 'false',
+      transportEnabled: true,
+      transportAllowedWeekdays: [3]
+    });
+
+    expect(result.errors.appointmentDate).toBe('Escolha um dia com transporte disponivel.');
+  });
+
+  it('blocks appointments outside the configured transport hours', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      needsTransport: 'true',
+      hasCompanion: 'false',
+      transportEnabled: true,
+      transportAllowedWeekdays: [5],
+      transportHoursRules: [{ weekday: 5, openingTime: '08:00', closingTime: '14:00' }]
+    });
+
+    expect(result.errors.appointmentTime).toBe('Escolha um horario dentro da disponibilidade do transporte.');
+  });
+
   it('creates an update with editable fields only', () => {
     const result = createLeadUpdate({
       ...validInput,

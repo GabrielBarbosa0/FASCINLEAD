@@ -99,6 +99,9 @@ service cloud.firestore {
           'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
+          'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
@@ -129,6 +132,20 @@ service cloud.firestore {
           && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
         ))
         && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
+        && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
+        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'other'])
+        && (!('eyeSurgeryDetails' in data) || (data.eyeSurgeryDetails is string && data.eyeSurgeryDetails.size() <= 120))
+        && (!('careRoute' in data) || data.careRoute in ['optometrist', 'ophthalmologist'])
+        && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
+        && (!('careRouteReasons' in data) || (data.careRouteReasons is list
+          && data.careRouteReasons.hasOnly(['pathology', 'surgery', 'manual'])))
+        && (!('needsTransport' in data) || data.needsTransport is bool)
+        && (!('hasCompanion' in data) || data.hasCompanion is bool)
+        && (!('transportSeats' in data) || (data.transportSeats is int
+          && data.transportSeats >= 0 && data.transportSeats <= 2))
+        && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
+        && (!('needsTransport' in data) || !('transportSeats' in data)
+          || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
         && (!('street' in data) || (data.street is string && data.street.size() <= 120))
         && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
         && data.notes is string
@@ -261,6 +278,20 @@ service cloud.firestore {
         && (!('birthDate' in data) || (data.birthDate is string
           && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))))
         && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
+        && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
+        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'other'])
+        && (!('eyeSurgeryDetails' in data) || (data.eyeSurgeryDetails is string && data.eyeSurgeryDetails.size() <= 120))
+        && (!('careRoute' in data) || data.careRoute in ['optometrist', 'ophthalmologist'])
+        && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
+        && (!('careRouteReasons' in data) || (data.careRouteReasons is list
+          && data.careRouteReasons.hasOnly(['pathology', 'surgery', 'manual'])))
+        && (!('needsTransport' in data) || data.needsTransport is bool)
+        && (!('hasCompanion' in data) || data.hasCompanion is bool)
+        && (!('transportSeats' in data) || (data.transportSeats is int
+          && data.transportSeats >= 0 && data.transportSeats <= 2))
+        && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
+        && (!('needsTransport' in data) || !('hasCompanion' in data) || !('transportSeats' in data)
+          || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
         && (!('street' in data) || (data.street is string && data.street.size() <= 120))
         && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
         && data.notes is string
@@ -329,6 +360,9 @@ service cloud.firestore {
           'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
+          'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
           'appointmentAttendance', 'notes', 'updatedAtServer'
@@ -413,6 +447,9 @@ service cloud.firestore {
           'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
+          'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
           'appointmentAttendance', 'notes', 'updatedAtServer'

@@ -3,6 +3,7 @@ import {
   BarChart3,
   BellRing,
   Building2,
+  BusFront,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -60,7 +61,7 @@ import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, ophthalmologyTriage } from '../utils/lead.js';
-import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, ophthalmologyAppointmentSchedule, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
+import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
@@ -79,6 +80,7 @@ const appIcons = {
   BarChart3,
   BellRing,
   Building2,
+  BusFront,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -637,12 +639,14 @@ function appointmentTimeField() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
   const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
+  const needsTransport = state.newLeadSchedule.triage?.needsTransport === true || state.newLeadSchedule.triage?.needsTransport === 'true';
   const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
     && appointmentDate
     && !isOphthalmologyDateAllowed(settings, appointmentDate);
   const storeDateBlocked = triage.careRoute !== 'ophthalmologist'
     && appointmentDate
     && !isStoreDateAllowed(settings, appointmentDate);
+  const transportDateBlocked = needsTransport && appointmentDate && !isTransportDateAllowed(settings, appointmentDate);
   const baseSchedule = triage.careRoute === 'ophthalmologist'
     ? ophthalmologyAppointmentSchedule(settings)
     : settings;
@@ -653,6 +657,9 @@ function appointmentTimeField() {
   if (storeDateBlocked) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">A loja nao funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado no horario de funcionamento da loja.</small></div>`;
   }
+  if (transportDateBlocked) {
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Transporte indisponivel neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado para transporte.</small></div>`;
+  }
   if (settings.schedulingMode === 'free') {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
   }
@@ -661,7 +668,12 @@ function appointmentTimeField() {
   const slots = appointmentDate
     ? buildAppointmentSlots(serviceSchedule, appointments, '', { appointmentDate, profile: state.profile })
     : [];
-  const availableSlots = slots.filter((slot) => slot.available);
+  const availableSlots = slots.filter((slot) => slot.available && (!needsTransport || isTransportAppointmentAllowed(
+    settings,
+    appointmentDate,
+    slot.time,
+    service.durationMinutes
+  )));
   let placeholder = 'Escolha primeiro uma data';
   if (loading) placeholder = 'Consultando horarios...';
   else if (error) placeholder = 'Horarios indisponiveis';
@@ -725,7 +737,66 @@ function canOverrideCareRoute() {
 
 function triageConfigFields(settings) {
   return `<input name="ophthalmologyRoutingEnabled" type="hidden" value="${settings.ophthalmologyRoutingEnabled}" />
-    <input name="ophthalmologyMinimumAge" type="hidden" value="${settings.ophthalmologyMinimumAge}" />`;
+    <input name="ophthalmologyMinimumAge" type="hidden" value="${settings.ophthalmologyMinimumAge}" />
+    <input name="transportEnabled" type="hidden" value="${settings.transportEnabled}" />
+    <input name="transportAllowedWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(settings.transportHoursRules.map((rule) => rule.weekday)))}" />`;
+}
+
+function transportFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefix = 'transport', locked = false) {
+  const needsTransport = values.needsTransport === true || values.needsTransport === 'true';
+  const hasCompanion = needsTransport && (values.hasCompanion === true || values.hasCompanion === 'true');
+  const appointmentDate = values.appointmentDate || '';
+  const hours = appointmentDate ? transportHoursForDate(settings, appointmentDate) : null;
+  const status = !needsTransport
+    ? ''
+    : !settings.transportEnabled
+      ? 'O transporte ainda nao esta configurado para esta loja.'
+      : !appointmentDate
+        ? 'Escolha a data para consultar a disponibilidade do transporte.'
+        : hours
+          ? `Transporte disponivel das ${hours.openingTime} as ${hours.closingTime}.`
+          : 'Nao ha transporte disponivel nesta data.';
+  return `<section class="transport-section" data-transport-section>
+    ${locked ? `<input type="hidden" name="needsTransport" value="${needsTransport}" /><input type="hidden" name="hasCompanion" value="${hasCompanion}" />` : ''}
+    <div class="field-row transport-fields">
+      <div class="field" data-field="needsTransport"><label for="${idPrefix}-needed">Transporte</label><select id="${idPrefix}-needed" name="needsTransport" ${locked ? 'disabled' : ''}><option value="false" ${needsTransport ? '' : 'selected'}>Sem transporte</option><option value="true" ${needsTransport ? 'selected' : ''}>Com transporte</option></select><small class="field-error"></small></div>
+      <div class="field ${needsTransport ? '' : 'is-disabled'}" data-transport-companion data-field="hasCompanion"><label for="${idPrefix}-companion">Tem acompanhante?</label><select id="${idPrefix}-companion" name="hasCompanion" ${locked || !needsTransport ? 'disabled' : ''}><option value="false" ${hasCompanion ? '' : 'selected'}>Nao</option><option value="true" ${hasCompanion ? 'selected' : ''}>Sim</option></select><small class="field-help">Limite de 1 acompanhante por cliente.</small><small class="field-error"></small></div>
+    </div>
+    <div class="transport-status" data-transport-status ${status ? '' : 'hidden'}><i data-lucide="bus-front"></i><span>${escapeHtml(status)}</span></div>
+  </section>`;
+}
+
+function bindTransportFields(form, settings, onChange = () => {}) {
+  const section = form.querySelector('[data-transport-section]');
+  if (!section) return;
+  const transportInput = section.querySelector('select[name="needsTransport"]');
+  const companionInput = section.querySelector('select[name="hasCompanion"]');
+  const companionField = section.querySelector('[data-transport-companion]');
+  const status = section.querySelector('[data-transport-status]');
+  const refresh = () => {
+    const needsTransport = transportInput.value === 'true';
+    companionInput.disabled = !needsTransport;
+    companionField.classList.toggle('is-disabled', !needsTransport);
+    if (!needsTransport) companionInput.value = 'false';
+    const appointmentDate = form.elements.appointmentDate?.value || '';
+    const hours = appointmentDate ? transportHoursForDate(settings, appointmentDate) : null;
+    const message = !needsTransport
+      ? ''
+      : !settings.transportEnabled
+        ? 'O transporte ainda nao esta configurado para esta loja.'
+        : !appointmentDate
+          ? 'Escolha a data para consultar a disponibilidade do transporte.'
+          : hours
+            ? `Transporte disponivel das ${hours.openingTime} as ${hours.closingTime}.`
+            : 'Nao ha transporte disponivel nesta data.';
+    status.hidden = !message;
+    status.querySelector('span').textContent = message;
+    onChange(leadFormValues(form));
+  };
+  transportInput.addEventListener('change', refresh);
+  companionInput.addEventListener('change', refresh);
+  form.elements.appointmentDate?.addEventListener('input', refresh);
+  refresh();
 }
 
 function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOverride = false, idPrefix = 'eye') {
@@ -765,6 +836,9 @@ function enrichLeadTriage(values, settings) {
     ophthalmologyPathologyIds: settings.ophthalmologyPathologyIds,
     ophthalmologySurgeryIds: settings.ophthalmologySurgeryIds,
     ophthalmologyAllowedWeekdays: settings.ophthalmologyWeekdays,
+    transportEnabled: settings.transportEnabled,
+    transportAllowedWeekdays: settings.transportHoursRules.map((rule) => rule.weekday),
+    transportHoursRules: settings.transportHoursRules,
     eyeSurgeryStatus: triage.eyeSurgeryStatus,
     eyeSurgeryType: triage.eyeSurgeryType,
     eyeSurgeryDetails: triage.eyeSurgeryDetails,
@@ -928,6 +1002,7 @@ function newLeadView() {
         <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
+      ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
@@ -1111,6 +1186,7 @@ function leadDetailView() {
         <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
       </fieldset>
       ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
+      ${transportFields(lead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
         <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
@@ -1351,6 +1427,8 @@ function appointmentsView() {
   const groups = appointmentsByDate(records);
   const days = calendarDays(month);
   const selected = groups[selectedDate] || [];
+  const transportCustomers = selected.filter((lead) => lead.needsTransport);
+  const transportSeats = transportCustomers.reduce((total, lead) => total + (Number(lead.transportSeats) || (lead.hasCompanion ? 2 : 1)), 0);
   const selectedDateCanBeScheduled = selectedDate >= toLocalDateInput(new Date());
   const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
@@ -1377,7 +1455,7 @@ function appointmentsView() {
       const updating = updatingId === lead.id;
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
-        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small></div>
+        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small>${lead.needsTransport ? `<small class="appointment-transport"><i data-lucide="bus-front"></i> Transporte · ${lead.hasCompanion ? 'com acompanhante' : 'sem acompanhante'}</small>` : ''}</div>
         ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
           <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Nao compareceu</span></button>
@@ -1421,6 +1499,7 @@ function appointmentsView() {
         <section class="agenda-day-details">
           <div class="agenda-day-heading">
             <div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div>
+            ${transportCustomers.length ? `<div class="transport-day-summary"><i data-lucide="bus-front"></i><span><strong>${transportCustomers.length}</strong> cliente(s)</span><span><strong>${transportSeats}</strong> assento(s)</span></div>` : ''}
           </div>
           <div class="appointment-list">${selectedItems}</div>
         </section>
@@ -1445,10 +1524,12 @@ function appointmentCreateTimeField() {
   const schedule = appointmentCreateSchedule();
   const service = appointmentCreateService();
   const triage = ophthalmologyTriage(state.appointmentCreate.draft || {}, schedule);
+  const needsTransport = state.appointmentCreate.draft?.needsTransport === true || state.appointmentCreate.draft?.needsTransport === 'true';
   const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
     && !isOphthalmologyDateAllowed(schedule, state.appointments.selectedDate);
   const storeDateBlocked = triage.careRoute !== 'ophthalmologist'
     && !isStoreDateAllowed(schedule, state.appointments.selectedDate);
+  const transportDateBlocked = needsTransport && !isTransportDateAllowed(schedule, state.appointments.selectedDate);
   if (state.appointmentCreate.loading) {
     return '<div id="appointment-create-time-field" class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
   }
@@ -1457,6 +1538,9 @@ function appointmentCreateTimeField() {
   }
   if (storeDateBlocked) {
     return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>A loja nao funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
+  }
+  if (transportDateBlocked) {
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>Transporte indisponivel neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (schedule.schedulingMode === 'free') {
     return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
@@ -1470,7 +1554,12 @@ function appointmentCreateTimeField() {
     '',
     { appointmentDate: state.appointments.selectedDate, profile: state.profile }
   )
-    .filter((slot) => slot.available);
+    .filter((slot) => slot.available && (!needsTransport || isTransportAppointmentAllowed(
+      schedule,
+      state.appointments.selectedDate,
+      slot.time,
+      service.durationMinutes
+    )));
   return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : triage.careRoute === 'ophthalmologist' ? 'Sem horarios do oftalmologista neste dia' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
 }
 
@@ -1515,6 +1604,7 @@ function appointmentCreateDialog(allowedStores) {
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
         <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
         ${eyeTriageFields(draft, schedule, canOverrideCareRoute(), 'agenda-lead-eye')}
+        ${transportFields({ ...draft, appointmentDate: state.appointments.selectedDate }, schedule, 'agenda-lead-transport')}
         <div class="field-row appointment-fields">
           <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pre-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
           ${appointmentCreateTimeField()}
@@ -1630,6 +1720,14 @@ function scheduleSettingsView() {
       <input aria-label="Fim do oftalmologista em ${day.label}" name="ophthalmologyClosingTime-${day.id}" type="time" value="${rule?.closingTime || selected.ophthalmologyClosingTime}" ${rule ? '' : 'disabled'} />
     </div>`;
   }).join('');
+  const transportHoursRuleRows = WEEKDAY_OPTIONS.map((day) => {
+    const rule = selected.transportHoursRules.find((item) => item.weekday === day.id);
+    return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-transport-hours-row="${day.id}">
+      <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="transportWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
+      <input aria-label="Inicio do transporte em ${day.label}" name="transportOpeningTime-${day.id}" type="time" value="${rule?.openingTime || '08:00'}" ${rule ? '' : 'disabled'} />
+      <input aria-label="Fim do transporte em ${day.label}" name="transportClosingTime-${day.id}" type="time" value="${rule?.closingTime || '18:00'}" ${rule ? '' : 'disabled'} />
+    </div>`;
+  }).join('');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
@@ -1655,6 +1753,11 @@ function scheduleSettingsView() {
             <span class="schedule-config-launch-icon"><i data-lucide="stethoscope"></i></span>
             <span><strong>Atendimento oftalmologico</strong><small data-ophthalmology-summary>${selected.ophthalmologyRoutingEnabled ? `${selected.ophthalmologyWeekdays.length} ${selected.ophthalmologyWeekdays.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
             <button class="button button-secondary" type="button" data-ophthalmology-open><i data-lucide="wrench"></i><span>Configurar triagem</span></button>
+          </div>
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="bus-front"></i></span>
+            <span><strong>Transporte</strong><small data-transport-summary>${selected.transportEnabled ? `${selected.transportHoursRules.length} ${selected.transportHoursRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
+            <button class="button button-secondary" type="button" data-transport-open><i data-lucide="wrench"></i><span>Configurar transporte</span></button>
           </div>
         </div>
         <dialog id="general-schedule-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="general-schedule-title">
@@ -1743,6 +1846,16 @@ function scheduleSettingsView() {
             </div>
           </div>
           <footer><span>A configuracao vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar triagem</span></button></div></footer>
+        </dialog>
+        <dialog id="transport-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="transport-title">
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="transport-title">Transporte</h2><p>Defina os dias e horarios em que a loja oferece transporte.</p></div><button class="icon-button" type="button" data-transport-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <div class="schedule-rule-dialog-body">
+            <input name="transportEnabled" type="hidden" value="false" />
+            <input name="transportHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.transportHoursRules))}" />
+            <label class="setting-toggle checkbox-label" for="settings-transport-enabled"><span><strong>Disponibilizar transporte</strong><small>Permite registrar clientes e acompanhantes que precisam do veiculo.</small></span><input id="settings-transport-enabled" name="transportEnabled" type="checkbox" value="true" ${selected.transportEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
+            <fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte esta disponivel.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Inicio</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
+          </div>
+          <footer><span>Nao define viagens nem fechamento do veiculo.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-transport-close>Cancelar</button><button class="button button-primary" type="button" data-transport-apply><i data-lucide="check"></i><span>Aplicar transporte</span></button></div></footer>
         </dialog>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
@@ -2139,6 +2252,10 @@ function bindPageEvents() {
       state.newLeadSchedule.triage = values;
       refreshAppointmentTimeControl();
     });
+    bindTransportFields(form, state.newLeadSchedule.settings, (values) => {
+      state.newLeadSchedule.triage = values;
+      refreshAppointmentTimeControl();
+    });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = enrichLeadTriage(leadFormValues(form), state.newLeadSchedule.settings);
@@ -2200,6 +2317,7 @@ function bindPageEvents() {
     bindExclusiveOptions(editLeadForm, 'ametropiaIds');
     bindExclusiveOptions(editLeadForm, 'pathologyIds');
     bindEyeTriage(editLeadForm, state.leadDetailSchedule.settings);
+    bindTransportFields(editLeadForm, state.leadDetailSchedule.settings);
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const managementEdit = editLeadForm.dataset.management === 'true';
@@ -2369,6 +2487,11 @@ function bindPageEvents() {
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
     bindEyeTriage(appointmentCreateForm, appointmentCreateSchedule(), (values) => {
+      state.appointmentCreate.draft = values;
+      const timeField = document.querySelector('#appointment-create-time-field');
+      if (timeField) timeField.outerHTML = appointmentCreateTimeField();
+    });
+    bindTransportFields(appointmentCreateForm, appointmentCreateSchedule(), (values) => {
       state.appointmentCreate.draft = values;
       const timeField = document.querySelector('#appointment-create-time-field');
       if (timeField) timeField.outerHTML = appointmentCreateTimeField();
@@ -3080,6 +3203,82 @@ function bindPageEvents() {
         : 'Desativado';
       ophthalmologyDialog.close();
     });
+    const transportDialog = document.querySelector('#transport-dialog');
+    const transportEnabledInput = document.querySelector('#settings-transport-enabled');
+    const transportFieldsGroup = transportDialog?.querySelector('[data-transport-fields]');
+    const setTransportFieldsState = () => {
+      const enabled = transportEnabledInput.checked;
+      transportFieldsGroup.disabled = !enabled;
+      transportFieldsGroup.classList.toggle('is-disabled', !enabled);
+      transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
+        const checked = row.querySelector('[name="transportWeekday"]').checked;
+        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
+      });
+    };
+    const syncTransportDraft = () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (!record || !transportDialog) return;
+      transportEnabledInput.checked = record.transportEnabled;
+      transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(record.transportHoursRules);
+      transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
+        const weekday = Number(row.dataset.transportHoursRow);
+        const rule = record.transportHoursRules.find((item) => item.weekday === weekday);
+        const checkbox = row.querySelector('[name="transportWeekday"]');
+        const openingInput = row.querySelector(`[name="transportOpeningTime-${weekday}"]`);
+        const closingInput = row.querySelector(`[name="transportClosingTime-${weekday}"]`);
+        checkbox.checked = Boolean(rule);
+        openingInput.value = rule?.openingTime || '08:00';
+        closingInput.value = rule?.closingTime || '18:00';
+        row.classList.toggle('is-active', Boolean(rule));
+      });
+      setTransportFieldsState();
+      setFieldErrors(transportDialog, {});
+    };
+    const discardTransportDraft = () => {
+      syncTransportDraft();
+      transportDialog.close();
+    };
+    document.querySelector('[data-transport-open]')?.addEventListener('click', () => {
+      syncTransportDraft();
+      transportDialog.showModal();
+    });
+    transportDialog?.querySelectorAll('[data-transport-close]').forEach((button) => button.addEventListener('click', discardTransportDraft));
+    transportDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      discardTransportDraft();
+    });
+    transportEnabledInput?.addEventListener('change', setTransportFieldsState);
+    transportDialog?.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
+      const checkbox = row.querySelector('[name="transportWeekday"]');
+      checkbox.addEventListener('change', () => {
+        row.classList.toggle('is-active', checkbox.checked);
+        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !checkbox.checked; });
+      });
+    });
+    transportDialog?.querySelector('[data-transport-apply]')?.addEventListener('click', () => {
+      const enabled = transportEnabledInput.checked;
+      const rules = [...transportDialog.querySelectorAll('[name="transportWeekday"]:checked')].map((checkbox) => {
+        const weekday = Number(checkbox.value);
+        return {
+          weekday,
+          openingTime: transportDialog.querySelector(`[name="transportOpeningTime-${weekday}"]`).value,
+          closingTime: transportDialog.querySelector(`[name="transportClosingTime-${weekday}"]`).value
+        };
+      });
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      const candidate = { ...record, transportEnabled: enabled, transportHoursRules: rules };
+      const validation = validateStoreSchedule(candidate);
+      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => name.startsWith('transport')));
+      setFieldErrors(transportDialog, errors);
+      if (Object.keys(errors).length) return;
+      record.transportEnabled = enabled;
+      if (enabled) record.transportHoursRules = rules;
+      transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(enabled ? rules : record.transportHoursRules);
+      document.querySelector('[data-transport-summary]').textContent = enabled
+        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
+        : 'Desativado';
+      transportDialog.close();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
@@ -3090,6 +3289,7 @@ function bindPageEvents() {
       values.limitedDaysEnabled = values.limitedDaysEnabled === 'true';
       values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
       values.ophthalmologyRoutingEnabled = values.ophthalmologyRoutingEnabled === 'true';
+      values.transportEnabled = values.transportEnabled === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       values.storeHoursRules = JSON.parse(values.storeHoursRules || '[]');
@@ -3111,6 +3311,7 @@ function bindPageEvents() {
       values.ophthalmologyClosingTime = values.ophthalmologyHoursRules[0]?.closingTime || current.ophthalmologyClosingTime;
       values.ophthalmologyPathologyIds = JSON.parse(values.ophthalmologyPathologyIds || '["cataract"]');
       values.ophthalmologySurgeryIds = JSON.parse(values.ophthalmologySurgeryIds || '["cataract"]');
+      values.transportHoursRules = JSON.parse(values.transportHoursRules || '[]');
       if (values.schedulingMode === 'free') {
         values.openingTime = current.openingTime;
         values.closingTime = current.closingTime;
@@ -3145,7 +3346,9 @@ function bindPageEvents() {
             ophthalmologyClosingTime: values.ophthalmologyClosingTime,
             ophthalmologyHoursRules: values.ophthalmologyHoursRules,
             ophthalmologyPathologyIds: values.ophthalmologyPathologyIds,
-            ophthalmologySurgeryIds: values.ophthalmologySurgeryIds
+            ophthalmologySurgeryIds: values.ophthalmologySurgeryIds,
+            transportEnabled: values.transportEnabled,
+            transportHoursRules: values.transportHoursRules
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
@@ -3518,9 +3721,12 @@ function refreshAppointmentTimeControl() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
   const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
-  const dateAllowed = triage.careRoute === 'ophthalmologist'
+  const routeDateAllowed = triage.careRoute === 'ophthalmologist'
     ? isOphthalmologyDateAllowed(settings, appointmentDate)
     : isStoreDateAllowed(settings, appointmentDate);
+  const needsTransport = state.newLeadSchedule.triage?.needsTransport === true || state.newLeadSchedule.triage?.needsTransport === 'true';
+  const transportDateAllowed = !needsTransport || isTransportDateAllowed(settings, appointmentDate);
+  const dateAllowed = routeDateAllowed && transportDateAllowed;
   const slots = appointmentDate && settings.schedulingMode === 'controlled'
     ? buildAppointmentSlots(
       {
@@ -3532,11 +3738,19 @@ function refreshAppointmentTimeControl() {
       { appointmentDate, profile: state.profile }
     )
     : [];
-  const fullyBooked = Boolean(appointmentDate && dateAllowed && !loading && !error && slots.length && !slots.some((slot) => slot.available));
+  const availableSlots = slots.filter((slot) => slot.available && (!needsTransport || isTransportAppointmentAllowed(
+    settings,
+    appointmentDate,
+    slot.time,
+    service.durationMinutes
+  )));
+  const fullyBooked = Boolean(appointmentDate && dateAllowed && !loading && !error && slots.length && !availableSlots.length);
   dateField?.classList.toggle('is-fully-booked', fullyBooked);
   dateField?.classList.toggle('is-date-restricted', Boolean(appointmentDate && !dateAllowed));
-  if (dateStatus) dateStatus.textContent = !dateAllowed
-    ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista nao atende neste dia.' : 'A loja nao funciona neste dia.'
+  if (dateStatus) dateStatus.textContent = !transportDateAllowed
+    ? 'Nao ha transporte disponivel neste dia.'
+    : !routeDateAllowed
+      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista nao atende neste dia.' : 'A loja nao funciona neste dia.'
     : fullyBooked ? 'Dia sem horarios disponiveis.' : '';
 }
 
