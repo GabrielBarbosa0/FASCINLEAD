@@ -2523,6 +2523,66 @@ svg {
   font-size: 0.72rem;
 }
 
+.mei-quota-launch {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+}
+
+.mei-quota-launch-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.mei-quota-launch-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.mei-quota-launch strong,
+.mei-quota-launch small {
+  display: block;
+}
+
+.mei-quota-launch strong {
+  font-size: 0.82rem;
+}
+
+.mei-quota-launch small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.mei-quota-dialog {
+  width: min(calc(100% - 32px), 640px);
+}
+
+.mei-quota-dialog-body {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.mei-quota-dialog-body .setting-toggle {
+  margin-bottom: 4px;
+}
+
+.mei-quota-dialog-body .schedule-limit-fields {
+  margin-top: 16px;
+}
+
 .setting-toggle {
   min-height: 68px;
   display: grid;
@@ -4851,6 +4911,19 @@ svg {
     margin-top: 22px;
     padding-top: 18px;
     border-top: 1px solid var(--line);
+  }
+
+  .mei-quota-launch {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .mei-quota-launch .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .mei-quota-dialog-body {
+    padding: 16px;
   }
 
   .role-settings-layout {

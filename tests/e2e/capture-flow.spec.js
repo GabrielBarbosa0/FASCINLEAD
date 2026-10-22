@@ -915,11 +915,17 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByRole('group', { name: 'Dias com vagas limitadas' }).getByLabel('Quarta')).toBeChecked();
   await expect(page.getByRole('group', { name: 'Dias com vagas limitadas' }).getByLabel('Sabado')).toBeChecked();
   await page.getByLabel('Vagas totais por dia').fill('6');
-  await page.getByLabel('Aplicar cotas ao cargo MEI').check();
-  await expect(page.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Quarta')).toBeChecked();
-  await expect(page.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Sabado')).toBeChecked();
-  await page.getByLabel('Cota pela manha').fill('2');
-  await page.getByLabel('Cota a tarde').fill('1');
+  await page.getByRole('button', { name: 'Configurar cotas' }).click();
+  const meiQuotaDialog = page.getByRole('dialog', { name: 'Cotas do MEI' });
+  await meiQuotaDialog.getByLabel('Aplicar cotas ao cargo MEI').check();
+  await expect(meiQuotaDialog.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Quarta')).toBeChecked();
+  await expect(meiQuotaDialog.getByRole('group', { name: 'Dias com cota para o MEI' }).getByLabel('Sabado')).toBeChecked();
+  await meiQuotaDialog.getByLabel('Cota pela manha').fill('2');
+  await meiQuotaDialog.getByLabel('Cota a tarde').fill('1');
+  await page.screenshot({ path: testInfo.outputPath('mei-quota-dialog.png'), fullPage: true });
+  await meiQuotaDialog.getByRole('button', { name: 'Aplicar cotas' }).click();
+  await expect(meiQuotaDialog).not.toBeVisible();
+  await expect(page.getByText('2 pela manha e 1 a tarde')).toBeVisible();
   const graceInput = page.getByLabel('Tolerancia apos o horario');
   await graceInput.fill('45');
   const graceLayout = await page.evaluate(() => {
@@ -937,8 +943,10 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByLabel('Tolerancia apos o horario')).toHaveValue('45');
   await expect(page.getByLabel('Gerar retorno automaticamente')).toBeChecked();
   await expect(page.getByLabel('Vagas totais por dia')).toHaveValue('6');
-  await expect(page.getByLabel('Cota pela manha')).toHaveValue('2');
-  await expect(page.getByLabel('Cota a tarde')).toHaveValue('1');
+  await page.getByRole('button', { name: 'Configurar cotas' }).click();
+  await expect(meiQuotaDialog.getByLabel('Cota pela manha')).toHaveValue('2');
+  await expect(meiQuotaDialog.getByLabel('Cota a tarde')).toHaveValue('1');
+  await meiQuotaDialog.getByRole('button', { name: 'Cancelar' }).click();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
@@ -987,6 +995,8 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   expect(layout.secondColumnLeft).toBeGreaterThan(layout.firstColumnRight);
   expect(layout.overflow).toBeLessThanOrEqual(1);
   await expect(page.locator('.schedule-preview')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Configurar cotas' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Cotas do MEI' })).not.toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
   await page.setViewportSize({ width: 900, height: 768 });
   const compactOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

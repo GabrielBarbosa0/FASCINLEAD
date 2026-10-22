@@ -1509,7 +1509,16 @@ function scheduleSettingsView() {
                 <div class="field" data-field="limitedDayCapacity"><label for="settings-day-capacity">Vagas totais por dia</label><div class="number-with-unit"><input id="settings-day-capacity" name="limitedDayCapacity" type="number" min="1" max="100" step="1" value="${selected.limitedDayCapacity}" /><span>vagas</span></div><small class="field-error"></small></div>
               </div>
             </fieldset>
-            <div class="schedule-section-heading"><i data-lucide="briefcase-business"></i><div><strong>Cotas do MEI</strong><small>Controle os agendamentos feitos por cada pessoa com este cargo.</small></div></div>
+            <div class="mei-quota-launch">
+              <span class="mei-quota-launch-icon"><i data-lucide="briefcase-business"></i></span>
+              <span><strong>Cotas do MEI</strong><small data-mei-quota-summary>${selected.meiQuotaEnabled ? `${selected.meiMorningQuota} pela manha e ${selected.meiAfternoonQuota} a tarde` : 'Desativadas'}</small></span>
+              <button class="button button-secondary" type="button" data-mei-quota-open><i data-lucide="settings-2"></i><span>Configurar cotas</span></button>
+            </div>
+          </div>
+        </div>
+        <dialog id="mei-quota-dialog" class="role-details-dialog mei-quota-dialog" aria-labelledby="mei-quota-title">
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="mei-quota-title">Cotas do MEI</h2><p>Defina os dias e os limites de agendamento por periodo.</p></div><button class="icon-button" type="button" data-mei-quota-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <div class="mei-quota-dialog-body">
             <input name="meiQuotaEnabled" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
               <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
@@ -1527,7 +1536,8 @@ function scheduleSettingsView() {
               <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
             </fieldset>
           </div>
-        </div>
+          <footer><span>As cotas sao individuais para cada MEI.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-mei-quota-close>Cancelar</button><button class="button button-primary" type="button" data-mei-quota-apply><i data-lucide="check"></i><span>Aplicar cotas</span></button></div></footer>
+        </dialog>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
     </section>`;
@@ -2473,7 +2483,7 @@ function bindPageEvents() {
           : scheduleSettingsForm.elements[name].value;
       });
     });
-    ['limitedDayCapacity', 'meiMorningQuota', 'meiAfternoonQuota'].forEach((name) => {
+    ['limitedDayCapacity'].forEach((name) => {
       scheduleSettingsForm.elements[name]?.addEventListener('input', () => {
         const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
         if (record) record[name] = Number(scheduleSettingsForm.elements[name].value);
@@ -2483,12 +2493,6 @@ function bindPageEvents() {
       input.addEventListener('change', () => {
         const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
         if (record) record.limitedWeekdays = [...scheduleSettingsForm.querySelectorAll('[name="limitedWeekdays"]:checked')].map((item) => Number(item.value));
-      });
-    });
-    scheduleSettingsForm.querySelectorAll('[name="meiQuotaWeekdays"]').forEach((input) => {
-      input.addEventListener('change', () => {
-        const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-        if (record) record.meiQuotaWeekdays = [...scheduleSettingsForm.querySelectorAll('[name="meiQuotaWeekdays"]:checked')].map((item) => Number(item.value));
       });
     });
     document.querySelector('#settings-automatic-follow-up')?.addEventListener('change', (event) => {
@@ -2506,10 +2510,73 @@ function bindPageEvents() {
       if (record) record.limitedDaysEnabled = event.target.checked;
       render();
     });
-    document.querySelector('#settings-mei-quota-enabled')?.addEventListener('change', (event) => {
+    const meiQuotaDialog = document.querySelector('#mei-quota-dialog');
+    const meiQuotaEnabledInput = document.querySelector('#settings-mei-quota-enabled');
+    const meiQuotaFields = meiQuotaDialog?.querySelector('[data-field="meiQuotaWeekdays"]');
+    const syncMeiQuotaDraft = () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) record.meiQuotaEnabled = event.target.checked;
-      render();
+      if (!record || !meiQuotaDialog) return;
+      meiQuotaEnabledInput.checked = record.meiQuotaEnabled;
+      meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekdays"]').forEach((input) => {
+        input.checked = record.meiQuotaWeekdays.includes(Number(input.value));
+      });
+      meiQuotaDialog.querySelector('[name="meiMorningQuota"]').value = record.meiMorningQuota;
+      meiQuotaDialog.querySelector('[name="meiAfternoonQuota"]').value = record.meiAfternoonQuota;
+      meiQuotaFields.disabled = !record.meiQuotaEnabled;
+      meiQuotaFields.classList.toggle('is-disabled', !record.meiQuotaEnabled);
+      setFieldErrors(meiQuotaDialog, {});
+    };
+    const discardMeiQuotaDraft = () => {
+      syncMeiQuotaDraft();
+      meiQuotaDialog.close();
+    };
+
+    document.querySelector('[data-mei-quota-open]')?.addEventListener('click', () => {
+      syncMeiQuotaDraft();
+      meiQuotaDialog?.showModal();
+    });
+    meiQuotaDialog?.querySelectorAll('[data-mei-quota-close]').forEach((button) => {
+      button.addEventListener('click', discardMeiQuotaDraft);
+    });
+    meiQuotaDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      discardMeiQuotaDraft();
+    });
+    meiQuotaEnabledInput?.addEventListener('change', () => {
+      meiQuotaFields.disabled = !meiQuotaEnabledInput.checked;
+      meiQuotaFields.classList.toggle('is-disabled', !meiQuotaEnabledInput.checked);
+      setFieldErrors(meiQuotaDialog, {});
+    });
+    meiQuotaDialog?.querySelector('[data-mei-quota-apply]')?.addEventListener('click', () => {
+      const enabled = meiQuotaEnabledInput.checked;
+      const weekdays = [...meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekdays"]:checked')].map((item) => Number(item.value));
+      const morningQuota = Number(meiQuotaDialog.querySelector('[name="meiMorningQuota"]').value);
+      const afternoonQuota = Number(meiQuotaDialog.querySelector('[name="meiAfternoonQuota"]').value);
+      const errors = {};
+
+      if (enabled && !weekdays.length) errors.meiQuotaWeekdays = 'Selecione pelo menos um dia.';
+      if (enabled && (!Number.isInteger(morningQuota) || morningQuota < 0 || morningQuota > 100)) errors.meiMorningQuota = 'Informe um valor entre 0 e 100.';
+      if (enabled && (!Number.isInteger(afternoonQuota) || afternoonQuota < 0 || afternoonQuota > 100)) errors.meiAfternoonQuota = 'Informe um valor entre 0 e 100.';
+      if (enabled && !errors.meiMorningQuota && !errors.meiAfternoonQuota && morningQuota + afternoonQuota < 1) {
+        errors.meiMorningQuota = 'Informe ao menos uma vaga entre manha e tarde.';
+      }
+      setFieldErrors(meiQuotaDialog, errors);
+      if (Object.keys(errors).length) return;
+
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (record) {
+        record.meiQuotaEnabled = enabled;
+        if (enabled) {
+          record.meiQuotaWeekdays = weekdays;
+          record.meiMorningQuota = morningQuota;
+          record.meiAfternoonQuota = afternoonQuota;
+          record.meiDailyQuota = morningQuota + afternoonQuota;
+        }
+      }
+      document.querySelector('[data-mei-quota-summary]').textContent = enabled
+        ? `${morningQuota} pela manha e ${afternoonQuota} a tarde`
+        : 'Desativadas';
+      meiQuotaDialog.close();
     });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
