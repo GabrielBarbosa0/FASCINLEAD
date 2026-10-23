@@ -187,13 +187,14 @@ test('opens the personal goals screen on mobile and desktop', async ({ page }, t
   await page.getByRole('button', { name: /Metas/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Metas', exact: true })).toBeVisible();
-  await expect(page.getByText('Minhas metas')).toBeVisible();
+  await expect(page.getByText('Minhas metas')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Atualizar' })).toHaveCount(0);
   await expect(page.getByText('Nenhuma meta cadastrada')).toBeVisible();
   const personalOrder = await page.evaluate(() => ({
     goalsTop: document.querySelector('.goals-results').getBoundingClientRect().top,
     metricsTop: document.querySelector('.goal-metrics').getBoundingClientRect().top
   }));
-  expect(personalOrder.goalsTop).toBeLessThan(personalOrder.metricsTop);
+  expect(personalOrder.metricsTop).toBeLessThan(personalOrder.goalsTop);
   await page.screenshot({ path: testInfo.outputPath('goals.png'), fullPage: true });
 
   await page.locator('.goals-results').evaluate((element) => {

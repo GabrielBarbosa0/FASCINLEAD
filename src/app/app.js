@@ -2203,15 +2203,15 @@ function goalsView() {
     </section>`;
 
   return `
-    <section class="service-catalog-heading goals-heading">
+    ${goalManagerView ? `<section class="service-catalog-heading goals-heading">
       <div><span class="eyebrow">METAS</span><h2>${goalManagerView ? 'Metas da equipe' : 'Minhas metas'}</h2><p>${goalManagerView ? 'Defina objetivos de captacao e acompanhe o desempenho da equipe.' : 'Acompanhe seus objetivos e o progresso das captacoes.'}</p></div>
       <div class="goals-heading-actions"><button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>${goalManagerView ? '<button class="button button-primary" type="button" data-goal-new><i data-lucide="circle-plus"></i><span>Nova meta</span></button>' : ''}</div>
-    </section>
+    </section>` : ''}
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
     ${goalManagerView
       ? `${metrics}${results}${creator}`
-      : `<section class="personal-goals">${results}<h2 class="personal-goals-summary">Resumo</h2>${metrics}</section>`}
+      : `<section class="personal-goals">${metrics}${results}</section>`}
     ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
       <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta &ldquo;${escapeHtml(selectedGroup.title)}&rdquo; sera removida de ${selectedGroup.goals.length} colaborador(es). As captacoes permanecem intactas.</p></div>

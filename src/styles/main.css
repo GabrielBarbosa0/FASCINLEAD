@@ -4566,19 +4566,6 @@ svg {
   gap: 22px;
 }
 
-.personal-goals .goals-results {
-  margin-bottom: 24px;
-}
-
-.personal-goals-summary {
-  margin: 0 0 12px;
-  font-size: 1rem;
-}
-
-.personal-goals .goal-metrics {
-  margin-bottom: 0;
-}
-
 .goal-form {
   background: var(--surface);
 }
@@ -5619,9 +5606,26 @@ svg {
     grid-template-columns: 1fr;
   }
 
-  .goal-metrics,
   .goal-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .goal-metrics {
+    gap: 8px;
+  }
+
+  .goal-metrics > div {
+    min-height: 104px;
+    padding: 12px 10px;
+  }
+
+  .goal-metrics span {
+    font-size: 0.68rem;
+    overflow-wrap: anywhere;
+  }
+
+  .goal-metrics strong {
+    font-size: 1.35rem;
   }
 
   .goal-card-footer {

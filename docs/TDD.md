@@ -173,6 +173,7 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Gestores podem criar metas somente para captadores ativos da propria loja.
 - Uma mesma configuracao pode ser atribuida a um ou mais captadores, gerando uma meta individual para cada pessoa.
 - Captadores visualizam somente as proprias metas e o proprio progresso.
+- Na visao pessoal, os tres indicadores de resumo aparecem no topo e os objetivos atribuidos sao apresentados logo abaixo, sem cabecalho ou acao manual de atualizacao redundantes.
 - Gestores visualizam somente metas e desempenho da propria equipe; administradores visualizam todas as lojas.
 - O progresso considera somente leads sincronizados, atribuidos ao captador e cuja data de captacao esteja dentro do periodo da meta.
 - Metas podem ser excluidas por administradores ou pelo gestor da loja correspondente sem alterar os leads contabilizados.
