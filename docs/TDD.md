@@ -788,6 +788,7 @@ O backend inclui a Callable Function `updateTeamMemberPassword`, protegida pela 
 - Nenhum cliente pode elevar seu proprio perfil, trocar `storeId` ou alterar `role`.
 - Validar chaves permitidas, tipos, limites de texto e valores enumerados.
 - Permitir exclusao definitiva de `leads` somente para administradores.
+- Correcoes administrativas de leads podem alterar somente os campos editaveis; `capturedByUid`, `storeId` e `createdAtServer` permanecem imutaveis. Essa rota evita revalidar integralmente documentos legados para nao ultrapassar o limite de 1.000 expressoes das regras do Firestore.
 - Captadores leem apenas suas metas; gestores leem e administram metas da propria loja; administradores administram todas.
 
 Testes automatizados de regras serao obrigatorios antes do deploy.

@@ -257,6 +257,46 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('lets an administrator normalize and correct a legacy lead through the full form', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      fullName: 'Cliente Importado Corrigido',
+      preferredName: '',
+      phone: '+5581999991234',
+      phoneSearch: '81999991234',
+      customerCpf: '',
+      customerRg: '',
+      birthDate: '',
+      sex: '',
+      street: '',
+      streetNumber: 'S/N',
+      neighborhood: '',
+      city: '',
+      state: 'PE',
+      interestId: '',
+      interestLabel: '',
+      ametropiaIds: [],
+      ametropiaLabels: [],
+      pathologyIds: [],
+      pathologyLabels: [],
+      eyeSurgeryStatus: '',
+      eyeSurgeryType: '',
+      eyeSurgeryDetails: '',
+      careRoute: 'optometrist',
+      careRouteOverride: 'automatic',
+      careRouteReasons: [],
+      needsTransport: false,
+      hasCompanion: false,
+      transportSeats: 0,
+      appointmentDate: '2026-10-15',
+      appointmentTime: '09:30',
+      appointmentSchedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      notes: '',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets an administrator delete any lead', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
     await assertSucceeds(deleteDoc(doc(db, 'leads', 'lead-test')));

@@ -555,12 +555,14 @@ service cloud.firestore {
         && request.resource.data.createdAtServer == resource.data.createdAtServer
         && (isManagerLeadUpdate() || isCaptorFollowUpContactUpdate());
 
-      allow update: if validCaptorCorrectionData(request.resource.data)
-        && request.resource.data.capturedByUid == resource.data.capturedByUid
+      allow update: if request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdminLeadCorrection() || (isCaptorLeadCorrection()
-          && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)));
+        && (isAdminLeadCorrection() || (
+          validCaptorCorrectionData(request.resource.data)
+          && isCaptorLeadCorrection()
+          && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
+        ));
 
       allow delete: if isAdmin() && hasPermission('leads.delete');
     }
