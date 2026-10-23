@@ -17,6 +17,13 @@ import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
+import {
+  listOfflineLeads,
+  removeOfflineLead,
+  saveOfflineLead,
+  subscribeToOfflineLeads,
+  updateOfflineLeadState
+} from './offline-lead-store.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
 
@@ -56,6 +63,19 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     return () => window.removeEventListener('fascinlead:demo-leads', emit);
   }
 
+  let remoteLeads = [];
+  let offlineLeads = [];
+  const emit = () => {
+    const merged = new Map(remoteLeads.map((lead) => [lead.id, lead]));
+    offlineLeads.forEach((lead) => merged.set(lead.id, lead));
+    onData([...merged.values()].sort((a, b) => (
+      String(b.capturedAtClient).localeCompare(String(a.capturedAtClient))
+    )));
+  };
+  const unsubscribeOffline = subscribeToOfflineLeads(profile.uid, (leads) => {
+    offlineLeads = leads;
+    emit();
+  }, onError);
   const leadsQuery = query(
     collection(db, 'leads'),
     where('capturedByUid', '==', profile.uid),
@@ -63,24 +83,27 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     limit(100)
   );
 
-  return onSnapshot(
+  const unsubscribeRemote = onSnapshot(
     leadsQuery,
     { includeMetadataChanges: true },
     (snapshot) => {
-      onData(
-        snapshot.docs.map((leadDoc) => ({
+      remoteLeads = snapshot.docs.map((leadDoc) => ({
           id: leadDoc.id,
           ...leadDoc.data(),
           syncState: leadDoc.metadata.hasPendingWrites ? 'pending' : 'synced',
           fromCache: leadDoc.metadata.fromCache
-        }))
-      );
+        }));
+      emit();
     },
     onError
   );
+  return () => {
+    unsubscribeRemote();
+    unsubscribeOffline();
+  };
 }
 
-export function saveLead(input, profile, demoMode, onRemoteError) {
+export function saveLead(input, profile, demoMode, onRemoteError, options = {}) {
   const result = createLeadDocument(input, profile, getInstallationId());
   if (!result.isValid) return result;
 
@@ -98,6 +121,23 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
       ...leads
     ]);
     return { ...result, id };
+  }
+
+  const offline = options.offline === true || !navigator.onLine;
+  if (offline) {
+    const offlineLead = {
+      id,
+      ...result.data,
+      appointmentDate: '',
+      appointmentTime: '',
+      syncState: 'pending',
+      fromCache: true
+    };
+    const localSavePromise = saveOfflineLead(offlineLead).catch((error) => {
+      onRemoteError(error);
+      throw error;
+    });
+    return { ...result, data: offlineLead, id, localSavePromise };
   }
 
   const leadData = {
@@ -141,7 +181,7 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     leads[index] = {
       ...leads[index],
       ...result.data,
-      ...(appointmentChanged && leads[index].appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
+      ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
       syncState: 'demo',
       fromCache: true
     };
@@ -155,7 +195,7 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   );
   const leadUpdate = {
     ...result.data,
-    ...(appointmentChanged && existingLead.appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
+    ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
   const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
@@ -226,9 +266,35 @@ export function markDemoFollowUpContact(id, profile) {
   return true;
 }
 
-export async function synchronizeNow(demoMode) {
+async function synchronizeOfflineLeads(profile) {
+  if (!profile?.uid) return { synchronized: 0, failed: 0 };
+  const leads = await listOfflineLeads(profile.uid);
+  let synchronized = 0;
+  let failed = 0;
+  for (const lead of leads) {
+    const { id, syncState, fromCache, ...data } = lead;
+    try {
+      await setDoc(doc(db, 'leads', id), {
+        ...data,
+        appointmentDate: '',
+        appointmentTime: '',
+        createdAtServer: serverTimestamp(),
+        updatedAtServer: serverTimestamp()
+      });
+      await removeOfflineLead(id);
+      synchronized += 1;
+    } catch {
+      await updateOfflineLeadState(id, 'error');
+      failed += 1;
+    }
+  }
+  return { synchronized, failed };
+}
+
+export async function synchronizeNow(demoMode, profile = null) {
   if (demoMode || !isFirebaseConfigured) return { demo: true };
   await enableNetwork(db);
+  const offline = await synchronizeOfflineLeads(profile);
   await waitForPendingWrites(db);
-  return { demo: false };
+  return { demo: false, ...offline };
 }

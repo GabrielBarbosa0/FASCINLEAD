@@ -4,7 +4,7 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.5 |
+| Versao | 2.6 |
 | Status | Em implementacao |
 | Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
@@ -115,9 +115,11 @@ Ao trocar a loja de destino durante um novo cadastro, o formulario preserva os d
 ### RF-03 - Operacao offline
 
 - O cadastro offline e uma capacidade experimental por loja, desativada por padrao.
-- Com a capacidade desativada, novos cadastros exigem conexao e a rota, o cartao e o item de navegacao `Sync` ficam ocultos.
+- Com a capacidade desativada, novos cadastros exigem conexao.
 - Um administrador pode ativar a capacidade em `Configuracoes > Agenda > Cadastro offline`.
 - Quando ativa, a capacidade permite salvar somente os dados do lead sem conexao; data e horario permanecem bloqueados e vazios.
+- O lead offline aparece imediatamente em `Meus cadastros` como `Aguardando agendamento`; nao existe uma pagina separada de sincronizacao.
+- A sincronizacao confirma somente o cadastro. Ela nao preenche data ou horario e nao cria blocos em `appointmentSlots`.
 - A mudanca de conectividade com o formulario aberto nao pode apagar os demais campos preenchidos.
 - Desativar a capacidade nao apaga escritas que ja estejam pendentes no cache do Firestore.
 
@@ -128,8 +130,7 @@ A sincronizacao sera tentada:
 - automaticamente ao salvar quando houver internet;
 - ao abrir o aplicativo;
 - quando o navegador disparar o evento `online`;
-- quando o aplicativo voltar ao primeiro plano;
-- pelo comando manual `Sincronizar agora`.
+- quando o aplicativo voltar ao primeiro plano.
 
 `navigator.onLine` e apenas um sinal de interface. A liberacao dos campos da agenda exige um snapshot do servidor (`fromCache === false`) tanto para a configuracao da loja quanto para os compromissos do dia.
 
@@ -425,7 +426,7 @@ FASCINLEAD/
 
 ### 6.2 Navegacao mobile
 
-A barra inferior e montada conforme as permissoes. Ela pode exibir `Inicio`, `Novo`, `Cadastros`, `Retornos`, `Sync` e `Gestao`, limitada aos destinos aplicaveis ao perfil. A acao principal `Novo` deve ficar disponivel em um toque para quem possui `leads.create`. O cabecalho identifica a unidade unica, a quantidade de lojas permitidas ou o acesso a todas as unidades.
+A barra inferior e montada conforme as permissoes. Ela pode exibir `Inicio`, `Novo`, `Cadastros`, `Retornos` e `Gestao`, limitada aos destinos aplicaveis ao perfil. A acao principal `Novo` deve ficar disponivel em um toque para quem possui `leads.create`. O cabecalho identifica a unidade unica, a quantidade de lojas permitidas ou o acesso a todas as unidades.
 
 ### 6.3 Estado de conectividade
 
@@ -704,16 +705,15 @@ Novos indices somente deverao ser adicionados a partir de consultas reais. Cada 
 
 ### 8.1 Persistencia
 
-O Firestore e inicializado com cache persistente em IndexedDB. Nesta etapa, nao existe uma caixa de saida adicional mantida pela aplicacao. Quando o cadastro offline estiver habilitado para a loja:
+O Firestore e inicializado com cache persistente em IndexedDB. Para impedir que uma escrita rejeitada pela nuvem faca o cadastro desaparecer, a aplicacao tambem mantem uma caixa de saida propria em IndexedDB. Quando o cadastro offline estiver habilitado para a loja:
 
 1. O formulario valida e normaliza os dados.
 2. O navegador gera um UUID.
 3. Data e horario sao removidos da gravacao offline.
-4. O Firestore grava o documento no cache local.
-5. O snapshot local exibe o item como `Pendente` enquanto a nuvem nao confirmar a escrita.
-6. Quando houver conexao, o SDK envia a escrita ao Firestore.
-7. O item passa para `Sincronizado` depois da confirmacao do servidor.
-8. Se a nuvem rejeitar a escrita, a interface informa a falha de carregamento. Uma estrategia duravel de recuperacao e reenvio ainda devera ser projetada antes de tornar o recurso padrao.
+4. A aplicacao grava o documento na caixa de saida local e o exibe em `Meus cadastros`.
+5. Quando houver conexao, a aplicacao envia o mesmo UUID ao Firestore, sem data e horario.
+6. A copia local so e removida depois da confirmacao do servidor; o snapshot remoto assume o mesmo item sem causar desaparecimento ou duplicidade visual.
+7. Se a nuvem rejeitar a escrita, o cadastro permanece no aparelho com indicacao de falha e sera tentado novamente em uma proxima reconexao.
 
 O agendamento nao opera offline:
 
@@ -726,25 +726,17 @@ O agendamento nao opera offline:
 
 | Estado | Significado | Acao disponivel |
 | --- | --- | --- |
-| Pendente | Salvo no aparelho e ainda nao confirmado na nuvem | Aguardar ou sincronizar |
-| Sincronizado | Confirmado pelo Firestore | Nenhuma |
+| Aguardando agendamento | Cadastro local ou confirmado, ainda sem data e horario | Entrar em contato e agendar quando estiver online |
+| Agendado | Cadastro confirmado com data, horario e blocos reservados | Consultar na agenda |
 | Local de teste | Registro criado somente no modo de desenvolvimento | Nenhuma |
 
-O estado de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento.
-
-Na tela `Sync`, os totais de documentos sincronizados e pendentes sao exibidos com a acao manual de sincronizacao. A tela so e acessivel quando o cadastro offline estiver habilitado para a loja.
+O estado tecnico de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento. A situacao operacional exibida ao usuario prioriza `Aguardando agendamento` ou `Agendado`.
 
 Enquanto o formulario de nova captacao estiver aberto, uma mudanca de conectividade atualiza somente o aviso e os controles da agenda, preservando os demais campos preenchidos.
 
-### 8.3 Acao `Sincronizar agora`
+### 8.3 Processamento automatico da caixa de saida
 
-A acao devera:
-
-1. verificar se o navegador declara conexao;
-2. habilitar a rede do Firestore;
-3. aguardar as escritas pendentes do SDK;
-4. falhar, sem anunciar sucesso, se a operacao nao for concluida;
-5. manter o cache local se o envio continuar pendente.
+Ao detectar conexao, o aplicativo habilita a rede do Firestore, envia os cadastros locais do usuario autenticado e aguarda a confirmacao individual. Falhas permanecem na caixa de saida para nova tentativa; nao existe comando manual nem mensagem de sucesso antes da confirmacao do servidor.
 
 ### 8.4 Conflitos
 
@@ -929,7 +921,7 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - bloqueio do cadastro offline por padrao;
 - cadastro e consulta offline quando a capacidade da loja estiver ativa;
 - data e horario bloqueados quando a agenda nao foi confirmada pelo servidor;
-- navegacao `Sync` oculta quando a capacidade estiver desativada e visivel quando ativa;
+- cadastro offline exibido diretamente em `Meus cadastros`, sem rota `Sync`;
 - disputa de horario entre dispositivos preserva o lead perdedor;
 - retorno da conexao e confirmacao da sincronizacao;
 - correcao de cadastro pendente;

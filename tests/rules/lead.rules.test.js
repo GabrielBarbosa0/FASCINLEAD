@@ -807,6 +807,33 @@ describe('appointment slot reservations', () => {
     )));
   });
 
+  it('lets the captor schedule a previously unscheduled offline lead', async () => {
+    const unscheduledLead = {
+      ...lead,
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentSchedulingMode: 'controlled'
+    };
+    delete unscheduledLead.appointmentAttendance;
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'leads', 'offline-lead'), unscheduledLead);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'leads', 'offline-lead'), {
+      appointmentDate: '2026-10-20',
+      appointmentTime: '08:00',
+      appointmentAttendance: 'pending',
+      appointmentDurationMinutes: 20,
+      updatedAtServer: Timestamp.now()
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+      ...slot,
+      leadId: 'offline-lead'
+    });
+    await assertSucceeds(batch.commit());
+  });
+
   it('lets a Surubim captor query the combined clinic occupancy', async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'appointmentSlots', 'legacy-loja-02-slot'), {

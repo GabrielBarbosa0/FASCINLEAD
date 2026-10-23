@@ -101,7 +101,7 @@ export async function updateManagementLead(profile, lead, input) {
     ...validation.data,
     ...((lead.appointmentDate !== validation.data.appointmentDate
       || lead.appointmentTime !== validation.data.appointmentTime)
-      && lead.appointmentAttendance === 'missed'
+      && validation.data.appointmentDate
       ? { appointmentAttendance: 'pending' }
       : {}),
     updatedAtServer: serverTimestamp()

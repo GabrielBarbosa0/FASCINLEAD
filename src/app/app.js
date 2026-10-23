@@ -403,7 +403,6 @@ function canAccessRoute(route) {
     new: () => hasAccess('leads.create'),
     leads: () => hasAccess('leads.view_own'),
     lead: () => hasAccess('leads.view_own'),
-    sync: () => state.offlineCapture.enabled && (hasAccess('leads.create') || hasAccess('leads.edit_own')),
     'follow-ups': () => hasAccess('followups.own') || hasAccess('followups.team'),
     management: () => hasAccess('management.view'),
     'management-lead': () => hasAccess('management.view'),
@@ -498,10 +497,15 @@ function filteredReportRecords() {
 }
 
 function syncLabel(lead) {
+  if (!lead.appointmentDate || !lead.appointmentTime) return ['Aguardando agendamento', 'warning'];
   if (lead.syncState === 'demo') return ['Somente neste navegador', 'neutral'];
-  if (lead.syncState === 'pending') return ['Pendente', 'warning'];
-  if (lead.syncState === 'error') return ['Erro', 'danger'];
-  return ['Sincronizado', 'success'];
+  return ['Agendado', 'success'];
+}
+
+function offlineSyncDetail(lead) {
+  if (lead.syncState === 'pending') return 'Salvo neste aparelho. Sincronizacao automatica pendente.';
+  if (lead.syncState === 'error') return 'Nao foi possivel sincronizar. O cadastro continua salvo neste aparelho.';
+  return '';
 }
 
 function loginView() {
@@ -545,7 +549,6 @@ function currentPageTitle() {
     new: 'Cadastro',
     leads: 'Meus cadastros',
     lead: 'Detalhes do cadastro',
-    sync: 'Sincronizacao',
     management: 'Painel de leads',
     'management-lead': 'Detalhes do lead',
     dashboard: 'Dashboard',
@@ -604,8 +607,6 @@ function profileCard() {
 }
 
 function homeView() {
-  const pending = state.leads.filter((lead) => lead.syncState === 'pending').length;
-  const synced = state.leads.filter((lead) => lead.syncState === 'synced').length;
   const followUps = pendingFollowUps();
 
   return `
@@ -620,11 +621,6 @@ function homeView() {
       ${hasAccess('leads.view_own') ? `<button class="action-card" type="button" data-route="leads">
         <span class="action-icon"><i data-lucide="clipboard-list"></i></span>
         <span><strong>Meus cadastros</strong><small>${state.leads.length} registro(s) neste acesso</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${canAccessRoute('sync') ? `<button class="action-card" type="button" data-route="sync">
-        <span class="action-icon"><i data-lucide="refresh-cw"></i></span>
-        <span><strong>Sincronizacao</strong><small>${pending} pendente(s), ${synced} sincronizado(s)</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       ${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups">
@@ -1135,7 +1131,7 @@ function leadsView() {
         const [label, tone] = syncLabel(lead);
         return `<button class="lead-item" type="button" data-open-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
           <div class="lead-avatar">${escapeHtml(lead.fullName[0]?.toUpperCase() || '?')}</div>
-          <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.interestLabel || 'Interesse nao informado')}</small></div>
+          <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(offlineSyncDetail(lead) || lead.interestLabel || 'Interesse nao informado')}</small></div>
           <span class="status-badge status-${tone}">${label}</span>
           <i class="lead-chevron" data-lucide="chevron-right"></i>
         </button>`;
@@ -1269,7 +1265,8 @@ function leadDetailView() {
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
   const managerReschedule = managementMode && state.profile?.role === 'manager';
-  const locked = managerReschedule ? 'disabled' : '';
+  const offlineEdit = !navigator.onLine;
+  const locked = managerReschedule || offlineEdit ? 'disabled' : '';
   const showAmetropiaFields = state.leadDetailSchedule.storeId === lead.storeId
     && state.leadDetailSchedule.settings.showAmetropiaFields;
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
@@ -1284,7 +1281,8 @@ function leadDetailView() {
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
-      <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || 'free')}" />
+      ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alteracoes e agendamento exigem internet.</span></div>' : ''}
+      <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || state.leadDetailSchedule.settings.schedulingMode || 'controlled')}" />
       ${triageConfigFields(state.leadDetailSchedule.settings)}
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
       ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
@@ -1313,11 +1311,11 @@ function leadDetailView() {
       ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
       ${transportFields(lead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(lead.appointmentDate)}" /><small class="field-error"></small></div>
-        <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" /><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" ${locked} /><small class="field-error"></small></div>
       </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
-      <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
+      <button class="button button-primary button-block" type="submit" ${offlineEdit ? 'disabled' : ''}><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
       ${managementMode && isAdmin() ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>
@@ -2063,7 +2061,7 @@ function scheduleSettingsView() {
               <input id="settings-offline-capture-enabled" name="offlineCaptureEnabled" type="checkbox" value="true" ${selected.offlineCaptureEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <div class="notice notice-info"><i data-lucide="info"></i><span>Ao desativar, a pagina Sync fica oculta e novos cadastros exigem conexao. Registros que ja estiverem pendentes nao sao apagados.</span></div>
+            <div class="notice notice-info"><i data-lucide="info"></i><span>Os cadastros offline aparecem em Meus cadastros e sincronizam automaticamente. Ao desativar, novos cadastros passam a exigir conexao; registros pendentes nao sao apagados.</span></div>
           </div>
           <footer><span>O recurso permanece desativado por padrao.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-offline-capture-close>Cancelar</button><button class="button button-primary" type="button" data-offline-capture-apply><i data-lucide="check"></i><span>Aplicar configuracao</span></button></div></footer>
         </dialog>
@@ -2327,28 +2325,10 @@ function goalsView() {
     </dialog>` : ''}`;
 }
 
-function syncView() {
-  const counts = state.leads.reduce((result, lead) => {
-    result[lead.syncState] = (result[lead.syncState] || 0) + 1;
-    return result;
-  }, {});
-
-  return `
-    ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="info"></i><span>No modo de desenvolvimento nao ha envio para a nuvem.</span></div>' : ''}
-    <section class="sync-grid">
-      <div class="metric metric-success"><span>Sincronizados</span><strong>${counts.synced || 0}</strong><i data-lucide="circle-check"></i></div>
-      <div class="metric metric-warning"><span>Pendentes</span><strong>${counts.pending || 0}</strong><i data-lucide="clock-3"></i></div>
-      <div class="metric"><span>Locais de teste</span><strong>${counts.demo || 0}</strong><i data-lucide="hard-drive"></i></div>
-      <div class="metric metric-danger"><span>Com erro</span><strong>${counts.error || 0}</strong><i data-lucide="circle-alert"></i></div>
-    </section>
-    <button class="button button-primary button-block" type="button" data-action="sync"><i data-lucide="refresh-cw"></i><span>Sincronizar agora</span></button>`;
-}
-
 function bottomNav() {
   const items = [['home', 'house', 'Inicio']];
   if (hasAccess('leads.create')) items.push(['new', 'circle-plus', 'Novo']);
   if (hasAccess('leads.view_own')) items.push(['leads', 'clipboard-list', 'Cadastros']);
-  if (canAccessRoute('sync')) items.push(['sync', 'refresh-cw', 'Sync']);
   if (hasAccess('followups.own') && !hasAccess('followups.team')) items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
   const followUpCount = pendingFollowUps().length;
@@ -2359,7 +2339,7 @@ function bottomNav() {
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, sync: syncView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
   const wideLayout = ['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
@@ -2421,6 +2401,9 @@ function syncConnectivityIndicator() {
 
 function handleConnectivityChange() {
   syncConnectivityIndicator();
+  if (navigator.onLine && state.profile && !state.demoMode) {
+    synchronizeNow(false, state.profile).catch(() => {});
+  }
   if (state.route !== 'new') return;
 
   const form = document.querySelector('#lead-form');
@@ -2576,6 +2559,15 @@ function bindPageEvents() {
         submitButton.disabled = false;
         return;
       }
+      if (result.localSavePromise) {
+        try {
+          await result.localSavePromise;
+        } catch {
+          submitButton.disabled = false;
+          showToast('Nao foi possivel salvar o cadastro neste aparelho.', 'danger', 'circle-alert');
+          return;
+        }
+      }
       if (controlledAppointment && result.writePromise) {
         try {
           await result.writePromise;
@@ -2611,6 +2603,10 @@ function bindPageEvents() {
     bindTransportFields(editLeadForm, state.leadDetailSchedule.settings);
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!navigator.onLine) {
+        showToast('Conecte-se a internet para alterar ou agendar este cadastro.', 'danger', 'wifi-off');
+        return;
+      }
       const managementEdit = editLeadForm.dataset.management === 'true';
       const existingLead = managementEdit
         ? findManagementLead(editLeadForm.dataset.leadId)
@@ -2672,8 +2668,17 @@ function bindPageEvents() {
         if (result.notFound) navigate('leads');
         return;
       }
+      if (values.appointmentDate && values.appointmentTime && result.writePromise) {
+        try {
+          await result.writePromise;
+        } catch {
+          submitButton.disabled = false;
+          setFieldErrors(editLeadForm, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
+          return;
+        }
+      }
       navigate('leads');
-      showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : 'Alteracoes salvas. A sincronizacao seguira automaticamente.');
+      showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : values.appointmentDate ? 'Agendamento salvo com sucesso.' : 'Alteracoes salvas com sucesso.');
     });
   }
 
@@ -4661,15 +4666,6 @@ async function handleAction(action) {
     render();
   }
 
-  if (action === 'sync') {
-    try {
-      await synchronizeNow(state.demoMode);
-      showToast(state.demoMode ? 'Modo local verificado.' : 'Sincronizacao concluida.');
-    } catch {
-      showToast('A sincronizacao ainda nao foi concluida.', 'danger', 'circle-alert');
-    }
-  }
-
   if (action === 'export-management') {
     const records = filteredManagementRecords();
     if (!records.length) return;
@@ -5350,7 +5346,7 @@ export async function startApp() {
   }, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {
-      synchronizeNow(false).catch(() => {});
+      synchronizeNow(false, state.profile).catch(() => {});
     }
   });
 
@@ -5389,6 +5385,7 @@ export async function startApp() {
       state.demoMode = false;
       state.authError = '';
       subscribeProfileLeads();
+      if (navigator.onLine) synchronizeNow(false, state.profile).catch(() => {});
       startOfflineCaptureSubscription();
       startFollowUpScheduleSubscription();
       state.unsubscribeProfile = observeAuthorizedProfile(firebaseUser, (profile) => {

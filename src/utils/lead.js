@@ -307,14 +307,12 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
-      ...(input.appointmentDate?.trim() ? {
-        appointmentAttendance: 'pending',
-        appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
-        ...(input.appointmentServiceId ? {
-          appointmentServiceId: String(input.appointmentServiceId),
-          appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
-        } : {})
+      appointmentSchedulingMode: input.schedulingMode === 'free' ? 'free' : 'controlled',
+      appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
+      ...(input.appointmentDate?.trim() ? { appointmentAttendance: 'pending' } : {}),
+      ...(input.appointmentServiceId ? {
+        appointmentServiceId: String(input.appointmentServiceId),
+        appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
       } : {}),
       notes: input.notes?.trim() || '',
       source: 'street',
@@ -366,13 +364,11 @@ export function createLeadUpdate(input) {
       transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
-      ...(input.appointmentDate?.trim() && input.schedulingMode ? {
-        appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
-        ...(input.appointmentServiceId ? {
-          appointmentServiceId: String(input.appointmentServiceId),
-          appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
-        } : {})
+      appointmentSchedulingMode: input.schedulingMode === 'free' ? 'free' : 'controlled',
+      appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
+      ...(input.appointmentServiceId ? {
+        appointmentServiceId: String(input.appointmentServiceId),
+        appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
       } : {}),
       notes: input.notes?.trim() || ''
     }

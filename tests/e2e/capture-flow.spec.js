@@ -1280,7 +1280,7 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await offlineDialog.getByLabel('Permitir cadastros sem internet').check();
   await offlineDialog.getByRole('button', { name: 'Aplicar configuracao' }).click();
   await page.getByRole('button', { name: 'Salvar configuracao' }).click();
-  await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sync', exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
   await page.setViewportSize({ width: 900, height: 768 });
   const compactOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -1288,9 +1288,21 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.context().setOffline(true);
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await expect(page.locator('#lead-form')).toBeVisible();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
   await expect(page.getByLabel('Data do pre-agendamento')).toBeDisabled();
+  await expect(page.getByLabel('Horario disponivel')).toBeDisabled();
   await expect(page.getByText(/somente os dados do lead serao salvos/i)).toBeVisible();
+  await page.getByLabel('Nome *').fill('Cliente Offline');
+  await page.getByLabel('Telefone ou WhatsApp *').fill('81999990000');
+  await page.getByLabel('Data de nascimento').fill('1980-01-01');
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  const offlineLead = page.getByRole('button', { name: 'Ver cadastro de Cliente Offline' });
+  await expect(offlineLead).toContainText('Aguardando agendamento');
   await page.context().setOffline(false);
+  await expect(offlineLead).toContainText('Aguardando agendamento');
+  await offlineLead.click();
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {

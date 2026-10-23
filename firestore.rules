@@ -397,7 +397,10 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
           || (
             request.resource.data.appointmentAttendance == 'pending'
-            && resource.data.appointmentAttendance == 'missed'
+            && (
+              !('appointmentAttendance' in resource.data)
+              || resource.data.appointmentAttendance == 'missed'
+            )
             && (
               request.resource.data.appointmentDate != resource.data.appointmentDate
               || request.resource.data.appointmentTime != resource.data.appointmentTime
