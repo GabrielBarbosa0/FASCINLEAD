@@ -5,6 +5,7 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   rescheduleAfterMinutes: 30,
   automaticPendingFollowUp: false,
   showAmetropiaFields: false,
+  offlineCaptureEnabled: false,
   ophthalmologyRoutingEnabled: true,
   ophthalmologyMinimumAge: 55,
   ophthalmologyWeekdays: Object.freeze([6]),
@@ -217,6 +218,7 @@ export function normalizeStoreSchedule(value = {}) {
     rescheduleAfterMinutes: normalizedRescheduleAfter,
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
+    offlineCaptureEnabled: value.offlineCaptureEnabled === true || value.offlineCaptureEnabled === 'true',
     ophthalmologyRoutingEnabled: value.ophthalmologyRoutingEnabled === undefined
       ? DEFAULT_STORE_SCHEDULE.ophthalmologyRoutingEnabled
       : value.ophthalmologyRoutingEnabled === true || value.ophthalmologyRoutingEnabled === 'true',

@@ -141,6 +141,18 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
 
+test('blocks new offline registrations while the store feature is disabled', async ({ page }) => {
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.context().setOffline(true);
+  await page.getByRole('button', { name: /Nova abordagem/ }).click();
+
+  await expect(page.getByText('Cadastro offline desativado', { exact: true })).toBeVisible();
+  await expect(page.locator('#lead-form')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sync', exact: true })).toHaveCount(0);
+
+  await page.context().setOffline(false);
+});
+
 test('routes cataract clients to configured ophthalmology days', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -1150,7 +1162,7 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
     };
   });
   expect(layout.formWidth).toBeGreaterThan(900);
-  expect(layout.cardCount).toBe(5);
+  expect(layout.cardCount).toBe(6);
   expect(new Set(layout.cardTops.map((top) => Math.round(top))).size).toBeLessThanOrEqual(3);
   expect(layout.cardsInsideForm).toBe(true);
   expect(layout.overflow).toBeLessThanOrEqual(1);
@@ -1161,10 +1173,28 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await expect(page.getByRole('dialog', { name: 'Limite de vagas' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Configurar cotas' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Cotas do MEI' })).not.toBeVisible();
+  await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
+  await expect(page.getByRole('button', { name: 'Configurar modo offline' })).toBeVisible();
+  await expect(page.locator('.schedule-config-launch').filter({ hasText: 'Cadastro offline' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sync', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Configurar modo offline' }).click();
+  const offlineDialog = page.getByRole('dialog', { name: 'Cadastro offline' });
+  await expect(offlineDialog).toBeVisible();
+  await expect(offlineDialog.getByLabel('Permitir cadastros sem internet')).not.toBeChecked();
+  await offlineDialog.getByLabel('Permitir cadastros sem internet').check();
+  await offlineDialog.getByRole('button', { name: 'Aplicar configuracao' }).click();
+  await page.getByRole('button', { name: 'Salvar configuracao' }).click();
+  await expect(page.getByRole('button', { name: 'Sync', exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
   await page.setViewportSize({ width: 900, height: 768 });
   const compactOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(compactOverflow).toBeLessThanOrEqual(1);
+  await page.context().setOffline(true);
+  await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await expect(page.locator('#lead-form')).toBeVisible();
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeDisabled();
+  await expect(page.getByText(/somente os dados do lead serao salvos/i)).toBeVisible();
+  await page.context().setOffline(false);
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {

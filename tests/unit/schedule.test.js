@@ -23,6 +23,7 @@ describe('store schedule helpers', () => {
       rescheduleAfterMinutes: 30,
       automaticPendingFollowUp: false,
       showAmetropiaFields: false,
+      offlineCaptureEnabled: false,
       ophthalmologyRoutingEnabled: true,
       ophthalmologyMinimumAge: 55,
       ophthalmologyWeekdays: [6],
@@ -183,6 +184,12 @@ describe('store schedule helpers', () => {
     expect(normalizeStoreSchedule({}).showAmetropiaFields).toBe(false);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'true' }).showAmetropiaFields).toBe(true);
     expect(normalizeStoreSchedule({ showAmetropiaFields: 'false' }).showAmetropiaFields).toBe(false);
+  });
+
+  it('keeps offline capture disabled by default and accepts explicit activation', () => {
+    expect(normalizeStoreSchedule({}).offlineCaptureEnabled).toBe(false);
+    expect(normalizeStoreSchedule({ offlineCaptureEnabled: 'true' }).offlineCaptureEnabled).toBe(true);
+    expect(normalizeStoreSchedule({ offlineCaptureEnabled: 'false' }).offlineCaptureEnabled).toBe(false);
   });
 
   it('limits ophthalmology availability to configured days and hours', () => {

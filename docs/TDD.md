@@ -4,9 +4,9 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.0 |
+| Versao | 2.1 |
 | Status | Em implementacao |
-| Data | 22/10/2026 |
+| Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
 
 ### Manutencao deste documento
@@ -21,13 +21,13 @@
 
 O FascinLead e uma aplicacao web progressiva (PWA) para substituir fichas de papel usadas por colaboradores durante a captacao de potenciais clientes na rua.
 
-O sistema permite o cadastro rapido mesmo sem internet. Quando a conexao e restabelecida, os registros pendentes sao sincronizados com a nuvem. A reserva de data e horario exige confirmacao online da agenda para evitar dupla ocupacao. O produto nao e um CRM completo: seu foco e registrar, consultar, agendar e encaminhar contatos captados para a equipe responsavel.
+O sistema permite cadastro rapido e oferece uma capacidade experimental de captacao sem internet, controlada por loja e desativada por padrao. Quando habilitada, os registros pendentes sao sincronizados com a nuvem ao restabelecer a conexao. A reserva de data e horario sempre exige conexao para evitar dupla ocupacao. O produto nao e um CRM completo: seu foco e registrar, consultar, agendar e encaminhar contatos captados para a equipe responsavel.
 
 ### 1.1 Objetivos
 
 - Reduzir o tempo gasto no cadastro durante uma abordagem.
 - Eliminar perda, rasura e digitacao posterior de fichas em papel.
-- Permitir uso confiavel sem internet.
+- Evoluir o uso sem internet de forma controlada, sem comprometer o fluxo online.
 - Identificar colaborador, loja, data e origem de cada captacao.
 - Centralizar os registros na nuvem quando houver conexao.
 - Entregar uma interface simples para celular e instalavel como aplicativo.
@@ -109,12 +109,12 @@ Receita, fotos e geolocalizacao exata nao fazem parte do MVP. CPF, RG e os dados
 
 ### RF-03 - Operacao offline
 
-- O formulario devera abrir e salvar sem conexao depois que o aplicativo tiver sido carregado ao menos uma vez.
-- Um registro salvo offline devera aparecer imediatamente em `Meus cadastros`.
-- Sem conexao confirmada com o Firestore, data e horario ficam bloqueados e vazios; o usuario salva o lead, nao um agendamento.
-- O lead sem agenda aparece em `Meus cadastros` e em `Sync` como `Aguardando agendamento`.
-- O usuario devera enxergar claramente se cada item esta pendente, sincronizando, sincronizado ou com erro.
-- Fechar e reabrir o aplicativo nao podera apagar registros pendentes.
+- O cadastro offline e uma capacidade experimental por loja, desativada por padrao.
+- Com a capacidade desativada, novos cadastros exigem conexao e a rota, o cartao e o item de navegacao `Sync` ficam ocultos.
+- Um administrador pode ativar a capacidade em `Configuracoes > Agenda > Cadastro offline`.
+- Quando ativa, a capacidade permite salvar somente os dados do lead sem conexao; data e horario permanecem bloqueados e vazios.
+- A mudanca de conectividade com o formulario aberto nao pode apagar os demais campos preenchidos.
+- Desativar a capacidade nao apaga escritas que ja estejam pendentes no cache do Firestore.
 
 ### RF-04 - Sincronizacao
 
@@ -438,6 +438,7 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
   "ophthalmologyHoursRules": [{ "weekday": 6, "openingTime": "08:00", "closingTime": "12:00" }],
   "transportEnabled": false,
   "transportHoursRules": [],
+  "offlineCaptureEnabled": false,
   "openingTime": "08:00",
   "closingTime": "18:00",
   "active": true,
@@ -450,7 +451,7 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
 
 Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos.
 
-O cadastro e a reserva nao sao criados no mesmo lote. Primeiro o lead e persistido sem horario confirmado; depois o documento e atualizado com o horario escolhido e, em uma operacao separada, todos os blocos sao reservados. Essa separacao evita exceder o limite de avaliacao das regras do Firestore em servicos com varios blocos. Se a reserva falhar, a confirmacao e desfeita e o lead permanece com `appointmentReservation.status = pending` em `Sync`.
+No fluxo online atual, o cadastro e todos os blocos exigidos pelo servico sao gravados no mesmo lote. Se qualquer bloco ja estiver ocupado, o lote inteiro falha e o usuario escolhe outro horario. O cadastro offline nunca inclui data, horario ou documentos em `appointmentSlots`.
 
 ```json
 {
@@ -564,12 +565,6 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "appointmentSchedulingMode": "controlled",
   "appointmentDate": "2026-10-02",
   "appointmentTime": "14:30",
-  "appointmentReservation": {
-    "status": "confirmed",
-    "reason": "",
-    "requestedDate": "",
-    "requestedTime": ""
-  },
   "appointmentAttendance": "pending",
   "appointmentAttendanceUpdatedAt": "Timestamp opcional",
   "appointmentAttendanceUpdatedByUid": "firebase-uid-gestor opcional",
@@ -597,7 +592,7 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
 
 `phoneSearch` facilita a busca autorizada, mas nao deve ser exibido como campo separado. Nao sera criada uma chave unica baseada no telefone, pois uma mesma pessoa pode ser abordada legitimamente em momentos diferentes.
 
-Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem vazios e `appointmentReservation` usa `status: pending`, `reason: offline` e solicitacao vazia. `reason: confirming` representa uma reserva em confirmacao; `reason: conflict` informa que os blocos solicitados foram ocupados por outra gravacao.
+Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem vazios. A escolha posterior de horario ocorre somente online e cria os documentos correspondentes em `appointmentSlots`.
 
 ### 7.7 Colecao `roleProfiles`
 
@@ -686,44 +681,37 @@ Novos indices somente deverao ser adicionados a partir de consultas reais. Cada 
 
 ### 8.1 Persistencia
 
-O Firestore sera inicializado com cache persistente em IndexedDB. Alem do cache do SDK, o FascinLead mantem uma caixa de saida propria em IndexedDB para impedir que uma escrita otimista desapareca da interface quando a nuvem rejeitar o documento. Ao salvar:
+O Firestore e inicializado com cache persistente em IndexedDB. Nesta etapa, nao existe uma caixa de saida adicional mantida pela aplicacao. Quando o cadastro offline estiver habilitado para a loja:
 
 1. O formulario valida e normaliza os dados.
 2. O navegador gera um UUID.
-3. A caixa de saida preserva o documento completo antes da tentativa de envio.
+3. Data e horario sao removidos da gravacao offline.
 4. O Firestore grava o documento no cache local.
-5. A interface mescla caixa de saida e snapshot para confirmar o cadastro imediatamente.
-6. O item recebe estado visual `Pendente` enquanto a nuvem nao confirmar a escrita.
-7. Quando houver conexao, o SDK envia a escrita ao Firestore.
-8. O item passa para `Sincronizado` e sai da caixa de saida somente depois de um snapshot confirmado pelo servidor que nao possua uma correcao local com erro.
-9. Se a nuvem rejeitar a escrita, a versao local tem precedencia visual sobre uma versao remota mais antiga; o item permanece em `Meus cadastros` e `Sync` com estado `Erro` e pode ser reenviado integralmente sem alterar `createdAtServer`.
+5. O snapshot local exibe o item como `Pendente` enquanto a nuvem nao confirmar a escrita.
+6. Quando houver conexao, o SDK envia a escrita ao Firestore.
+7. O item passa para `Sincronizado` depois da confirmacao do servidor.
+8. Se a nuvem rejeitar a escrita, a interface informa a falha de carregamento. Uma estrategia duravel de recuperacao e reenvio ainda devera ser projetada antes de tornar o recurso padrao.
 
-O agendamento segue um fluxo deliberadamente diferente:
+O agendamento nao opera offline:
 
-1. Sem snapshot confirmado do servidor, data e horario ficam desabilitados.
-2. O lead offline e gravado com `appointmentReservation.status = pending` e sem data ou horario solicitado.
-3. Ao voltar online, o captador abre o lead e consulta a disponibilidade atual.
-4. Online, o sistema persiste primeiro o lead pendente com UUID definitivo.
-5. Somente depois da confirmacao remota confirma o horario no lead e tenta reservar, em um segundo lote, todos os blocos de 10 minutos.
-6. Se algum bloco estiver ocupado, o lote falha, a confirmacao do horario e desfeita e o documento do lead permanece com `reason = conflict`.
-7. Se a conexao oscilar durante a confirmacao, o lead permanece em `Sync` para conclusao posterior.
+1. Sem conexao, data e horario ficam desabilitados e vazios.
+2. Ao voltar online, o captador abre o cadastro e consulta a disponibilidade atual.
+3. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
+4. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.
 
 ### 8.2 Estados exibidos
 
 | Estado | Significado | Acao disponivel |
 | --- | --- | --- |
 | Pendente | Salvo no aparelho e ainda nao confirmado na nuvem | Aguardar ou sincronizar |
-| Sincronizando | Envio em andamento | Aguardar |
 | Sincronizado | Confirmado pelo Firestore | Nenhuma |
-| Erro | Rejeitado por permissao, validacao ou falha nao transitoria | Ver detalhe e tentar novamente |
-| Aguardando agendamento | Lead preservado sem data e horario | Conectar, contatar o cliente e escolher um horario |
-| Horario ocupado | Lead preservado, mas a reserva perdeu uma disputa | Escolher outra data ou horario |
+| Local de teste | Registro criado somente no modo de desenvolvimento | Nenhuma |
 
 O estado de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento.
 
-Na tela `Sync`, cada lead aparece em um unico cartao, mesmo quando possui simultaneamente erro de sincronizacao e agendamento pendente. O cartao combina a causa tecnica, os dados do horario solicitado e as acoes de WhatsApp e escolha de horario.
+Na tela `Sync`, os totais de documentos sincronizados e pendentes sao exibidos com a acao manual de sincronizacao. A tela so e acessivel quando o cadastro offline estiver habilitado para a loja.
 
-Enquanto o formulario de nova captacao estiver aberto, seus valores sao mantidos como rascunho em memoria antes de qualquer nova renderizacao. Atualizacoes de snapshot, configuracao, conectividade ou aviso visual nao podem apagar os campos ja preenchidos.
+Enquanto o formulario de nova captacao estiver aberto, uma mudanca de conectividade atualiza somente o aviso e os controles da agenda, preservando os demais campos preenchidos.
 
 ### 8.3 Acao `Sincronizar agora`
 
@@ -731,15 +719,13 @@ A acao devera:
 
 1. verificar se o navegador declara conexao;
 2. habilitar a rede do Firestore;
-3. reenviar documentos completos que estejam na caixa de saida com erro;
-4. aguardar as escritas pendentes com limite de tempo;
-5. falhar, sem anunciar sucesso, se alguma escrita individual for rejeitada;
-6. atualizar a contagem e o horario da ultima confirmacao;
-7. manter os registros localmente se o envio nao for concluido.
+3. aguardar as escritas pendentes do SDK;
+4. falhar, sem anunciar sucesso, se a operacao nao for concluida;
+5. manter o cache local se o envio continuar pendente.
 
 ### 8.4 Conflitos
 
-Edicoes comuns do mesmo documento usam a ultima alteracao aceita. Reservas de agenda nao usam `ultima escrita vence`: documentos deterministico de `appointmentSlots` impedem sobrescrever blocos ocupados. A falha da reserva nunca deve excluir o lead, que permanece na lista e em `Sync`.
+Edicoes comuns do mesmo documento usam a ultima alteracao aceita. Reservas de agenda nao usam `ultima escrita vence`: documentos deterministicos de `appointmentSlots` impedem sobrescrever blocos ocupados. Como a reserva exige conexao, o cadastro offline nunca cria ou disputa blocos da agenda.
 
 Transporte, escala da loja, agenda oftalmologica, limite diario e cotas do MEI sao validados novamente no momento da escolha do horario. A interface filtra opcoes, enquanto regras e lotes do Firestore protegem a disputa entre dispositivos.
 
@@ -892,8 +878,8 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - calculo de blocos consecutivos, escalas semanais e duracao por servico;
 - limites diarios e cotas do MEI por manha e tarde;
 - triagem oftalmologica, transporte e retornos;
-- serializacao de leads pendentes sem data e horario.
-- mesclagem da caixa de saida com snapshots locais e remotos sem esconder leads rejeitados.
+- serializacao de leads pendentes sem data e horario;
+- normalizacao do sinalizador de cadastro offline, desativado por padrao.
 
 ### 14.2 Regras e integracao
 
@@ -903,8 +889,8 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - usuario nao altera seu perfil ou papel;
 - lead invalido e rejeitado;
 - UUID repetido nao cria duplicata;
-- escrita offline reaparece apos reiniciar a pagina e sincroniza ao voltar online.
-- lead offline sem agenda e aceito com `appointmentReservation` pendente;
+- cadastro offline e rejeitado pela interface quando a capacidade da loja esta desativada;
+- lead offline habilitado e aceito sem data, horario ou reserva;
 - reserva concorrente nao sobrescreve blocos ocupados e nao remove o lead;
 - administrador conserva todas as permissoes e demais perfis respeitam o escopo configurado;
 - API rejeita token ausente ou invalido;
@@ -916,9 +902,10 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - primeiro login online;
 - instalacao do PWA;
 - cadastro online;
-- cadastro e consulta offline;
+- bloqueio do cadastro offline por padrao;
+- cadastro e consulta offline quando a capacidade da loja estiver ativa;
 - data e horario bloqueados quando a agenda nao foi confirmada pelo servidor;
-- lead offline listado em Cadastros e Sync e agendado depois da reconexao;
+- navegacao `Sync` oculta quando a capacidade estiver desativada e visivel quando ativa;
 - disputa de horario entre dispositivos preserva o lead perdedor;
 - retorno da conexao e confirmacao da sincronizacao;
 - correcao de cadastro pendente;

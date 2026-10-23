@@ -157,17 +157,15 @@ A versao `v1` usa consulta ativa do CRM (polling) e nao oferece webhooks nem eve
 
 O indice de todas as interfaces, incluindo a Callable Function `updateTeamMemberPassword`, dependencias externas e fronteiras que nao sao APIs publicas, esta em [`docs/API-CATALOG.md`](docs/API-CATALOG.md).
 
-## Offline primeiro
+## Operacao offline controlada
 
-O modo offline e o requisito central do FascinLead, nao uma funcionalidade secundaria.
+O cadastro offline e um recurso experimental configurado por loja e permanece desativado por padrao. Com o recurso desligado, novos cadastros exigem internet e a pagina **Sync** fica oculta.
 
-Depois do primeiro acesso online, o aplicativo devera abrir e permitir novos cadastros sem conexao. Os dados serao mantidos no IndexedDB por meio do SDK do Firestore. A sincronizacao sera tentada ao salvar online, abrir o aplicativo, recuperar a conexao, voltar ao primeiro plano e tocar em `Sincronizar agora`.
-
-Antes de enviar, o FascinLead tambem preserva o documento completo em uma caixa de saida propria no IndexedDB. A copia so e removida depois da confirmacao do servidor e nunca e descartada enquanto houver uma correcao local com erro. Se regras ou validacoes recusarem a escrita, o lead continua em **Meus cadastros** e aparece uma unica vez em **Sync**, reunindo erro e pendencia de agendamento no mesmo cartao, podendo ser reenviado sem redigitar os dados.
+Quando um administrador ativa o recurso em **Configuracoes > Agenda > Cadastro offline**, o aplicativo permite salvar somente os dados do lead sem conexao. Data e horario continuam bloqueados, pois o agendamento depende da disponibilidade atual da loja, do transporte, das cotas e das escalas. Os dados pendentes sao mantidos pelo cache persistente do SDK do Firestore e enviados quando a conexao retorna.
 
 Cada cadastro tera um UUID criado no dispositivo. Novas tentativas usarao o mesmo identificador para evitar duplicacao.
 
-O sistema nao dependera de sincronizacao em segundo plano com o aplicativo fechado, pois navegadores moveis nao garantem essa execucao.
+O sistema nao depende de sincronizacao em segundo plano com o aplicativo fechado, pois navegadores moveis nao garantem essa execucao.
 
 ## Seguranca e privacidade
 

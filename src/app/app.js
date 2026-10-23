@@ -137,6 +137,7 @@ const state = {
   unsubscribeLeads: null,
   unsubscribeAppointments: null,
   unsubscribeStoreSchedule: null,
+  unsubscribeOfflineCapture: null,
   unsubscribeFollowUpSchedule: null,
   unsubscribeFollowUpLeads: null,
   unsubscribeDayAppointments: null,
@@ -189,6 +190,10 @@ const state = {
     loading: false,
     storeId: '',
     settings: { ...DEFAULT_STORE_SCHEDULE }
+  },
+  offlineCapture: {
+    loaded: false,
+    enabled: false
   },
   followUps: {
     loaded: false,
@@ -389,7 +394,7 @@ function canAccessRoute(route) {
     new: () => hasAccess('leads.create'),
     leads: () => hasAccess('leads.view_own'),
     lead: () => hasAccess('leads.view_own'),
-    sync: () => hasAccess('leads.create') || hasAccess('leads.edit_own'),
+    sync: () => state.offlineCapture.enabled && (hasAccess('leads.create') || hasAccess('leads.edit_own')),
     'follow-ups': () => hasAccess('followups.own') || hasAccess('followups.team'),
     management: () => hasAccess('management.view'),
     'management-lead': () => hasAccess('management.view'),
@@ -652,6 +657,9 @@ function appointmentTimeField() {
     ? ophthalmologyAppointmentSchedule(settings)
     : settings;
   const serviceSchedule = { ...baseSchedule, appointmentDurationMinutes: service.durationMinutes };
+  if (!navigator.onLine) {
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Conecte-se para consultar os horarios</option></select><small class="field-error"></small><small class="schedule-availability">Agendamentos exigem conexao com a agenda atualizada.</small></div>`;
+  }
   if (ophthalmologyDateBlocked) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmologico.</small></div>`;
   }
@@ -920,6 +928,13 @@ function bindBirthDateInput(form) {
 }
 
 function newLeadView() {
+  if (!navigator.onLine && !state.offlineCapture.enabled) {
+    return `
+      <section class="page-toolbar">
+        <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
+      </section>
+      <div class="empty-state"><i data-lucide="wifi-off"></i><strong>Cadastro offline desativado</strong><p>Conecte-se a internet para iniciar um novo cadastro. Esta protecao evita registros incompletos enquanto o modo offline esta em refinamento.</p></div>`;
+  }
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   const selectedService = selectedNewLeadService();
   const availableServices = servicesForStore(state.newLeadSchedule.services, state.profile.storeId);
@@ -931,6 +946,7 @@ function newLeadView() {
       <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
     </section>
     <form id="lead-form" class="form-panel" novalidate>
+      <div class="notice notice-warning" data-offline-capture-notice ${navigator.onLine ? 'hidden' : ''}><i data-lucide="wifi-off"></i><span>Cadastro offline ativo. Os dados do lead serao preservados, mas data e horario so poderao ser escolhidos com internet.</span></div>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
       ${triageConfigFields(state.newLeadSchedule.settings)}
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
@@ -1005,7 +1021,7 @@ function newLeadView() {
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
       ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine ? '' : 'disabled'} /><small class="schedule-date-status">${navigator.onLine ? '' : 'Conecte-se para escolher uma data.'}</small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
       <div class="field" data-field="notes">
@@ -1015,7 +1031,7 @@ function newLeadView() {
         <small class="field-error"></small>
       </div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar cadastro</span></button>
-      <p class="form-footnote"><i data-lucide="shield-check"></i> O cadastro sera preservado neste aparelho se a conexao falhar.</p>
+      <p class="form-footnote"><i data-lucide="shield-check"></i> ${state.offlineCapture.enabled ? 'Quando offline, somente os dados do lead serao salvos; o agendamento sera feito depois.' : 'O cadastro exige conexao com a internet nesta loja.'}</p>
     </form>`;
 }
 
@@ -1827,6 +1843,11 @@ function scheduleSettingsView() {
             <span><strong>Transporte</strong><small data-transport-summary>${selected.transportEnabled ? `${selected.transportHoursRules.length} ${selected.transportHoursRules.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
             <button class="button button-secondary" type="button" data-transport-open><i data-lucide="wrench"></i><span>Configurar transporte</span></button>
           </div>
+          <div class="schedule-config-launch">
+            <span class="schedule-config-launch-icon"><i data-lucide="hard-drive"></i></span>
+            <span><strong>Cadastro offline</strong><small data-offline-capture-summary>${selected.offlineCaptureEnabled ? 'Ativado' : 'Desativado'}</small></span>
+            <button class="button button-secondary" type="button" data-offline-capture-open><i data-lucide="wrench"></i><span>Configurar modo offline</span></button>
+          </div>
         </div>
         <dialog id="general-schedule-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="general-schedule-title">
           <header><div><span class="eyebrow">AGENDA</span><h2 id="general-schedule-title">Configuracoes gerais</h2><p>Defina a disponibilidade e as regras gerais da agenda.</p></div><button class="icon-button" type="button" data-general-schedule-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
@@ -1924,6 +1945,19 @@ function scheduleSettingsView() {
             <fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte esta disponivel.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Inicio</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
           </div>
           <footer><span>Nao define viagens nem fechamento do veiculo.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-transport-close>Cancelar</button><button class="button button-primary" type="button" data-transport-apply><i data-lucide="check"></i><span>Aplicar transporte</span></button></div></footer>
+        </dialog>
+        <dialog id="offline-capture-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="offline-capture-title">
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="offline-capture-title">Cadastro offline</h2><p>Controle se a equipe pode cadastrar leads sem conexao nesta loja.</p></div><button class="icon-button" type="button" data-offline-capture-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <div class="schedule-rule-dialog-body">
+            <input name="offlineCaptureEnabled" type="hidden" value="false" />
+            <label class="setting-toggle checkbox-label" for="settings-offline-capture-enabled">
+              <span><strong>Permitir cadastros sem internet</strong><small>Quando ativo, somente os dados do lead podem ser salvos offline. Data e horario continuam bloqueados.</small></span>
+              <input id="settings-offline-capture-enabled" name="offlineCaptureEnabled" type="checkbox" value="true" ${selected.offlineCaptureEnabled ? 'checked' : ''} />
+              <span class="setting-toggle-control" aria-hidden="true"></span>
+            </label>
+            <div class="notice notice-info"><i data-lucide="info"></i><span>Ao desativar, a pagina Sync fica oculta e novos cadastros exigem conexao. Registros que ja estiverem pendentes nao sao apagados.</span></div>
+          </div>
+          <footer><span>O recurso permanece desativado por padrao.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-offline-capture-close>Cancelar</button><button class="button button-primary" type="button" data-offline-capture-apply><i data-lucide="check"></i><span>Aplicar configuracao</span></button></div></footer>
         </dialog>
         <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
       </form>
@@ -2277,6 +2311,37 @@ function syncConnectivityIndicator() {
   createIcons({ icons: appIcons });
 }
 
+function handleConnectivityChange() {
+  syncConnectivityIndicator();
+  if (state.route !== 'new') return;
+
+  const form = document.querySelector('#lead-form');
+  if (!form) {
+    render();
+    return;
+  }
+
+  const online = navigator.onLine;
+  const blocked = !online && !state.offlineCapture.enabled;
+  const notice = form.querySelector('[data-offline-capture-notice]');
+  const dateInput = form.elements.appointmentDate;
+  const submitButton = form.querySelector('[type="submit"]');
+  if (notice) {
+    notice.hidden = online;
+    notice.querySelector('span').textContent = blocked
+      ? 'Cadastro offline desativado. Reconecte-se antes de salvar este cadastro.'
+      : 'Cadastro offline ativo. Os dados do lead serao preservados, mas data e horario so poderao ser escolhidos com internet.';
+  }
+  if (!online) {
+    state.newLeadSchedule.appointmentDate = '';
+    dateInput.value = '';
+  }
+  dateInput.disabled = !online;
+  submitButton.disabled = blocked;
+  refreshAppointmentTimeControl();
+  createIcons({ icons: appIcons });
+}
+
 function showToast(message, tone = 'success', icon = 'circle-check') {
   state.toast = { message, tone, icon };
   render();
@@ -2331,7 +2396,16 @@ function bindPageEvents() {
     });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = enrichLeadTriage(leadFormValues(form), state.newLeadSchedule.settings);
+      if (!navigator.onLine && !state.offlineCapture.enabled) {
+        showToast('O cadastro offline esta desativado. Reconecte-se para salvar.', 'danger', 'wifi-off');
+        return;
+      }
+      const rawValues = leadFormValues(form);
+      if (!navigator.onLine) {
+        rawValues.appointmentDate = '';
+        rawValues.appointmentTime = '';
+      }
+      const values = enrichLeadTriage(rawValues, state.newLeadSchedule.settings);
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
         const selectedSlot = buildAppointmentSlots({
@@ -2375,7 +2449,11 @@ function bindPageEvents() {
       }
       form.reset();
       navigate('leads');
-      showToast(state.demoMode ? 'Cadastro salvo somente neste navegador.' : 'Cadastro salvo. A sincronizacao seguira automaticamente.');
+      showToast(state.demoMode
+        ? 'Cadastro salvo somente neste navegador.'
+        : navigator.onLine
+          ? 'Cadastro salvo com sucesso.'
+          : 'Cadastro salvo neste aparelho. Ele sera sincronizado quando a internet voltar.');
     });
   }
 
@@ -3364,6 +3442,35 @@ function bindPageEvents() {
         : 'Desativado';
       transportDialog.close();
     });
+    const offlineCaptureDialog = document.querySelector('#offline-capture-dialog');
+    const offlineCaptureEnabledInput = document.querySelector('#settings-offline-capture-enabled');
+    const syncOfflineCaptureDraft = () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (!record || !offlineCaptureDialog) return;
+      offlineCaptureEnabledInput.checked = record.offlineCaptureEnabled;
+    };
+    const discardOfflineCaptureDraft = () => {
+      syncOfflineCaptureDraft();
+      offlineCaptureDialog.close();
+    };
+    document.querySelector('[data-offline-capture-open]')?.addEventListener('click', () => {
+      syncOfflineCaptureDraft();
+      offlineCaptureDialog?.showModal();
+    });
+    offlineCaptureDialog?.querySelectorAll('[data-offline-capture-close]').forEach((button) => {
+      button.addEventListener('click', discardOfflineCaptureDraft);
+    });
+    offlineCaptureDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      discardOfflineCaptureDraft();
+    });
+    offlineCaptureDialog?.querySelector('[data-offline-capture-apply]')?.addEventListener('click', () => {
+      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
+      if (!record) return;
+      record.offlineCaptureEnabled = offlineCaptureEnabledInput.checked;
+      document.querySelector('[data-offline-capture-summary]').textContent = record.offlineCaptureEnabled ? 'Ativado' : 'Desativado';
+      offlineCaptureDialog.close();
+    });
     scheduleSettingsForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (state.settings.saving) return;
@@ -3375,6 +3482,7 @@ function bindPageEvents() {
       values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
       values.ophthalmologyRoutingEnabled = values.ophthalmologyRoutingEnabled === 'true';
       values.transportEnabled = values.transportEnabled === 'true';
+      values.offlineCaptureEnabled = values.offlineCaptureEnabled === 'true';
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       values.storeHoursRules = JSON.parse(values.storeHoursRules || '[]');
@@ -3433,11 +3541,13 @@ function bindPageEvents() {
             ophthalmologyPathologyIds: values.ophthalmologyPathologyIds,
             ophthalmologySurgeryIds: values.ophthalmologySurgeryIds,
             transportEnabled: values.transportEnabled,
-            transportHoursRules: values.transportHoursRules
+            transportHoursRules: values.transportHoursRules,
+            offlineCaptureEnabled: values.offlineCaptureEnabled
           });
           if (values.storeId === state.profile.storeId) {
             state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
             state.followUps.settings = { ...state.followUps.settings, ...record };
+            state.offlineCapture = { loaded: true, enabled: record.offlineCaptureEnabled };
           }
         } else {
           const result = await saveStoreSchedule(state.profile, values.storeId, values);
@@ -3448,6 +3558,9 @@ function bindPageEvents() {
           }
           const record = state.settings.records.find((item) => item.id === values.storeId);
           Object.assign(record, result.data);
+          if (values.storeId === state.profile.storeId) {
+            state.offlineCapture = { loaded: true, enabled: result.data.offlineCaptureEnabled };
+          }
         }
         state.settings.saving = false;
         render();
@@ -3561,6 +3674,33 @@ function subscribeProfileLeads() {
       render();
     }
   );
+}
+
+function stopOfflineCaptureSubscription() {
+  state.unsubscribeOfflineCapture?.();
+  state.unsubscribeOfflineCapture = null;
+}
+
+function startOfflineCaptureSubscription() {
+  stopOfflineCaptureSubscription();
+  state.offlineCapture = { loaded: state.demoMode, enabled: false };
+  if (!state.profile || state.demoMode) return;
+
+  try {
+    state.unsubscribeOfflineCapture = subscribeToStoreSchedule(
+      state.profile,
+      (settings) => {
+        state.offlineCapture = { loaded: true, enabled: settings.offlineCaptureEnabled };
+        render();
+      },
+      () => {
+        state.offlineCapture = { loaded: true, enabled: false };
+        render();
+      }
+    );
+  } catch {
+    state.offlineCapture = { loaded: true, enabled: false };
+  }
 }
 
 function stopFollowUpScheduleSubscription() {
@@ -4130,6 +4270,7 @@ async function handleAction(action) {
     state.authError = '';
     state.authMessage = '';
     subscribeProfileLeads();
+    startOfflineCaptureSubscription();
     startFollowUpScheduleSubscription();
     navigate('home');
     render();
@@ -4192,6 +4333,7 @@ async function handleAction(action) {
     state.unsubscribeLeads = null;
     stopAppointmentsSubscription();
     stopNewLeadScheduleSubscriptions();
+    stopOfflineCaptureSubscription();
     stopFollowUpScheduleSubscription();
     sessionStorage.removeItem(DEMO_SESSION_KEY);
     await signOutUser();
@@ -4248,6 +4390,7 @@ async function handleAction(action) {
       storeId: '',
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
+    state.offlineCapture = { loaded: false, enabled: false };
     state.followUps = {
       loaded: false,
       error: '',
@@ -4956,8 +5099,8 @@ export async function startApp() {
     ensureSettingsData();
   });
 
-  window.addEventListener('online', syncConnectivityIndicator);
-  window.addEventListener('offline', syncConnectivityIndicator);
+  window.addEventListener('online', handleConnectivityChange);
+  window.addEventListener('offline', handleConnectivityChange);
   window.addEventListener('resize', syncAgendaSidebarHeight);
   window.setInterval(() => {
     if (['captor', 'manager', 'admin'].includes(state.profile?.role) && ['home', 'follow-ups'].includes(state.route)) render();
@@ -4973,6 +5116,7 @@ export async function startApp() {
     state.profile = createDemoProfile();
     state.loading = false;
     subscribeProfileLeads();
+    startOfflineCaptureSubscription();
     startFollowUpScheduleSubscription();
     render();
     return;
@@ -4987,6 +5131,7 @@ export async function startApp() {
   observeAuth(async (firebaseUser) => {
     state.unsubscribeProfile?.();
     state.unsubscribeProfile = null;
+    stopOfflineCaptureSubscription();
     state.loading = true;
     render();
     if (!firebaseUser) {
@@ -5001,6 +5146,7 @@ export async function startApp() {
       state.demoMode = false;
       state.authError = '';
       subscribeProfileLeads();
+      startOfflineCaptureSubscription();
       startFollowUpScheduleSubscription();
       state.unsubscribeProfile = observeAuthorizedProfile(firebaseUser, (profile) => {
         if (profileAccessSignature(profile) === profileAccessSignature(state.profile)) return;
@@ -5012,6 +5158,7 @@ export async function startApp() {
         state.settings.loaded = false;
         if (!hasAccess('appointments.view')) stopAppointmentsSubscription();
         subscribeProfileLeads();
+        startOfflineCaptureSubscription();
         startFollowUpScheduleSubscription();
         render();
         ensureManagementData();
