@@ -163,7 +163,7 @@ O modo offline e o requisito central do FascinLead, nao uma funcionalidade secun
 
 Depois do primeiro acesso online, o aplicativo devera abrir e permitir novos cadastros sem conexao. Os dados serao mantidos no IndexedDB por meio do SDK do Firestore. A sincronizacao sera tentada ao salvar online, abrir o aplicativo, recuperar a conexao, voltar ao primeiro plano e tocar em `Sincronizar agora`.
 
-Antes de enviar, o FascinLead tambem preserva o documento completo em uma caixa de saida propria no IndexedDB. A copia so e removida depois da confirmacao do servidor. Se regras ou validacoes recusarem a escrita, o lead continua em **Meus cadastros** e aparece em **Sync** como erro, podendo ser reenviado sem redigitar os dados.
+Antes de enviar, o FascinLead tambem preserva o documento completo em uma caixa de saida propria no IndexedDB. A copia so e removida depois da confirmacao do servidor e nunca e descartada enquanto houver uma correcao local com erro. Se regras ou validacoes recusarem a escrita, o lead continua em **Meus cadastros** e aparece uma unica vez em **Sync**, reunindo erro e pendencia de agendamento no mesmo cartao, podendo ser reenviado sem redigitar os dados.
 
 Cada cadastro tera um UUID criado no dispositivo. Novas tentativas usarao o mesmo identificador para evitar duplicacao.
 

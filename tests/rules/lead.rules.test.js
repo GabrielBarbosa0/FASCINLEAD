@@ -169,6 +169,58 @@ describe('lead correction rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('lets the captor confirm an appointment that was saved offline', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'leads', 'offline-lead'), {
+        fullName: 'Cliente Offline',
+        phone: '+5581999995678',
+        phoneSearch: '81999995678',
+        notes: '',
+        appointmentDate: '',
+        appointmentTime: '',
+        appointmentSchedulingMode: 'controlled',
+        appointmentDurationMinutes: 20,
+        appointmentReservation: {
+          status: 'pending',
+          reason: 'offline',
+          requestedDate: '',
+          requestedTime: ''
+        },
+        source: 'street',
+        schemaVersion: 1,
+        capturedByUid: 'captor-uid',
+        capturedByName: 'Captador Teste',
+        storeId: 'loja-06',
+        capturedAtClient: '2026-10-22T12:00:00.000Z',
+        createdAtServer: Timestamp.now(),
+        updatedAtServer: Timestamp.now()
+      });
+    });
+
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'offline-lead'), {
+      appointmentDate: '2026-10-24',
+      appointmentTime: '08:00',
+      appointmentReservation: { status: 'confirmed', reason: '', requestedDate: '', requestedTime: '' },
+      updatedAtServer: Timestamp.now()
+    }));
+
+    const batch = writeBatch(db);
+    for (const blockTime of ['08:00', '08:10']) {
+      batch.set(doc(db, 'appointmentSlots', `slot-loja-06-2026-10-24-${blockTime}`), {
+        storeId: 'loja-06',
+        appointmentDate: '2026-10-24',
+        appointmentTime: '08:00',
+        blockTime,
+        durationMinutes: 20,
+        leadId: 'offline-lead',
+        capturedByUid: 'captor-uid',
+        createdAt: Timestamp.now()
+      });
+    }
+    await assertSucceeds(batch.commit());
+  });
+
   it('lets the captor correct editable fields in their own lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {

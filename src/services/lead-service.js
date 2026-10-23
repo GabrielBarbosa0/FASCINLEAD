@@ -30,8 +30,10 @@ export function mergeLeadSources(remoteLeads, localLeads) {
   }]));
   for (const lead of remoteLeads || []) {
     const local = merged.get(lead.id);
-    merged.set(lead.id, lead.syncState === 'synced'
+    merged.set(lead.id, lead.syncState === 'synced' && local?.syncState !== 'error'
       ? lead
+      : local?.syncState === 'error'
+        ? { ...lead, ...local, fromCache: lead.fromCache }
       : { ...local, ...lead, syncState: lead.syncState || local?.syncState || 'pending' });
   }
   return [...merged.values()].sort((left, right) => (
@@ -69,7 +71,7 @@ function retryLeadData(localLead) {
     id,
     data: {
       ...data,
-      createdAtServer: serverTimestamp(),
+      createdAtServer: createdAtServer || serverTimestamp(),
       updatedAtServer: serverTimestamp()
     }
   };
@@ -77,16 +79,16 @@ function retryLeadData(localLead) {
 
 async function retryFailedLocalLeads(capturedByUid) {
   const failedLeads = (await listLocalLeads(capturedByUid)).filter((lead) => lead.syncState === 'error');
-  return failedLeads.map((localLead) => preserveLocalLead({
-    ...localLead,
-    syncState: 'pending',
-    syncError: ''
-  }).then(() => {
+  return failedLeads.map((localLead) => {
     const retry = retryLeadData(localLead);
-    let write;
-    if (retry.data.appointmentSchedulingMode === 'controlled'
-      && retry.data.appointmentDate
-      && retry.data.appointmentTime) {
+    const write = (async () => {
+      await setDoc(doc(db, 'leads', retry.id), retry.data, { merge: true });
+      if (retry.data.appointmentSchedulingMode !== 'controlled'
+        || !retry.data.appointmentDate
+        || !retry.data.appointmentTime) {
+        await removeLocalLeads([retry.id]);
+        return;
+      }
       const durationMinutes = Number(retry.data.appointmentDurationMinutes) || 20;
       const blocks = reservationBlocks(
         retry.data.storeId,
@@ -95,7 +97,6 @@ async function retryFailedLocalLeads(capturedByUid) {
         durationMinutes
       );
       const batch = writeBatch(db);
-      batch.set(doc(db, 'leads', retry.id), retry.data);
       blocks.forEach((block) => setReservationBlock(batch, block, {
         storeId: retry.data.storeId,
         appointmentDate: retry.data.appointmentDate,
@@ -104,12 +105,11 @@ async function retryFailedLocalLeads(capturedByUid) {
         leadId: retry.id,
         capturedByUid: retry.data.capturedByUid
       }));
-      write = batch.commit();
-    } else {
-      write = setDoc(doc(db, 'leads', retry.id), retry.data);
-    }
+      await batch.commit();
+      await removeLocalLeads([retry.id]);
+    })();
     return trackWrite(write, retry.id);
-  }));
+  });
 }
 
 function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
@@ -181,8 +181,11 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
           fromCache: snapshot.metadata.fromCache
         }));
       if (!snapshot.metadata.fromCache) {
+        const failedLocalIds = new Set(localLeads
+          .filter((lead) => lead.syncState === 'error')
+          .map((lead) => lead.id));
         const confirmedIds = remoteLeads
-          .filter((lead) => lead.syncState === 'synced')
+          .filter((lead) => lead.syncState === 'synced' && !failedLocalIds.has(lead.id))
           .map((lead) => lead.id);
         removeLocalLeads(confirmedIds).catch(onError);
       }
@@ -275,15 +278,15 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     existingLead.appointmentDate !== result.data.appointmentDate
     || existingLead.appointmentTime !== result.data.appointmentTime
   );
+  const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
+    && existingLead.appointmentDate && existingLead.appointmentTime;
+  const newControlled = result.data.appointmentSchedulingMode === 'controlled'
+    && result.data.appointmentDate && result.data.appointmentTime;
   const leadUpdate = {
     ...result.data,
     ...(appointmentChanged && existingLead.appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
-  const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
-    && existingLead.appointmentDate && existingLead.appointmentTime;
-  const newControlled = result.data.appointmentSchedulingMode === 'controlled'
-    && result.data.appointmentDate && result.data.appointmentTime;
   const oldBlocks = oldControlled
     ? reservationBlocks(existingLead.storeId, existingLead.appointmentDate, existingLead.appointmentTime, existingLead.appointmentDurationMinutes || 20)
     : [];
@@ -301,7 +304,33 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     fromCache: true
   };
   let remoteWrite;
-  if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
+  if (existingLead && !oldControlled && newControlled && reservationChanged) {
+    remoteWrite = async () => {
+      await setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
+      const reservationBatch = writeBatch(db);
+      newBlocks.forEach((block) => setReservationBlock(reservationBatch, block, {
+        storeId: existingLead.storeId,
+        appointmentDate: result.data.appointmentDate,
+        appointmentTime: result.data.appointmentTime,
+        durationMinutes: result.data.appointmentDurationMinutes,
+        leadId: id,
+        capturedByUid: existingLead.capturedByUid
+      }));
+      try {
+        await reservationBatch.commit();
+      } catch (error) {
+        await setDoc(doc(db, 'leads', id), {
+          appointmentDate: existingLead.appointmentDate || '',
+          appointmentTime: existingLead.appointmentTime || '',
+          appointmentReservation: existingLead.appointmentReservation || {
+            status: 'pending', reason: 'offline', requestedDate: '', requestedTime: ''
+          },
+          updatedAtServer: serverTimestamp()
+        }, { merge: true });
+        throw error;
+      }
+    };
+  } else if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
     oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));

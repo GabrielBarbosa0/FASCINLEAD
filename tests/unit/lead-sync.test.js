@@ -32,4 +32,28 @@ describe('lead synchronization sources', () => {
       syncState: 'pending'
     });
   });
+
+  it('keeps a failed local correction visible beside an older server copy', () => {
+    const localLead = {
+      id: 'lead-1',
+      fullName: 'Cliente corrigido',
+      appointmentDate: '2026-10-24',
+      syncState: 'error',
+      syncError: 'Horario indisponivel'
+    };
+    const remoteLead = {
+      id: 'lead-1',
+      fullName: 'Cliente',
+      appointmentDate: '',
+      syncState: 'synced',
+      fromCache: false
+    };
+
+    expect(mergeLeadSources([remoteLead], [localLead])[0]).toMatchObject({
+      fullName: 'Cliente corrigido',
+      appointmentDate: '2026-10-24',
+      syncState: 'error',
+      fromCache: false
+    });
+  });
 });

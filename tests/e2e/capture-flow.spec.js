@@ -83,6 +83,9 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByLabel('Nome *').fill('Cliente Exemplo');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.evaluate(() => window.dispatchEvent(new Event('fascinlead:demo-leads')));
+  await expect(page.getByLabel('Nome *')).toHaveValue('Cliente Exemplo');
+  await expect(page.getByLabel('Telefone ou WhatsApp *')).toHaveValue('(81) 99999-1234');
   await page.getByLabel('RG', { exact: true }).fill('12.345.678-X');
   await page.getByLabel('CPF', { exact: true }).fill('52998224725');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
@@ -167,12 +170,22 @@ test('preserves an offline lead and lists its pending appointment in Sync', asyn
     }
   });
 
-  await expect(page.getByRole('heading', { name: 'Pendencias de agendamento' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pendencias de cadastro e agendamento' })).toBeVisible();
   await expect(page.getByText('Cliente Offline')).toBeVisible();
   await expect(page.getByText('Aguardando agendamento')).toBeVisible();
   await expect(page.getByText('Escolher quando estiver online')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Chamar no WhatsApp' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Escolher horario' })).toBeDisabled();
+  await page.evaluate(() => {
+    const leads = JSON.parse(localStorage.getItem('fascinlead:demo-leads'));
+    leads[0].syncState = 'error';
+    leads[0].syncError = 'Falha de teste preservada no aparelho.';
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify(leads));
+    window.dispatchEvent(new Event('fascinlead:demo-leads'));
+  });
+  await expect(page.getByText('Cliente Offline')).toHaveCount(1);
+  await expect(page.getByText('Requer atencao')).toBeVisible();
+  await expect(page.getByText(/Falha de teste preservada/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('offline-appointment-sync.png'), fullPage: true });
 
   await context.setOffline(false);

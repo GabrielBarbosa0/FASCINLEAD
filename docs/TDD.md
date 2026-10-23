@@ -450,7 +450,7 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
 
 Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos.
 
-O cadastro e a reserva nao sao mais criados no mesmo lote. Primeiro o lead e persistido sem horario confirmado; depois um lote atualiza o lead e cria todos os blocos. Se a reserva falhar, o lead permanece salvo com `appointmentReservation.status = pending` e aparece em `Sync`.
+O cadastro e a reserva nao sao criados no mesmo lote. Primeiro o lead e persistido sem horario confirmado; depois o documento e atualizado com o horario escolhido e, em uma operacao separada, todos os blocos sao reservados. Essa separacao evita exceder o limite de avaliacao das regras do Firestore em servicos com varios blocos. Se a reserva falhar, a confirmacao e desfeita e o lead permanece com `appointmentReservation.status = pending` em `Sync`.
 
 ```json
 {
@@ -695,8 +695,8 @@ O Firestore sera inicializado com cache persistente em IndexedDB. Alem do cache 
 5. A interface mescla caixa de saida e snapshot para confirmar o cadastro imediatamente.
 6. O item recebe estado visual `Pendente` enquanto a nuvem nao confirmar a escrita.
 7. Quando houver conexao, o SDK envia a escrita ao Firestore.
-8. O item passa para `Sincronizado` e sai da caixa de saida somente depois de um snapshot confirmado pelo servidor.
-9. Se a nuvem rejeitar a escrita, o item permanece em `Meus cadastros` e `Sync` com estado `Erro` e pode ser reenviado integralmente.
+8. O item passa para `Sincronizado` e sai da caixa de saida somente depois de um snapshot confirmado pelo servidor que nao possua uma correcao local com erro.
+9. Se a nuvem rejeitar a escrita, a versao local tem precedencia visual sobre uma versao remota mais antiga; o item permanece em `Meus cadastros` e `Sync` com estado `Erro` e pode ser reenviado integralmente sem alterar `createdAtServer`.
 
 O agendamento segue um fluxo deliberadamente diferente:
 
@@ -704,8 +704,8 @@ O agendamento segue um fluxo deliberadamente diferente:
 2. O lead offline e gravado com `appointmentReservation.status = pending` e sem data ou horario solicitado.
 3. Ao voltar online, o captador abre o lead e consulta a disponibilidade atual.
 4. Online, o sistema persiste primeiro o lead pendente com UUID definitivo.
-5. Somente depois da confirmacao remota tenta reservar, em lote, todos os blocos de 10 minutos e confirmar o horario no lead.
-6. Se algum bloco estiver ocupado, o lote falha, mas o documento do lead permanece e muda para `reason = conflict`.
+5. Somente depois da confirmacao remota confirma o horario no lead e tenta reservar, em um segundo lote, todos os blocos de 10 minutos.
+6. Se algum bloco estiver ocupado, o lote falha, a confirmacao do horario e desfeita e o documento do lead permanece com `reason = conflict`.
 7. Se a conexao oscilar durante a confirmacao, o lead permanece em `Sync` para conclusao posterior.
 
 ### 8.2 Estados exibidos
@@ -720,6 +720,10 @@ O agendamento segue um fluxo deliberadamente diferente:
 | Horario ocupado | Lead preservado, mas a reserva perdeu uma disputa | Escolher outra data ou horario |
 
 O estado de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento.
+
+Na tela `Sync`, cada lead aparece em um unico cartao, mesmo quando possui simultaneamente erro de sincronizacao e agendamento pendente. O cartao combina a causa tecnica, os dados do horario solicitado e as acoes de WhatsApp e escolha de horario.
+
+Enquanto o formulario de nova captacao estiver aberto, seus valores sao mantidos como rascunho em memoria antes de qualquer nova renderizacao. Atualizacoes de snapshot, configuracao, conectividade ou aviso visual nao podem apagar os campos ja preenchidos.
 
 ### 8.3 Acao `Sincronizar agora`
 
