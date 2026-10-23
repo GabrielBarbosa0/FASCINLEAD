@@ -18,6 +18,20 @@ function middlewareFor(plugin) {
 }
 
 describe('FascinLead integration API contract', () => {
+  it('exposes health only through GET', async () => {
+    const middleware = middlewareFor(createFascinLeadApi({}));
+    const healthy = responseMock();
+    await middleware({ method: 'GET', url: '/api/v1/health', headers: {} }, healthy, vi.fn());
+    expect(healthy.statusCode).toBe(200);
+    expect(healthy.body).toEqual({ ok: true, service: 'fascinlead-api', version: 'v1' });
+
+    const invalidMethod = responseMock();
+    await middleware({ method: 'POST', url: '/api/v1/health', headers: {} }, invalidMethod, vi.fn());
+    expect(invalidMethod.statusCode).toBe(405);
+    expect(invalidMethod.headers.Allow).toBe('GET');
+    expect(invalidMethod.body.error.code).toBe('method_not_allowed');
+  });
+
   it('keeps sensitive fields out unless explicitly enabled', () => {
     const lead = {
       fullName: 'Cliente Exemplo',

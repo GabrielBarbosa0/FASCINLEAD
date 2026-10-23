@@ -107,7 +107,7 @@ Celular / navegador
 - HTML5, CSS3 e JavaScript com ES Modules;
 - Vite;
 - Web App Manifest e Service Worker;
-- Firebase Authentication com Google;
+- Firebase Authentication com Google e E-mail/Senha;
 - Cloud Firestore com persistencia offline;
 - Firebase Hosting;
 - Firebase Emulator Suite;
@@ -115,11 +115,11 @@ Celular / navegador
 - Playwright;
 - Lucide Icons.
 
-Nao serao usados Cloud Functions, Cloud Run, Storage ou outros recursos que exijam o plano Blaze durante o MVP.
+Cloud Run e Storage nao fazem parte do MVP. Existe uma Callable Function administrativa para redefinicao de senha; sua publicacao exige aprovacao de faturamento, controle de acesso e alerta de custo.
 
 ## SavWin local
 
-Durante o desenvolvimento, o servidor do Vite disponibiliza um proxy local somente leitura para o endpoint `ProdutosPorOSGrid`. As credenciais permanecem no processo Node e nao sao enviadas no bundle do navegador.
+Durante o desenvolvimento, o servidor do Vite disponibiliza um proxy local somente leitura para consultas por produtos/OS e vendas por CPF. As credenciais permanecem no processo Node e nao sao enviadas no bundle do navegador.
 
 Configure no `.env.local`:
 
@@ -131,6 +131,13 @@ SAVWIN_TIMEOUT_SECONDS=30
 ```
 
 Inicie pelo `INICIAR-FASCINLEAD.bat`, entre como gestor ou administrador e use **Consultar SavWin** no Dashboard. Esse recurso existe apenas no servidor de desenvolvimento e nao e publicado no GitHub Pages.
+
+Endpoints locais:
+
+- `POST /api/savwin/products-by-os`;
+- `POST /api/savwin/sales-by-cpf`.
+
+O contrato completo esta em [`docs/savwin-local-proxy.openapi.yaml`](docs/savwin-local-proxy.openapi.yaml).
 
 ## API de integracao com CRM
 
@@ -144,9 +151,11 @@ Endpoints iniciais:
 
 As rotas de leads exigem `Authorization: Bearer <token>`. Configure `FASCINLEAD_API_TOKEN` com pelo menos 32 caracteres e restrinja as unidades em `FASCINLEAD_API_ALLOWED_STORES`. Use credenciais administrativas somente no processo Node. Para desenvolvimento sem custo, a API pode apontar para o Firestore Emulator por meio de `FASCINLEAD_API_FIRESTORE_EMULATOR_HOST=127.0.0.1:8180`. Para consultar o projeto remoto localmente, use Application Default Credentials ou uma conta de servico em `FASCINLEAD_API_SERVICE_ACCOUNT_JSON`; nunca use prefixo `VITE_` nem versione esse valor.
 
-CPF, ametropias e condicoes de saude ficam fora da resposta padrao. Eles somente sao retornados quando `FASCINLEAD_API_SENSITIVE_FIELDS=true` e a requisicao inclui `include_sensitive=true`. O contrato completo esta em [`docs/fascinlead-api.openapi.yaml`](docs/fascinlead-api.openapi.yaml).
+CPF, RG, nascimento, sexo, ametropias e condicoes de saude ficam fora da resposta padrao. Eles somente sao retornados quando `FASCINLEAD_API_SENSITIVE_FIELDS=true` e a requisicao inclui `include_sensitive=true`. O contrato completo esta em [`docs/fascinlead-api.openapi.yaml`](docs/fascinlead-api.openapi.yaml).
 
 A versao `v1` usa consulta ativa do CRM (polling) e nao oferece webhooks nem eventos de exclusao. O consumidor deve guardar `updatedAt` e o `cursor` para continuar a sincronizacao sem reler toda a base. Webhooks, credenciais separadas por parceiro e tombstones de exclusao ficam previstos para a etapa de hospedagem da API.
+
+O indice de todas as interfaces, incluindo a Callable Function `updateTeamMemberPassword`, dependencias externas e fronteiras que nao sao APIs publicas, esta em [`docs/API-CATALOG.md`](docs/API-CATALOG.md).
 
 ## Offline primeiro
 

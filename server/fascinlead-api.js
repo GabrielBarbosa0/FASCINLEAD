@@ -102,6 +102,10 @@ export function createFascinLeadApi(env, dependencies = {}) {
         const requestId = randomUUID();
 
         if (requestUrl.pathname === `${API_PREFIX}/health`) {
+          if (request.method !== 'GET') {
+            response.setHeader('Allow', 'GET');
+            return apiError(response, 405, 'method_not_allowed', 'Metodo nao permitido.', requestId);
+          }
           return sendJson(response, 200, { ok: true, service: 'fascinlead-api', version: 'v1' }, requestId);
         }
         if (token.length < 32) {

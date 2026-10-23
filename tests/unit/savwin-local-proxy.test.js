@@ -1,7 +1,28 @@
-import { describe, expect, it } from 'vitest';
-import { buildProductsByOsBody, buildSalesByCpfBody, filterSavwinRecordsByCpf, normalizeSavwinRecords } from '../../server/savwin-local-proxy.js';
+import { describe, expect, it, vi } from 'vitest';
+import { buildProductsByOsBody, buildSalesByCpfBody, createSavwinLocalProxy, filterSavwinRecordsByCpf, normalizeSavwinRecords } from '../../server/savwin-local-proxy.js';
+
+function middlewareFor(plugin) {
+  let middleware;
+  plugin.configureServer({ middlewares: { use(handler) { middleware = handler; } } });
+  return middleware;
+}
 
 describe('SavWin local proxy', () => {
+  it('documents POST as the only accepted method', async () => {
+    const middleware = middlewareFor(createSavwinLocalProxy({}));
+    const response = {
+      headers: {},
+      setHeader(name, value) { this.headers[name] = value; },
+      end(value) { this.body = JSON.parse(value); }
+    };
+
+    await middleware({ method: 'GET', url: '/api/savwin/products-by-os' }, response, vi.fn());
+
+    expect(response.statusCode).toBe(405);
+    expect(response.headers.Allow).toBe('POST');
+    expect(response.body).toEqual({ ok: false, error: 'Metodo nao permitido.' });
+  });
+
   it('builds the documented products by OS request body', () => {
     expect(buildProductsByOsBody({
       startDate: '2026-10-01',

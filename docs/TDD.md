@@ -314,9 +314,11 @@ O ambiente de desenvolvimento disponibiliza uma API Node local e somente leitura
 
 A API nao faz parte do bundle da PWA nem do GitHub Pages. A versao local usa Firebase Admin com Firestore Emulator, Application Default Credentials ou conta de servico mantida fora do repositorio. Uma publicacao futura exigira um backend HTTPS, armazenamento seguro de segredos, rotacao de tokens, limites de requisicao e auditoria; essa publicacao nao sera feita no plano Spark sem decisao explicita sobre custos.
 
-O contrato inicial e versionado em `/api/v1` e documentado em `docs/fascinlead-api.openapi.yaml`. CPF e informacoes de saude ficam excluidos por padrao e exigem habilitacao no servidor e solicitacao explicita do consumidor.
+O contrato inicial e versionado em `/api/v1` e documentado em `docs/fascinlead-api.openapi.yaml`. CPF, RG e informacoes de saude ficam excluidos por padrao e exigem habilitacao no servidor e solicitacao explicita do consumidor.
 
 O proxy local do SavWin segue a mesma fronteira: ele existe apenas no servidor de desenvolvimento Vite, depende de credenciais mantidas fora do bundle e alimenta uma consulta experimental no Dashboard. Nem o proxy, nem a API `/api/v1`, nem a fundacao `leadSales` estao disponiveis numa publicacao puramente estatica.
+
+O inventario completo das interfaces de rede esta em `docs/API-CATALOG.md`. O proxy SavWin possui contrato proprio em `docs/savwin-local-proxy.openapi.yaml`; a Callable Function administrativa e documentada no catalogo porque usa o protocolo do Firebase Functions, nao uma rota REST publica. Rotas novas ou alteradas devem atualizar contrato, catalogo, testes e este TDD na mesma entrega.
 
 ### 5.3 Canais de publicacao
 
@@ -333,11 +335,13 @@ FASCINLEAD/
 |-- .github/
 |   `-- workflows/deploy-pages.yml
 |-- docs/
+|   |-- API-CATALOG.md
 |   |-- fascinlead-api.openapi.yaml
 |   |-- ORCAMENTO-INFRAESTRUTURA.md
 |   |-- TDD.md
 |   |-- PLANO-PRE-ATENDIMENTO-CLINICO.md
-|   `-- PLANO-SERVICOS-AGENDA.md
+|   |-- PLANO-SERVICOS-AGENDA.md
+|   `-- savwin-local-proxy.openapi.yaml
 |-- functions/
 |   `-- index.js
 |-- public/

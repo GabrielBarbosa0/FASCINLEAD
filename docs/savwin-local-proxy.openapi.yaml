@@ -1,0 +1,147 @@
+openapi: 3.1.0
+info:
+  title: FascinLead SavWin Local Proxy
+  version: 0.1.0
+  description: |
+    Proxy somente leitura disponivel exclusivamente no servidor Vite local.
+    Mantem as credenciais SavWin no processo Node e nao deve ser publicado como
+    endpoint aberto nem incluido em uma hospedagem puramente estatica.
+servers:
+  - url: http://127.0.0.1:5173
+    description: Desenvolvimento local
+security: []
+paths:
+  /api/savwin/products-by-os:
+    post:
+      operationId: listSavwinProductsByOs
+      summary: Consulta produtos e ordens de servico por periodo e lojas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductsByOsRequest' }
+            example:
+              startDate: '2026-10-01'
+              endDate: '2026-10-22'
+              storeCodes: ['2', '6']
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '502': { $ref: '#/components/responses/UpstreamFailure' }
+        '503': { $ref: '#/components/responses/NotConfigured' }
+  /api/savwin/sales-by-cpf:
+    post:
+      operationId: listSavwinSalesByCpf
+      summary: Consulta vendas por CPF
+      description: |
+        Tenta primeiro o endpoint de vendas por CPF do SavWin. Se o upstream
+        responder 404, consulta ate cinco periodos em ProdutosPorOSGrid e filtra
+        localmente o CPF exato.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SalesByCpfRequest' }
+            example:
+              cpf: '52998224725'
+              startDate: '2026-10-01'
+              endDate: '2026-10-22'
+              storeCodes: ['2', '6']
+              periods: []
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '502': { $ref: '#/components/responses/UpstreamFailure' }
+        '503': { $ref: '#/components/responses/NotConfigured' }
+components:
+  responses:
+    Success:
+      description: Consulta concluida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SavwinResponse' }
+    InvalidRequest:
+      description: CPF, periodo ou lojas invalidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MethodNotAllowed:
+      description: Somente POST e aceito
+      headers:
+        Allow:
+          schema: { type: string, const: POST }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UpstreamFailure:
+      description: Falha, timeout ou resposta nao bem-sucedida do SavWin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotConfigured:
+      description: Credenciais locais do SavWin ausentes
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    StoreCode:
+      type: string
+      enum: ['2', '4', '5', '6']
+    Period:
+      type: object
+      required: [startDate, endDate]
+      properties:
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        storeCodes:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/StoreCode' }
+    ProductsByOsRequest:
+      allOf:
+        - $ref: '#/components/schemas/Period'
+        - type: object
+          required: [storeCodes]
+      description: O intervalo inclusivo nao pode ultrapassar 93 dias.
+    SalesByCpfRequest:
+      type: object
+      required: [cpf]
+      properties:
+        cpf:
+          type: string
+          pattern: '^\D*(?:\d\D*){11}$'
+          description: Aceita pontuacao; o proxy envia apenas os 11 digitos.
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        storeCodes:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/StoreCode' }
+        periods:
+          type: array
+          maxItems: 5
+          description: Periodos usados somente no fallback por produtos/OS.
+          items: { $ref: '#/components/schemas/Period' }
+      description: Datas e lojas sao opcionais na consulta direta, mas um periodo valido e necessario se o upstream exigir o fallback.
+    SavwinResponse:
+      type: object
+      required: [ok, count, osCount, records, source]
+      properties:
+        ok: { type: boolean, const: true }
+        count: { type: integer, minimum: 0 }
+        osCount: { type: integer, minimum: 0 }
+        records:
+          type: array
+          description: Registros no formato devolvido pelo SavWin.
+          items: { type: object, additionalProperties: true }
+        source:
+          type: string
+          enum: [products-by-os, sales-by-cpf, products-by-os-fallback]
+    ErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, const: false }
+        error: { type: string }

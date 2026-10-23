@@ -98,7 +98,10 @@ export function createSavwinLocalProxy(env, fetchImpl = globalThis.fetch) {
       server.middlewares.use(async (request, response, next) => {
         const pathname = new URL(request.url || '/', 'http://127.0.0.1').pathname;
         if (![LOCAL_ROUTE, SALES_BY_CPF_ROUTE].includes(pathname)) return next();
-        if (request.method !== 'POST') return sendJson(response, 405, { ok: false, error: 'Metodo nao permitido.' });
+        if (request.method !== 'POST') {
+          response.setHeader('Allow', 'POST');
+          return sendJson(response, 405, { ok: false, error: 'Metodo nao permitido.' });
+        }
         if (!config.baseUrl || !config.identificador || !config.authorization) {
           return sendJson(response, 503, { ok: false, error: 'Credenciais locais do SavWin nao configuradas.' });
         }
