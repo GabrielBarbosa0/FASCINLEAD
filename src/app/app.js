@@ -147,6 +147,7 @@ const state = {
     loaded: false,
     error: '',
     records: [],
+    activeLead: null,
     truncated: false,
     page: 1,
     pageSize: 20,
@@ -1158,16 +1159,22 @@ function followUpsView() {
     ${captorDialog}`;
 }
 
+function findManagementLead(leadId) {
+  return state.management.records.find((item) => item.id === leadId)
+    || state.appointments.records.find((item) => item.id === leadId)
+    || (state.management.activeLead?.id === leadId ? state.management.activeLead : null);
+}
+
 function leadDetailView() {
   const managementMode = state.route === 'management-lead';
   if (managementMode && !canManage()) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao pode alterar leads da equipe.</span></div>`;
   }
 
-  const source = managementMode
-    ? [...state.management.records, ...state.appointments.records]
-    : state.leads;
-  const lead = source.find((item) => item.id === currentRouteParam());
+  const leadId = currentRouteParam();
+  const lead = managementMode
+    ? findManagementLead(leadId)
+    : state.leads.find((item) => item.id === leadId);
   const backRoute = managementMode ? 'management' : 'leads';
   if (!lead) {
     return `<section class="page-toolbar">
@@ -2489,7 +2496,7 @@ function bindPageEvents() {
       event.preventDefault();
       const managementEdit = editLeadForm.dataset.management === 'true';
       const existingLead = managementEdit
-        ? state.management.records.find((lead) => lead.id === editLeadForm.dataset.leadId)
+        ? findManagementLead(editLeadForm.dataset.leadId)
         : state.leads.find((lead) => lead.id === editLeadForm.dataset.leadId);
       let values = enrichLeadTriage(leadFormValues(editLeadForm), state.leadDetailSchedule.settings);
       if (existingLead && !editLeadForm.querySelector('[name="ametropiaIds"]')) {
@@ -2526,6 +2533,9 @@ function bindPageEvents() {
           state.appointments.records = state.appointments.records.map((lead) => lead.id === editLeadForm.dataset.leadId
             ? { ...lead, ...result.data }
             : lead);
+          state.management.activeLead = existingLead
+            ? { ...existingLead, ...result.data }
+            : state.management.activeLead;
           navigate('management');
           showToast('Lead atualizado com sucesso.');
         } catch (error) {
@@ -3858,10 +3868,10 @@ function ensureManagementData() {
 
 async function ensureLeadDetailSchedule() {
   if (!['lead', 'management-lead'].includes(state.route) || !state.profile || state.leadDetailSchedule.loading) return;
-  const source = state.route === 'management-lead'
-    ? [...state.management.records, ...state.appointments.records]
-    : state.leads;
-  const lead = source.find((item) => item.id === currentRouteParam());
+  const leadId = currentRouteParam();
+  const lead = state.route === 'management-lead'
+    ? findManagementLead(leadId)
+    : state.leads.find((item) => item.id === leadId);
   if (!lead?.storeId || state.leadDetailSchedule.storeId === lead.storeId) return;
 
   state.leadDetailSchedule.loading = true;
@@ -4367,6 +4377,7 @@ async function handleAction(action) {
       loaded: false,
       error: '',
       records: [],
+      activeLead: null,
       truncated: false,
       page: 1,
       pageSize: 20,
@@ -4852,18 +4863,22 @@ export async function startApp() {
         .find((item) => item.id === followUpRescheduleButton.dataset.followUpReschedule);
       if (lead) {
         state.followUps.selectedCaptorId = '';
-        state.management.records = [lead, ...state.management.records.filter((item) => item.id !== lead.id)];
+        state.management.activeLead = lead;
         navigate('management-lead', lead.id);
       }
     }
     const managementLeadButton = event.target.closest('[data-management-lead-id]');
-    if (managementLeadButton) navigate('management-lead', managementLeadButton.dataset.managementLeadId);
+    if (managementLeadButton) {
+      const lead = state.management.records.find((item) => item.id === managementLeadButton.dataset.managementLeadId);
+      if (lead) state.management.activeLead = lead;
+      navigate('management-lead', managementLeadButton.dataset.managementLeadId);
+    }
     const appointmentLeadButton = event.target.closest('[data-appointment-lead-id]');
     if (appointmentLeadButton) {
       const appointmentRecords = state.demoMode ? state.leads : state.appointments.records;
       const lead = appointmentRecords.find((item) => item.id === appointmentLeadButton.dataset.appointmentLeadId);
       if (lead) {
-        state.management.records = [lead, ...state.management.records.filter((item) => item.id !== lead.id)];
+        state.management.activeLead = lead;
         navigate('management-lead', lead.id);
       }
     }
@@ -4912,7 +4927,7 @@ export async function startApp() {
     }
     const deleteLeadButton = event.target.closest('[data-delete-lead]');
     if (deleteLeadButton && !deleteLeadButton.disabled) {
-      const lead = state.management.records.find((item) => item.id === deleteLeadButton.dataset.deleteLead);
+      const lead = findManagementLead(deleteLeadButton.dataset.deleteLead);
       const dialog = document.querySelector('#delete-lead-dialog');
       if (lead && dialog) dialog.showModal();
     }
@@ -4922,13 +4937,14 @@ export async function startApp() {
     }
     const confirmDeleteButton = event.target.closest('[data-confirm-delete]');
     if (confirmDeleteButton && !confirmDeleteButton.disabled) {
-      const lead = state.management.records.find((item) => item.id === confirmDeleteButton.dataset.confirmDelete);
+      const lead = findManagementLead(confirmDeleteButton.dataset.confirmDelete);
       if (!lead) return;
       confirmDeleteButton.disabled = true;
       try {
         await deleteManagementLead(state.profile, lead);
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
         state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
+        state.management.activeLead = null;
         navigate('management');
         showToast('Lead excluido definitivamente.');
       } catch (error) {
@@ -5118,6 +5134,9 @@ export async function startApp() {
     if (managementRoutes.includes(state.route) && !managementRoutes.includes(previousRoute)) {
       state.management.loaded = false;
     }
+    if (previousRoute === 'management-lead' && state.route !== 'management-lead') {
+      state.management.activeLead = null;
+    }
     if (state.route !== 'appointments') stopAppointmentsSubscription();
     if (state.route !== 'new') {
       stopNewLeadScheduleSubscriptions();
@@ -5193,6 +5212,7 @@ export async function startApp() {
         state.profile = profile;
         state.management.loaded = false;
         state.management.records = [];
+        state.management.activeLead = null;
         state.access.loaded = false;
         state.goals.loaded = false;
         state.settings.loaded = false;

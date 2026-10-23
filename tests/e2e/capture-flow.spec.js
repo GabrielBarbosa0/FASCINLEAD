@@ -925,8 +925,11 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(captorDialog.getByRole('link', { name: 'Chamar no WhatsApp' })).toBeVisible();
   await expect(captorDialog.getByRole('button', { name: 'Reagendar' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('captor-pending-follow-ups-dialog.png'), fullPage: true });
-  await captorDialog.getByRole('button', { name: 'Fechar' }).first().click();
-  await expect(captorDialog).not.toBeVisible();
+  await captorDialog.getByRole('button', { name: 'Reagendar' }).click();
+  await expect(page.getByRole('heading', { name: 'Cliente Aguardando' })).toBeVisible();
+  await expect(page.getByText('Cadastro nao encontrado. Volte para a lista e tente novamente.')).not.toBeVisible();
+  await page.evaluate(() => { location.hash = '#/follow-ups'; });
+  await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
   await page.locator('[data-follow-up-filter="contacted"]').click();
   await expect(page.getByText('Cliente Contatado', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Aguardando', { exact: true })).not.toBeVisible();
