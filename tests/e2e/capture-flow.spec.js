@@ -503,6 +503,18 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   await expect(page.getByText('Nenhum exame neste dia')).toBeVisible();
+  const toolbarAlignment = await page.locator('.calendar-toolbar-actions').evaluate((toolbar) => {
+    const store = toolbar.querySelector('select')?.getBoundingClientRect();
+    const today = toolbar.querySelector('.calendar-today').getBoundingClientRect();
+    return store ? {
+      topDifference: Math.abs(store.top - today.top),
+      bottomDifference: Math.abs(store.bottom - today.bottom)
+    } : null;
+  });
+  if (toolbarAlignment) {
+    expect(toolbarAlignment.topDifference).toBeLessThanOrEqual(1);
+    expect(toolbarAlignment.bottomDifference).toBeLessThanOrEqual(1);
+  }
 
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');

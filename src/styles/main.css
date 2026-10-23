@@ -5394,6 +5394,7 @@ svg {
   .calendar-toolbar-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
   }
 
   .calendar-store-filter {
