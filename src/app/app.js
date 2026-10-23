@@ -2221,6 +2221,7 @@ function syncView() {
     return result;
   }, {});
   const schedulingIssues = state.leads.filter((lead) => lead.appointmentReservation?.status === 'pending');
+  const failedLeads = state.leads.filter((lead) => lead.syncState === 'error');
   const schedulingList = schedulingIssues.map((lead) => {
     const reason = lead.appointmentReservation?.reason;
     const requestedDate = lead.appointmentReservation?.requestedDate || '';
@@ -2232,6 +2233,11 @@ function syncView() {
     <div class="sync-issue-actions"><a class="button button-whatsapp" href="${escapeHtml(schedulingWhatsAppUrl(lead))}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a><button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}" ${navigator.onLine ? '' : 'disabled'}><i data-lucide="calendar-days"></i><span>Escolher horario</span></button></div>
   </article>`;
   }).join('');
+  const failedList = failedLeads.map((lead) => `<article class="sync-issue-item">
+    <div class="sync-issue-heading"><span class="sync-issue-icon"><i data-lucide="circle-alert"></i></span><div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div><span class="status-badge status-danger">Erro de sincronizacao</span></div>
+    <p>${escapeHtml(lead.syncError || 'A nuvem recusou este cadastro. Os dados continuam preservados neste aparelho.')}</p>
+    <div class="sync-issue-actions"><button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}"><i data-lucide="clipboard-list"></i><span>Ver cadastro</span></button></div>
+  </article>`).join('');
 
   return `
     ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="info"></i><span>No modo de desenvolvimento nao ha envio para a nuvem.</span></div>' : ''}
@@ -2241,6 +2247,7 @@ function syncView() {
       <div class="metric"><span>Locais de teste</span><strong>${counts.demo || 0}</strong><i data-lucide="hard-drive"></i></div>
       <div class="metric metric-danger"><span>Com erro</span><strong>${counts.error || 0}</strong><i data-lucide="circle-alert"></i></div>
     </section>
+    ${failedLeads.length ? `<section class="sync-issues"><header><div><span class="eyebrow">SINCRONIZACAO</span><h2>Cadastros com erro</h2><p>Os dados permanecem neste aparelho. Corrija o problema e tente sincronizar novamente.</p></div><strong>${failedLeads.length}</strong></header><div class="sync-issue-list">${failedList}</div></section>` : ''}
     ${schedulingIssues.length ? `<section class="sync-issues"><header><div><span class="eyebrow">AGENDA</span><h2>Pendencias de agendamento</h2><p>Os dados dos clientes estao preservados. Confirme um novo horario quando estiver online.</p></div><strong>${schedulingIssues.length}</strong></header><div class="sync-issue-list">${schedulingList}</div></section>` : '<div class="notice notice-success"><i data-lucide="circle-check"></i><span>Nenhum conflito ou agendamento pendente.</span></div>'}
     <button class="button button-primary button-block" type="button" data-action="sync"><i data-lucide="refresh-cw"></i><span>Sincronizar agora</span></button>`;
 }
@@ -4541,7 +4548,7 @@ async function handleAction(action) {
 
   if (action === 'sync') {
     try {
-      await synchronizeNow(state.demoMode);
+      await synchronizeNow(state.demoMode, state.profile?.uid);
       showToast(state.demoMode ? 'Modo local verificado.' : 'Sincronizacao concluida.');
     } catch {
       showToast('A sincronizacao ainda nao foi concluida.', 'danger', 'circle-alert');
@@ -5203,7 +5210,7 @@ export async function startApp() {
   }, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {
-      synchronizeNow(false).catch(() => {});
+      synchronizeNow(false, state.profile.uid).catch(() => {});
     }
   });
 

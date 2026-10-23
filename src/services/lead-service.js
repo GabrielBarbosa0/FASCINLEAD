@@ -17,8 +17,100 @@ import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
+import { listLocalLeads, markLocalLeadError, preserveLocalLead, removeLocalLeads, subscribeToLocalLeads } from './local-lead-outbox.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
+const activeWrites = new Set();
+
+export function mergeLeadSources(remoteLeads, localLeads) {
+  const merged = new Map((localLeads || []).map((lead) => [lead.id, {
+    ...lead,
+    syncState: lead.syncState || 'pending',
+    fromCache: true
+  }]));
+  for (const lead of remoteLeads || []) {
+    const local = merged.get(lead.id);
+    merged.set(lead.id, lead.syncState === 'synced'
+      ? lead
+      : { ...local, ...lead, syncState: lead.syncState || local?.syncState || 'pending' });
+  }
+  return [...merged.values()].sort((left, right) => (
+    String(right.capturedAtClient || '').localeCompare(String(left.capturedAtClient || ''))
+  ));
+}
+
+function trackWrite(writePromise, id, onRemoteError) {
+  let tracked;
+  tracked = writePromise.catch(async (error) => {
+    try {
+      await markLocalLeadError(id, error?.message);
+    } finally {
+      onRemoteError?.(error);
+    }
+    throw error;
+  }).finally(() => activeWrites.delete(tracked));
+  activeWrites.add(tracked);
+  tracked.catch(() => {});
+  return tracked;
+}
+
+function retryLeadData(localLead) {
+  const {
+    id,
+    syncState,
+    syncError,
+    fromCache,
+    localUpdatedAt,
+    createdAtServer,
+    updatedAtServer,
+    ...data
+  } = localLead;
+  return {
+    id,
+    data: {
+      ...data,
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp()
+    }
+  };
+}
+
+async function retryFailedLocalLeads(capturedByUid) {
+  const failedLeads = (await listLocalLeads(capturedByUid)).filter((lead) => lead.syncState === 'error');
+  return failedLeads.map((localLead) => preserveLocalLead({
+    ...localLead,
+    syncState: 'pending',
+    syncError: ''
+  }).then(() => {
+    const retry = retryLeadData(localLead);
+    let write;
+    if (retry.data.appointmentSchedulingMode === 'controlled'
+      && retry.data.appointmentDate
+      && retry.data.appointmentTime) {
+      const durationMinutes = Number(retry.data.appointmentDurationMinutes) || 20;
+      const blocks = reservationBlocks(
+        retry.data.storeId,
+        retry.data.appointmentDate,
+        retry.data.appointmentTime,
+        durationMinutes
+      );
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'leads', retry.id), retry.data);
+      blocks.forEach((block) => setReservationBlock(batch, block, {
+        storeId: retry.data.storeId,
+        appointmentDate: retry.data.appointmentDate,
+        appointmentTime: retry.data.appointmentTime,
+        durationMinutes,
+        leadId: retry.id,
+        capturedByUid: retry.data.capturedByUid
+      }));
+      write = batch.commit();
+    } else {
+      write = setDoc(doc(db, 'leads', retry.id), retry.data);
+    }
+    return trackWrite(write, retry.id);
+  }));
+}
 
 function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
   return appointmentBlockTimes(appointmentTime, durationMinutes).map((blockTime) => ({
@@ -63,21 +155,46 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     limit(100)
   );
 
-  return onSnapshot(
+  let remoteLeads = [];
+  let localLeads = [];
+  let disposed = false;
+  const emit = () => onData(mergeLeadSources(remoteLeads, localLeads));
+  const refreshLocal = async () => {
+    try {
+      localLeads = await listLocalLeads(profile.uid);
+      if (!disposed) emit();
+    } catch (error) {
+      if (!disposed) onError(error);
+    }
+  };
+  const unsubscribeLocal = subscribeToLocalLeads(refreshLocal);
+  refreshLocal();
+
+  const unsubscribeRemote = onSnapshot(
     leadsQuery,
     { includeMetadataChanges: true },
     (snapshot) => {
-      onData(
-        snapshot.docs.map((leadDoc) => ({
+      remoteLeads = snapshot.docs.map((leadDoc) => ({
           id: leadDoc.id,
           ...leadDoc.data(),
           syncState: leadDoc.metadata.hasPendingWrites ? 'pending' : 'synced',
-          fromCache: leadDoc.metadata.fromCache
-        }))
-      );
+          fromCache: snapshot.metadata.fromCache
+        }));
+      if (!snapshot.metadata.fromCache) {
+        const confirmedIds = remoteLeads
+          .filter((lead) => lead.syncState === 'synced')
+          .map((lead) => lead.id);
+        removeLocalLeads(confirmedIds).catch(onError);
+      }
+      emit();
     },
     onError
   );
+  return () => {
+    disposed = true;
+    unsubscribeLocal();
+    unsubscribeRemote();
+  };
 }
 
 export function saveLead(input, profile, demoMode, onRemoteError) {
@@ -105,7 +222,8 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
     createdAtServer: serverTimestamp(),
     updatedAtServer: serverTimestamp()
   };
-  let writePromise;
+  const localLead = { id, ...result.data, syncState: 'pending', fromCache: true };
+  let remoteWrite;
   if (input.schedulingMode === 'controlled' && result.data.appointmentDate && result.data.appointmentTime) {
     const durationMinutes = Number(input.appointmentDurationMinutes) || 20;
     const blocks = reservationBlocks(profile.storeId, result.data.appointmentDate, result.data.appointmentTime, durationMinutes);
@@ -119,12 +237,16 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
       leadId: id,
       capturedByUid: profile.uid
     }));
-    writePromise = batch.commit();
+    remoteWrite = () => batch.commit();
   } else {
-    writePromise = setDoc(doc(db, 'leads', id), leadData);
+    remoteWrite = () => setDoc(doc(db, 'leads', id), leadData);
   }
 
-  writePromise.catch(onRemoteError);
+  const writePromise = trackWrite(
+    preserveLocalLead(localLead).then(remoteWrite),
+    id,
+    onRemoteError
+  );
   return { ...result, id, writePromise };
 }
 
@@ -171,7 +293,14 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   const newIds = new Set(newBlocks.map((block) => block.id));
   const reservationChanged = oldBlocks.length !== newBlocks.length
     || oldBlocks.some((block) => !newIds.has(block.id));
-  let writePromise;
+  const localLead = {
+    ...(existingLead || {}),
+    id,
+    ...result.data,
+    syncState: 'pending',
+    fromCache: true
+  };
+  let remoteWrite;
   if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
@@ -184,12 +313,16 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
       leadId: id,
       capturedByUid: existingLead.capturedByUid
     }));
-    writePromise = batch.commit();
+    remoteWrite = () => batch.commit();
   } else {
-    writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
+    remoteWrite = () => setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
   }
 
-  writePromise.catch(onRemoteError);
+  const writePromise = trackWrite(
+    preserveLocalLead(localLead).then(remoteWrite),
+    id,
+    onRemoteError
+  );
   return { ...result, id, writePromise };
 }
 
@@ -226,9 +359,14 @@ export function markDemoFollowUpContact(id, profile) {
   return true;
 }
 
-export async function synchronizeNow(demoMode) {
+export async function synchronizeNow(demoMode, capturedByUid = '') {
   if (demoMode || !isFirebaseConfigured) return { demo: true };
   await enableNetwork(db);
-  await waitForPendingWrites(db);
+  const retryWrites = capturedByUid ? await retryFailedLocalLeads(capturedByUid) : [];
+  const writes = [...new Set([...activeWrites, ...retryWrites])];
+  const results = await Promise.allSettled([waitForPendingWrites(db), ...writes]);
+  if (results.some((result) => result.status === 'rejected')) {
+    throw new Error('Um ou mais cadastros foram recusados pela nuvem e continuam salvos neste aparelho.');
+  }
   return { demo: false };
 }

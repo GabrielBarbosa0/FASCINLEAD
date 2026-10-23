@@ -686,15 +686,17 @@ Novos indices somente deverao ser adicionados a partir de consultas reais. Cada 
 
 ### 8.1 Persistencia
 
-O Firestore sera inicializado com cache persistente em IndexedDB. Ao salvar:
+O Firestore sera inicializado com cache persistente em IndexedDB. Alem do cache do SDK, o FascinLead mantem uma caixa de saida propria em IndexedDB para impedir que uma escrita otimista desapareca da interface quando a nuvem rejeitar o documento. Ao salvar:
 
 1. O formulario valida e normaliza os dados.
 2. O navegador gera um UUID.
-3. O Firestore grava o documento no cache local.
-4. A interface confirma o cadastro imediatamente.
-5. O item recebe estado visual `Pendente` enquanto `hasPendingWrites` for verdadeiro.
-6. Quando houver conexao, o SDK envia a escrita ao Firestore.
-7. O item passa para `Sincronizado` depois da confirmacao remota.
+3. A caixa de saida preserva o documento completo antes da tentativa de envio.
+4. O Firestore grava o documento no cache local.
+5. A interface mescla caixa de saida e snapshot para confirmar o cadastro imediatamente.
+6. O item recebe estado visual `Pendente` enquanto a nuvem nao confirmar a escrita.
+7. Quando houver conexao, o SDK envia a escrita ao Firestore.
+8. O item passa para `Sincronizado` e sai da caixa de saida somente depois de um snapshot confirmado pelo servidor.
+9. Se a nuvem rejeitar a escrita, o item permanece em `Meus cadastros` e `Sync` com estado `Erro` e pode ser reenviado integralmente.
 
 O agendamento segue um fluxo deliberadamente diferente:
 
@@ -725,9 +727,11 @@ A acao devera:
 
 1. verificar se o navegador declara conexao;
 2. habilitar a rede do Firestore;
-3. aguardar as escritas pendentes com limite de tempo;
-4. atualizar a contagem e o horario da ultima confirmacao;
-5. manter os registros localmente se o envio nao for concluido.
+3. reenviar documentos completos que estejam na caixa de saida com erro;
+4. aguardar as escritas pendentes com limite de tempo;
+5. falhar, sem anunciar sucesso, se alguma escrita individual for rejeitada;
+6. atualizar a contagem e o horario da ultima confirmacao;
+7. manter os registros localmente se o envio nao for concluido.
 
 ### 8.4 Conflitos
 
@@ -885,6 +889,7 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - limites diarios e cotas do MEI por manha e tarde;
 - triagem oftalmologica, transporte e retornos;
 - serializacao de leads pendentes sem data e horario.
+- mesclagem da caixa de saida com snapshots locais e remotos sem esconder leads rejeitados.
 
 ### 14.2 Regras e integracao
 
