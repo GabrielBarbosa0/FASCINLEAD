@@ -638,6 +638,22 @@ describe('appointment slot reservations', () => {
     }));
   });
 
+  it('lets a captor preserve an offline lead that still needs an appointment', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const { appointmentAttendance, ...deferredLead } = lead;
+    await assertSucceeds(setDoc(doc(db, 'leads', 'offline-unscheduled-lead'), {
+      ...deferredLead,
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentReservation: {
+        status: 'pending',
+        reason: 'offline',
+        requestedDate: '',
+        requestedTime: ''
+      }
+    }));
+  });
+
   it('lets a captor reserve and read slots without reading colleagues leads', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const batch = writeBatch(db);

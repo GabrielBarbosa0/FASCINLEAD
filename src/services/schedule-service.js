@@ -18,8 +18,11 @@ function permissionError(message) {
 
 export function subscribeToStoreSchedule(profile, onData, onError) {
   if (!isFirebaseConfigured || !profile?.storeId) throw permissionError('Configuracao de agenda indisponivel.');
-  return onSnapshot(doc(db, 'stores', profile.storeId), (snapshot) => {
-    onData(normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE));
+  return onSnapshot(doc(db, 'stores', profile.storeId), { includeMetadataChanges: true }, (snapshot) => {
+    onData(
+      normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE),
+      { fromCache: snapshot.metadata.fromCache }
+    );
   }, onError);
 }
 
@@ -32,8 +35,11 @@ export function subscribeToDayAppointments(profile, appointmentDate, onData, onE
     where('storeId', '==', profile.storeId),
     where('appointmentDate', '==', appointmentDate)
   );
-  return onSnapshot(dayQuery, (snapshot) => {
-    onData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+  return onSnapshot(dayQuery, { includeMetadataChanges: true }, (snapshot) => {
+    onData(
+      snapshot.docs.map((item) => ({ id: item.id, ...item.data() })),
+      { fromCache: snapshot.metadata.fromCache }
+    );
   }, onError);
 }
 

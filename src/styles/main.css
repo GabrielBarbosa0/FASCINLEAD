@@ -297,6 +297,10 @@ svg {
   color: var(--success);
 }
 
+.scheduling-connectivity-notice[hidden] {
+  display: none;
+}
+
 .app-header {
   position: sticky;
   z-index: 20;

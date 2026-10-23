@@ -148,6 +148,29 @@ describe('lead validation', () => {
     expect(result.data).not.toHaveProperty('appointmentAttendance');
   });
 
+  it('preserves an offline lead without inventing a requested appointment', () => {
+    const result = createLeadDocument({
+      ...validInput,
+      appointmentDate: '',
+      appointmentTime: '',
+      deferAppointment: true,
+      appointmentReservationReason: 'offline'
+    }, profile, 'installation-test');
+
+    expect(result.isValid).toBe(true);
+    expect(result.data).toMatchObject({
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentReservation: {
+        status: 'pending',
+        reason: 'offline',
+        requestedDate: '',
+        requestedTime: ''
+      },
+      appointmentServiceName: 'Exame de vista'
+    });
+  });
+
   it('stores transport customers and companions as separate seat counts', () => {
     const result = createLeadDocument({
       ...validInput,

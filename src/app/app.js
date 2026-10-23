@@ -183,7 +183,9 @@ const state = {
     appointments: [],
     services: [],
     serviceId: '',
-    triage: {}
+    triage: {},
+    serverVerified: false,
+    dayServerVerified: false
   },
   leadDetailSchedule: {
     loading: false,
@@ -644,6 +646,10 @@ function homeView() {
     </section>`;
 }
 
+function newLeadCanSchedule() {
+  return navigator.onLine && (state.demoMode || state.newLeadSchedule.serverVerified);
+}
+
 function appointmentTimeField() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
@@ -660,6 +666,9 @@ function appointmentTimeField() {
     ? ophthalmologyAppointmentSchedule(settings)
     : settings;
   const serviceSchedule = { ...baseSchedule, appointmentDurationMinutes: service.durationMinutes };
+  if (!newLeadCanSchedule()) {
+    return '<div class="field is-disabled" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Disponivel somente com internet</option></select><small class="field-error"></small><small class="schedule-availability">Salve o cadastro e agende quando a conexao voltar.</small></div>';
+  }
   if (ophthalmologyDateBlocked) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmologico.</small></div>`;
   }
@@ -699,7 +708,7 @@ function appointmentTimeField() {
     .join('');
   return `<div class="field" data-field="appointmentTime">
     <label for="appointmentTime">Horario disponivel</label>
-    <select id="appointmentTime" name="appointmentTime" ${!appointmentDate || loading || error || !availableSlots.length ? 'disabled' : ''}>
+    <select id="appointmentTime" name="appointmentTime" ${!appointmentDate || loading || error || (settings.schedulingMode === 'controlled' && !state.newLeadSchedule.dayServerVerified) || !availableSlots.length ? 'disabled' : ''}>
       <option value="">${placeholder}</option>${options}
     </select>
     <small class="field-error"></small>
@@ -1012,8 +1021,9 @@ function newLeadView() {
       </fieldset>
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
       ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
+      <div id="scheduling-connectivity-notice" class="notice notice-warning scheduling-connectivity-notice" ${newLeadCanSchedule() ? 'hidden' : ''}><i data-lucide="wifi-off"></i><div><strong>Agendamento indisponivel sem internet</strong><span>O cadastro sera salvo normalmente. Escolha a data e o horario quando a conexao voltar.</span></div></div>
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.newLeadSchedule.appointmentDate)}" /><small class="schedule-date-status"></small><small class="field-error"></small></div>
+        <div class="field ${newLeadCanSchedule() ? '' : 'is-disabled'}" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${newLeadCanSchedule() ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${newLeadCanSchedule() ? '' : 'disabled'} /><small class="schedule-date-status"></small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
       <div class="field" data-field="notes">
@@ -1037,7 +1047,10 @@ function leadsView() {
 
   const list = filtered.length
     ? filtered.map((lead) => {
-        const [label, tone] = syncLabel(lead);
+        const appointmentPending = lead.appointmentReservation?.status === 'pending';
+        const [syncStatus, syncTone] = syncLabel(lead);
+        const label = appointmentPending ? 'Aguardando agendamento' : syncStatus;
+        const tone = appointmentPending ? 'warning' : syncTone;
         return `<button class="lead-item" type="button" data-open-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
           <div class="lead-avatar">${escapeHtml(lead.fullName[0]?.toUpperCase() || '?')}</div>
           <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.interestLabel || 'Interesse nao informado')}</small></div>
@@ -1153,6 +1166,7 @@ function leadDetailView() {
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
   const pendingAppointment = lead.appointmentReservation?.status === 'pending';
+  const pendingScheduleAvailable = navigator.onLine && (state.demoMode || lead.fromCache === false);
   const editableLead = pendingAppointment ? {
     ...lead,
     appointmentDate: lead.appointmentReservation?.requestedDate || '',
@@ -1173,7 +1187,7 @@ function leadDetailView() {
       <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
-    ${pendingAppointment ? `<div class="notice notice-warning scheduling-pending-notice"><i data-lucide="calendar-days"></i><div><strong>Agendamento ainda nao confirmado</strong><span>${lead.appointmentReservation?.reason === 'conflict' ? 'O horario solicitado foi ocupado. Escolha uma nova data ou horario.' : 'O cadastro foi preservado sem reservar a agenda porque o aparelho estava offline.'}</span></div></div>` : ''}
+    ${pendingAppointment ? `<div class="notice notice-warning scheduling-pending-notice"><i data-lucide="calendar-days"></i><div><strong>Agendamento ainda nao confirmado</strong><span>${lead.appointmentReservation?.reason === 'conflict' ? 'O horario solicitado foi ocupado. Escolha uma nova data ou horario.' : lead.appointmentReservation?.reason === 'confirming' ? 'O cadastro foi preservado e aguarda a confirmacao do horario.' : 'O cadastro foi salvo sem agendamento. Escolha a data e o horario quando estiver online.'}</span></div></div>` : ''}
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       <input name="schedulingMode" type="hidden" value="${escapeHtml(pendingAppointment ? 'controlled' : lead.appointmentSchedulingMode || 'free')}" />
       ${triageConfigFields(state.leadDetailSchedule.settings)}
@@ -1203,9 +1217,10 @@ function leadDetailView() {
       </fieldset>
       ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
       ${transportFields(editableLead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
+      ${pendingAppointment && !pendingScheduleAvailable ? '<div class="notice notice-warning scheduling-connectivity-notice"><i data-lucide="wifi-off"></i><span>Conecte-se a internet para escolher uma data e um horario disponiveis.</span></div>' : ''}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(editableLead.appointmentDate)}" /><small class="field-error"></small></div>
-        <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(editableLead.appointmentTime)}" /><small class="field-error"></small></div>
+        <div class="field ${pendingAppointment && !pendingScheduleAvailable ? 'is-disabled' : ''}" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" value="${escapeHtml(editableLead.appointmentDate)}" ${pendingAppointment && !pendingScheduleAvailable ? 'disabled' : ''} /><small class="field-error"></small></div>
+        <div class="field ${pendingAppointment && !pendingScheduleAvailable ? 'is-disabled' : ''}" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(editableLead.appointmentTime)}" ${pendingAppointment && !pendingScheduleAvailable ? 'disabled' : ''} /><small class="field-error"></small></div>
       </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
@@ -2206,11 +2221,17 @@ function syncView() {
     return result;
   }, {});
   const schedulingIssues = state.leads.filter((lead) => lead.appointmentReservation?.status === 'pending');
-  const schedulingList = schedulingIssues.map((lead) => `<article class="sync-issue-item">
-    <div class="sync-issue-heading"><span class="sync-issue-icon"><i data-lucide="calendar-days"></i></span><div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div><span class="status-badge ${lead.appointmentReservation?.reason === 'conflict' ? 'status-danger' : 'status-warning'}">${lead.appointmentReservation?.reason === 'conflict' ? 'Horario ocupado' : 'Salvo offline'}</span></div>
-    <dl><div><dt>Horario solicitado</dt><dd>${escapeHtml(formatGoalDate(lead.appointmentReservation?.requestedDate))}, ${escapeHtml(lead.appointmentReservation?.requestedTime || 'sem horario')}</dd></div><div><dt>Servico</dt><dd>${escapeHtml(lead.appointmentServiceName || 'Nao informado')}</dd></div>${lead.needsTransport ? `<div><dt>Transporte</dt><dd>${lead.hasCompanion ? 'Cliente e acompanhante' : 'Somente o cliente'}</dd></div>` : ''}</dl>
-    <div class="sync-issue-actions"><a class="button button-whatsapp" href="${escapeHtml(schedulingWhatsAppUrl(lead))}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a><button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}"><i data-lucide="calendar-days"></i><span>Escolher horario</span></button></div>
-  </article>`).join('');
+  const schedulingList = schedulingIssues.map((lead) => {
+    const reason = lead.appointmentReservation?.reason;
+    const requestedDate = lead.appointmentReservation?.requestedDate || '';
+    const requestedTime = lead.appointmentReservation?.requestedTime || '';
+    const statusLabel = reason === 'conflict' ? 'Horario ocupado' : reason === 'confirming' ? 'Aguardando confirmacao' : 'Aguardando agendamento';
+    return `<article class="sync-issue-item">
+    <div class="sync-issue-heading"><span class="sync-issue-icon"><i data-lucide="calendar-days"></i></span><div><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></div><span class="status-badge ${reason === 'conflict' ? 'status-danger' : 'status-warning'}">${statusLabel}</span></div>
+    <dl>${requestedDate && requestedTime ? `<div><dt>Horario solicitado</dt><dd>${escapeHtml(formatGoalDate(requestedDate))}, ${escapeHtml(requestedTime)}</dd></div>` : '<div><dt>Agendamento</dt><dd>Escolher quando estiver online</dd></div>'}<div><dt>Servico</dt><dd>${escapeHtml(lead.appointmentServiceName || 'Nao informado')}</dd></div>${lead.needsTransport ? `<div><dt>Transporte</dt><dd>${lead.hasCompanion ? 'Cliente e acompanhante' : 'Somente o cliente'}</dd></div>` : ''}</dl>
+    <div class="sync-issue-actions"><a class="button button-whatsapp" href="${escapeHtml(schedulingWhatsAppUrl(lead))}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Chamar no WhatsApp</span></a><button class="button button-secondary" type="button" data-open-lead-id="${escapeHtml(lead.id)}" ${navigator.onLine ? '' : 'disabled'}><i data-lucide="calendar-days"></i><span>Escolher horario</span></button></div>
+  </article>`;
+  }).join('');
 
   return `
     ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="info"></i><span>No modo de desenvolvimento nao ha envio para a nuvem.</span></div>' : ''}
@@ -2299,6 +2320,21 @@ function syncConnectivityIndicator() {
   createIcons({ icons: appIcons });
 }
 
+function handleConnectivityChange() {
+  syncConnectivityIndicator();
+  if (state.route !== 'new') return;
+
+  if (!navigator.onLine) {
+    state.newLeadSchedule.serverVerified = false;
+    state.newLeadSchedule.dayServerVerified = false;
+    state.newLeadSchedule.appointmentDate = '';
+    state.newLeadSchedule.appointments = [];
+  } else if (state.demoMode) {
+    state.newLeadSchedule.serverVerified = true;
+  }
+  refreshAppointmentTimeControl();
+}
+
 function showToast(message, tone = 'success', icon = 'circle-check') {
   state.toast = { message, tone, icon };
   render();
@@ -2317,6 +2353,69 @@ function setFieldErrors(form, errors) {
     if (!field) continue;
     field.classList.add('has-error');
     field.querySelector('.field-error').textContent = message;
+  }
+}
+
+async function saveLeadBeforeReservingAppointment(values, profile, onRemoteError) {
+  if (state.demoMode) {
+    const demoResult = saveLead(values, profile, true, onRemoteError);
+    return { ...demoResult, reservationStatus: demoResult.isValid ? 'confirmed' : '' };
+  }
+
+  const pendingResult = saveLead({
+    ...values,
+    deferAppointment: true,
+    appointmentReservationReason: 'confirming'
+  }, profile, state.demoMode, onRemoteError);
+  if (!pendingResult.isValid) return pendingResult;
+
+  if (pendingResult.writePromise) {
+    let timeoutId;
+    let persisted;
+    try {
+      persisted = await Promise.race([
+        pendingResult.writePromise.then(() => true),
+        new Promise((resolve) => {
+          timeoutId = window.setTimeout(() => resolve(false), 8000);
+        })
+      ]);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+    if (!persisted) return { ...pendingResult, reservationStatus: 'pending' };
+  }
+
+  const pendingLead = {
+    id: pendingResult.id,
+    ...pendingResult.data,
+    storeId: profile.storeId,
+    capturedByUid: profile.uid
+  };
+  try {
+    const reservationResult = updateLead(
+      pendingResult.id,
+      values,
+      state.demoMode,
+      () => {},
+      pendingLead
+    );
+    if (!reservationResult.isValid) return reservationResult;
+    if (reservationResult.writePromise) await reservationResult.writePromise;
+    return { ...reservationResult, reservationStatus: 'confirmed' };
+  } catch (error) {
+    const conflictResult = updateLead(
+      pendingResult.id,
+      {
+        ...values,
+        deferAppointment: true,
+        appointmentReservationReason: 'conflict'
+      },
+      state.demoMode,
+      () => {},
+      pendingLead
+    );
+    if (conflictResult.writePromise) await conflictResult.writePromise;
+    return { ...conflictResult, reservationStatus: 'conflict', reservationError: error };
   }
 }
 
@@ -2353,10 +2452,17 @@ function bindPageEvents() {
     });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const values = enrichLeadTriage(leadFormValues(form), state.newLeadSchedule.settings);
+      let values = enrichLeadTriage(leadFormValues(form), state.newLeadSchedule.settings);
+      const canSchedule = newLeadCanSchedule();
+      if (!canSchedule) {
+        values = { ...values, appointmentDate: '', appointmentTime: '' };
+      }
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
-      const deferredOffline = controlledAppointment && !navigator.onLine;
-      if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
+      if (controlledAppointment && (!state.demoMode && !state.newLeadSchedule.dayServerVerified)) {
+        setFieldErrors(form, { appointmentTime: 'Aguarde a confirmacao dos horarios pela internet.' });
+        return;
+      }
+      if (controlledAppointment) {
         const selectedSlot = buildAppointmentSlots({
           ...(values.careRoute === 'ophthalmologist'
             ? ophthalmologyAppointmentSchedule(state.newLeadSchedule.settings)
@@ -2375,57 +2481,44 @@ function bindPageEvents() {
       }
       const submitButton = form.querySelector('[type="submit"]');
       submitButton.disabled = true;
-      const result = saveLead(deferredOffline ? {
-        ...values,
-        deferAppointment: true,
-        appointmentReservationReason: 'offline'
-      } : values, state.profile, state.demoMode, () => {
-        if (!controlledAppointment) {
-          state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
-          render();
-        }
-      });
+      let result;
+      try {
+        result = controlledAppointment
+          ? await saveLeadBeforeReservingAppointment(values, state.profile, () => {})
+          : saveLead(canSchedule ? values : {
+            ...values,
+            deferAppointment: true,
+            appointmentReservationReason: 'offline'
+          }, state.profile, state.demoMode, () => {
+            state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
+            render();
+          });
+      } catch {
+        submitButton.disabled = false;
+        state.dataError = 'Nao foi possivel preservar o cadastro. Verifique a conexao e tente novamente.';
+        render();
+        return;
+      }
       setFieldErrors(form, result.errors || {});
       if (!result.isValid) {
         submitButton.disabled = false;
         return;
       }
-      if (controlledAppointment && !deferredOffline && result.writePromise) {
-        try {
-          await result.writePromise;
-        } catch {
-          const recovery = saveLead({
-            ...values,
-            deferAppointment: true,
-            appointmentReservationReason: 'conflict'
-          }, state.profile, state.demoMode, () => {});
-          if (!recovery.isValid) {
-            submitButton.disabled = false;
-            setFieldErrors(form, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
-            startDayAppointmentsSubscription();
-            return;
-          }
-          try {
-            if (recovery.writePromise) await recovery.writePromise;
-          } catch {
-            submitButton.disabled = false;
-            state.dataError = 'Nao foi possivel preservar o cadastro. Verifique a conexao e tente novamente.';
-            render();
-            return;
-          }
-          form.reset();
-          navigate('sync');
-          showToast('Lead preservado. Escolha outro horario na aba Sync.', 'warning', 'calendar-days');
-          return;
-        }
+      if (['conflict', 'pending'].includes(result.reservationStatus)) {
+        form.reset();
+        navigate('sync');
+        showToast(result.reservationStatus === 'conflict'
+          ? 'Horario ocupado. O lead continua salvo na aba Sync.'
+          : 'A conexao oscilou. O lead foi preservado para concluir o agendamento depois.', 'warning', 'calendar-days');
+        return;
       }
       form.reset();
-      navigate('leads');
+      navigate(canSchedule ? 'leads' : 'sync');
       showToast(state.demoMode
         ? 'Cadastro salvo somente neste navegador.'
-        : deferredOffline
-          ? 'Lead salvo. O agendamento sera concluido quando houver conexao.'
-          : 'Cadastro salvo. A sincronizacao seguira automaticamente.', deferredOffline ? 'warning' : 'success', deferredOffline ? 'calendar-days' : 'circle-check');
+        : !canSchedule
+          ? 'Lead salvo sem agendamento. Escolha a data e o horario quando estiver online.'
+          : 'Cadastro salvo. A sincronizacao seguira automaticamente.', !canSchedule ? 'warning' : 'success', !canSchedule ? 'calendar-days' : 'circle-check');
     });
   }
 
@@ -2461,6 +2554,17 @@ function bindPageEvents() {
           appointmentTime: editLeadForm.elements.appointmentTime.value,
           ametropiaIds: existingLead.ametropiaIds || [],
           pathologyIds: existingLead.pathologyIds || []
+        };
+      }
+      const preservePendingAppointment = existingLead?.appointmentReservation?.status === 'pending'
+        && !(navigator.onLine && (state.demoMode || existingLead.fromCache === false));
+      if (preservePendingAppointment) {
+        values = {
+          ...values,
+          appointmentDate: existingLead.appointmentReservation?.requestedDate || '',
+          appointmentTime: existingLead.appointmentReservation?.requestedTime || '',
+          deferAppointment: true,
+          appointmentReservationReason: existingLead.appointmentReservation?.reason || 'offline'
         };
       }
       const submitButton = editLeadForm.querySelector('[type="submit"]');
@@ -2501,8 +2605,8 @@ function bindPageEvents() {
         setFieldErrors(editLeadForm, { appointmentTime: 'Conecte-se a internet para alterar um horario confirmado.' });
         return;
       }
-      const deferredOffline = controlledAppointment && !navigator.onLine && !existingLead?.appointmentDate;
-      const updateValues = deferredOffline ? {
+      const deferredOffline = !preservePendingAppointment && controlledAppointment && !navigator.onLine && !existingLead?.appointmentDate;
+      const updateValues = preservePendingAppointment ? values : deferredOffline ? {
         ...values,
         deferAppointment: true,
         appointmentReservationReason: 'offline'
@@ -2694,44 +2798,38 @@ function bindPageEvents() {
       const submitButton = appointmentCreateForm.querySelector('[type="submit"]');
       submitButton.disabled = true;
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
-      const deferredOffline = controlledAppointment && !navigator.onLine;
-      const result = saveLead(deferredOffline ? {
-        ...values,
-        deferAppointment: true,
-        appointmentReservationReason: 'offline'
-      } : values, { ...state.profile, storeId }, state.demoMode, () => {
-        state.appointmentCreate.error = 'O cadastro nao foi aceito pela nuvem.';
-        render();
-      });
+      const deferredOffline = !navigator.onLine;
+      let result;
+      try {
+        result = controlledAppointment && !deferredOffline
+          ? await saveLeadBeforeReservingAppointment(values, { ...state.profile, storeId }, () => {})
+          : saveLead(deferredOffline ? {
+            ...values,
+            appointmentDate: '',
+            appointmentTime: '',
+            deferAppointment: true,
+            appointmentReservationReason: 'offline'
+          } : values, { ...state.profile, storeId }, state.demoMode, () => {
+            state.appointmentCreate.error = 'O cadastro nao foi aceito pela nuvem.';
+            render();
+          });
+      } catch {
+        state.appointmentCreate.saving = false;
+        setFieldErrors(appointmentCreateForm, { appointmentTime: 'Nao foi possivel confirmar o horario. Tente novamente.' });
+        submitButton.disabled = false;
+        return;
+      }
       setFieldErrors(appointmentCreateForm, result.errors || {});
       if (!result.isValid) {
         state.appointmentCreate.saving = false;
         submitButton.disabled = false;
         return;
       }
-      try {
-        if (result.writePromise && !deferredOffline) await result.writePromise;
-        document.querySelector('#appointment-create-dialog')?.close();
-        state.appointmentCreate.saving = false;
-        state.appointmentCreate.error = '';
-        showToast(deferredOffline ? 'Lead salvo sem confirmar o horario. Consulte a aba Sync.' : 'Cadastro adicionado a agenda.', deferredOffline ? 'warning' : 'success', deferredOffline ? 'calendar-days' : 'circle-check');
-      } catch {
-        const recovery = saveLead({
-          ...values,
-          deferAppointment: true,
-          appointmentReservationReason: 'conflict'
-        }, { ...state.profile, storeId }, state.demoMode, () => {});
-        try {
-          if (recovery.writePromise) await recovery.writePromise;
-          document.querySelector('#appointment-create-dialog')?.close();
-          state.appointmentCreate.saving = false;
-          showToast('Horario ocupado. O lead foi preservado na aba Sync.', 'warning', 'calendar-days');
-        } catch {
-          state.appointmentCreate.saving = false;
-          setFieldErrors(appointmentCreateForm, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
-          submitButton.disabled = false;
-        }
-      }
+      document.querySelector('#appointment-create-dialog')?.close();
+      state.appointmentCreate.saving = false;
+      state.appointmentCreate.error = '';
+      const pending = deferredOffline || ['conflict', 'pending'].includes(result.reservationStatus);
+      showToast(pending ? 'Lead preservado sem agendamento. Consulte a aba Sync.' : 'Cadastro adicionado a agenda.', pending ? 'warning' : 'success', pending ? 'calendar-days' : 'circle-check');
     });
   }
 
@@ -3935,6 +4033,20 @@ function refreshAppointmentTimeControl() {
   const container = document.querySelector('#appointment-time-field');
   if (container) container.innerHTML = appointmentTimeField();
   const dateField = document.querySelector('[data-field="appointmentDate"]');
+  const dateInput = dateField?.querySelector('input[name="appointmentDate"]');
+  const schedulingNotice = document.querySelector('#scheduling-connectivity-notice');
+  const canSchedule = newLeadCanSchedule();
+  if (dateInput) {
+    dateInput.disabled = !canSchedule;
+    if (!canSchedule) dateInput.value = '';
+  }
+  if (!canSchedule) {
+    state.newLeadSchedule.appointmentDate = '';
+    state.newLeadSchedule.appointments = [];
+    state.newLeadSchedule.dayServerVerified = false;
+  }
+  dateField?.classList.toggle('is-disabled', !canSchedule);
+  if (schedulingNotice) schedulingNotice.hidden = canSchedule;
   const dateStatus = dateField?.querySelector('.schedule-date-status');
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
@@ -3965,7 +4077,9 @@ function refreshAppointmentTimeControl() {
   const fullyBooked = Boolean(appointmentDate && dateAllowed && !loading && !error && slots.length && !availableSlots.length);
   dateField?.classList.toggle('is-fully-booked', fullyBooked);
   dateField?.classList.toggle('is-date-restricted', Boolean(appointmentDate && !dateAllowed));
-  if (dateStatus) dateStatus.textContent = !transportDateAllowed
+  if (dateStatus) dateStatus.textContent = !canSchedule
+    ? 'Conecte-se a internet para consultar a agenda.'
+    : !transportDateAllowed
     ? 'Nao ha transporte disponivel neste dia.'
     : !routeDateAllowed
       ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista nao atende neste dia.' : 'A loja nao funciona neste dia.'
@@ -3997,6 +4111,7 @@ function startDayAppointmentsSubscription() {
   state.unsubscribeDayAppointments = null;
   state.newLeadSchedule.appointments = [];
   state.newLeadSchedule.error = '';
+  state.newLeadSchedule.dayServerVerified = false;
   const appointmentDate = state.newLeadSchedule.appointmentDate;
   if (!appointmentDate || state.newLeadSchedule.settings.schedulingMode === 'free') {
     state.newLeadSchedule.loading = false;
@@ -4006,6 +4121,7 @@ function startDayAppointmentsSubscription() {
 
   if (state.demoMode) {
     state.newLeadSchedule.appointments = state.leads.filter((lead) => lead.appointmentDate === appointmentDate);
+    state.newLeadSchedule.dayServerVerified = navigator.onLine;
     state.newLeadSchedule.loading = false;
     refreshAppointmentTimeControl();
     return;
@@ -4017,19 +4133,22 @@ function startDayAppointmentsSubscription() {
     state.unsubscribeDayAppointments = subscribeToDayAppointments(
       state.profile,
       appointmentDate,
-      (appointments) => {
+      (appointments, metadata = {}) => {
         state.newLeadSchedule.appointments = appointments;
-        state.newLeadSchedule.loading = false;
+        state.newLeadSchedule.dayServerVerified = navigator.onLine && metadata.fromCache === false;
+        state.newLeadSchedule.loading = !state.newLeadSchedule.dayServerVerified;
         state.newLeadSchedule.error = '';
         refreshAppointmentTimeControl();
       },
       () => {
+        state.newLeadSchedule.dayServerVerified = false;
         state.newLeadSchedule.loading = false;
         state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
         refreshAppointmentTimeControl();
       }
     );
   } catch {
+    state.newLeadSchedule.dayServerVerified = false;
     state.newLeadSchedule.loading = false;
     state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
     refreshAppointmentTimeControl();
@@ -4047,6 +4166,7 @@ async function ensureNewLeadSchedule() {
       state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
     }
     state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0].id;
+    state.newLeadSchedule.serverVerified = navigator.onLine;
     state.newLeadSchedule.loaded = true;
     state.newLeadSchedule.loading = false;
     render();
@@ -4065,14 +4185,16 @@ async function ensureNewLeadSchedule() {
   try {
     state.unsubscribeStoreSchedule = subscribeToStoreSchedule(
       state.profile,
-      (settings) => {
+      (settings, metadata = {}) => {
         state.newLeadSchedule.settings = settings;
+        state.newLeadSchedule.serverVerified = navigator.onLine && metadata.fromCache === false;
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
         refreshNewLeadAmetropiaField();
         refreshAppointmentTimeControl();
       },
       () => {
+        state.newLeadSchedule.serverVerified = false;
         state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
@@ -4082,6 +4204,7 @@ async function ensureNewLeadSchedule() {
       }
     );
   } catch {
+    state.newLeadSchedule.serverVerified = false;
     state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
     state.newLeadSchedule.loaded = true;
     state.newLeadSchedule.loading = false;
@@ -4353,7 +4476,9 @@ async function handleAction(action) {
       appointments: [],
       services: [],
       serviceId: '',
-      triage: {}
+      triage: {},
+      serverVerified: false,
+      dayServerVerified: false
     };
     state.leadDetailSchedule = {
       loading: false,
@@ -5054,6 +5179,8 @@ export async function startApp() {
       state.newLeadSchedule.appointmentDate = '';
       state.newLeadSchedule.appointments = [];
       state.newLeadSchedule.triage = {};
+      state.newLeadSchedule.serverVerified = false;
+      state.newLeadSchedule.dayServerVerified = false;
     } else if (previousRoute !== 'new') {
       state.newLeadSchedule.loaded = false;
     }
@@ -5068,8 +5195,8 @@ export async function startApp() {
     ensureSettingsData();
   });
 
-  window.addEventListener('online', syncConnectivityIndicator);
-  window.addEventListener('offline', syncConnectivityIndicator);
+  window.addEventListener('online', handleConnectivityChange);
+  window.addEventListener('offline', handleConnectivityChange);
   window.addEventListener('resize', syncAgendaSidebarHeight);
   window.setInterval(() => {
     if (['captor', 'manager', 'admin'].includes(state.profile?.role) && ['home', 'follow-ups'].includes(state.route)) render();

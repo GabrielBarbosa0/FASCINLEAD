@@ -272,7 +272,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
   const requestedAppointmentDate = input.appointmentDate?.trim() || '';
   const requestedAppointmentTime = input.appointmentTime?.trim() || '';
-  const deferredAppointment = input.deferAppointment === true && requestedAppointmentDate && requestedAppointmentTime;
+  const deferredAppointment = input.deferAppointment === true;
   const appointmentDate = deferredAppointment ? '' : requestedAppointmentDate;
   const appointmentTime = deferredAppointment ? '' : requestedAppointmentTime;
 
@@ -311,7 +311,9 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       ...(deferredAppointment ? {
         appointmentReservation: {
           status: 'pending',
-          reason: input.appointmentReservationReason === 'conflict' ? 'conflict' : 'offline',
+          reason: ['conflict', 'confirming'].includes(input.appointmentReservationReason)
+            ? input.appointmentReservationReason
+            : 'offline',
           requestedDate: requestedAppointmentDate,
           requestedTime: requestedAppointmentTime
         },
@@ -347,7 +349,7 @@ export function createLeadUpdate(input) {
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
   const requestedAppointmentDate = input.appointmentDate?.trim() || '';
   const requestedAppointmentTime = input.appointmentTime?.trim() || '';
-  const deferredAppointment = input.deferAppointment === true && requestedAppointmentDate && requestedAppointmentTime;
+  const deferredAppointment = input.deferAppointment === true;
   const appointmentDate = deferredAppointment ? '' : requestedAppointmentDate;
   const appointmentTime = deferredAppointment ? '' : requestedAppointmentTime;
   return {
@@ -384,7 +386,9 @@ export function createLeadUpdate(input) {
       appointmentTime,
       appointmentReservation: {
         status: deferredAppointment ? 'pending' : appointmentDate ? 'confirmed' : '',
-        reason: deferredAppointment ? (input.appointmentReservationReason === 'conflict' ? 'conflict' : 'offline') : '',
+        reason: deferredAppointment && ['conflict', 'confirming'].includes(input.appointmentReservationReason)
+          ? input.appointmentReservationReason
+          : deferredAppointment ? 'offline' : '',
         requestedDate: deferredAppointment ? requestedAppointmentDate : '',
         requestedTime: deferredAppointment ? requestedAppointmentTime : ''
       },
