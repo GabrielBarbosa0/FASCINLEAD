@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import {
   appointmentBlockTimes,
@@ -7,7 +7,7 @@ import {
   normalizeStoreSchedule,
   validateStoreSchedule
 } from '../utils/schedule.js';
-import { STORES } from '../utils/stores.js';
+import { appointmentResourceStoreIds, STORES, transportResourceStoreIds } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 
 function permissionError(message) {
@@ -16,20 +16,49 @@ function permissionError(message) {
   return error;
 }
 
+function scheduleWithSharedTransport(storeId, schedulesByStore) {
+  const ownSchedule = normalizeStoreSchedule(schedulesByStore.get(storeId) || DEFAULT_STORE_SCHEDULE);
+  const resourceStoreIds = transportResourceStoreIds(storeId);
+  if (resourceStoreIds.length === 1) return ownSchedule;
+
+  const resourceSchedules = resourceStoreIds.map((id) => (
+    normalizeStoreSchedule(schedulesByStore.get(id) || DEFAULT_STORE_SCHEDULE)
+  ));
+  const transportSchedule = resourceSchedules.find((schedule) => schedule.transportEnabled)
+    || resourceSchedules.find((schedule) => schedule.transportHoursRules.length)
+    || resourceSchedules[0];
+  return {
+    ...ownSchedule,
+    transportEnabled: transportSchedule.transportEnabled,
+    transportHoursRules: transportSchedule.transportHoursRules
+  };
+}
+
 export function subscribeToStoreSchedule(profile, onData, onError, storeId = profile?.storeId) {
   if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId)) throw permissionError('Configuracao de agenda indisponivel.');
-  return onSnapshot(doc(db, 'stores', storeId), (snapshot) => {
-    onData(normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE));
-  }, onError);
+  const resourceStoreIds = transportResourceStoreIds(storeId);
+  const schedulesByStore = new Map();
+  const unsubscribes = resourceStoreIds.map((resourceStoreId) => onSnapshot(
+    doc(db, 'stores', resourceStoreId),
+    (snapshot) => {
+      schedulesByStore.set(resourceStoreId, snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE);
+      if (schedulesByStore.size === resourceStoreIds.length) {
+        onData(scheduleWithSharedTransport(storeId, schedulesByStore));
+      }
+    },
+    onError
+  ));
+  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
 }
 
 export function subscribeToDayAppointments(profile, appointmentDate, onData, onError, storeId = profile?.storeId) {
   if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId) || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate || '')) {
     throw permissionError('Data de agendamento indisponivel.');
   }
+  const resourceStoreIds = appointmentResourceStoreIds(storeId);
   const dayQuery = query(
     collection(db, 'appointmentSlots'),
-    where('storeId', '==', storeId),
+    where('storeId', resourceStoreIds.length === 1 ? '==' : 'in', resourceStoreIds.length === 1 ? storeId : resourceStoreIds),
     where('appointmentDate', '==', appointmentDate)
   );
   return onSnapshot(dayQuery, (snapshot) => {
@@ -44,7 +73,7 @@ export async function loadStoreSchedules(profile) {
   const allowedStoreIds = profileStoreIds(profile);
   return STORES.filter((store) => allowedStoreIds.includes(store.id)).map((store) => ({
     ...store,
-    ...normalizeStoreSchedule(byId.get(store.id) || DEFAULT_STORE_SCHEDULE)
+    ...scheduleWithSharedTransport(store.id, byId)
   }));
 }
 
@@ -52,10 +81,15 @@ export async function loadStoreSchedule(profile, storeId) {
   if (!isFirebaseConfigured || !profile?.uid || !profileStoreIds(profile).includes(storeId)) {
     throw permissionError('Configuracao de agenda indisponivel.');
   }
-  const snapshot = await getDoc(doc(db, 'stores', storeId));
+  const resourceStoreIds = transportResourceStoreIds(storeId);
+  const snapshots = await Promise.all(resourceStoreIds.map((id) => getDoc(doc(db, 'stores', id))));
+  const byId = new Map(snapshots.map((snapshot, index) => [
+    resourceStoreIds[index],
+    snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE
+  ]));
   return {
     id: storeId,
-    ...normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE)
+    ...scheduleWithSharedTransport(storeId, byId)
   };
 }
 
@@ -63,11 +97,22 @@ export async function saveStoreSchedule(profile, storeId, values) {
   if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem configurar agendas.');
   const validation = validateStoreSchedule(values);
   if (!validation.isValid) return validation;
-  await setDoc(doc(db, 'stores', storeId), {
+  const updatedAt = serverTimestamp();
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'stores', storeId), {
     ...validation.data,
-    updatedAt: serverTimestamp(),
+    updatedAt,
     updatedByUid: profile.uid
   }, { merge: true });
+  transportResourceStoreIds(storeId)
+    .filter((resourceStoreId) => resourceStoreId !== storeId)
+    .forEach((resourceStoreId) => batch.set(doc(db, 'stores', resourceStoreId), {
+      transportEnabled: validation.data.transportEnabled,
+      transportHoursRules: validation.data.transportHoursRules,
+      updatedAt,
+      updatedByUid: profile.uid
+    }, { merge: true }));
+  await batch.commit();
   return validation;
 }
 

@@ -206,7 +206,7 @@ describe('lead correction rules', () => {
       createdAtServer: Timestamp.now(),
       updatedAtServer: Timestamp.now()
     });
-    batch.set(doc(db, 'appointmentSlots', 'slot-loja-02-2026-10-20-10:00'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-10:00'), {
       storeId: 'loja-02',
       appointmentDate: '2026-10-20',
       appointmentTime: '10:00',
@@ -618,6 +618,18 @@ describe('store schedule settings', () => {
     await assertSucceeds(getDoc(doc(db, 'stores', 'loja-06')));
   });
 
+  it('lets a Surubim captor read the shared transport configuration', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'stores', 'loja-02'), {
+        transportEnabled: true,
+        transportHoursRules: [{ weekday: 3, openingTime: '13:00', closingTime: '17:00' }]
+      });
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(getDoc(doc(db, 'stores', 'loja-02')));
+    await assertFails(getDoc(doc(db, 'stores', 'loja-04')));
+  });
+
   it('rejects store schedule changes by a captor', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(setDoc(doc(db, 'stores', 'loja-06'), {
@@ -717,7 +729,7 @@ describe('appointment slot reservations', () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'lead-slot'), lead);
-    batch.set(doc(db, 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot);
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot);
     await assertSucceeds(batch.commit());
     await assertSucceeds(getDocs(query(
       collection(db, 'appointmentSlots'),
@@ -730,11 +742,11 @@ describe('appointment slot reservations', () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await Promise.all([
         setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
-        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot)
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
       ]);
     });
     const db = authenticatedDb('captor-uid', 'captor@example.com');
-    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), {
+    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
       ...slot,
       leadId: 'second-lead',
       createdAt: Timestamp.now()
@@ -745,7 +757,7 @@ describe('appointment slot reservations', () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await Promise.all([
         setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
-        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot)
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
       ]);
     });
     const db = authenticatedDb('captor-uid', 'captor@example.com');
@@ -757,7 +769,7 @@ describe('appointment slot reservations', () => {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'overlapping-lead'), overlappingLead);
     ['07:50', '08:00'].forEach((blockTime) => {
-      batch.set(doc(db, 'appointmentSlots', `slot-loja-06-2026-10-20-${blockTime}`), {
+      batch.set(doc(db, 'appointmentSlots', `slot-consultorio-surubim-2026-10-20-${blockTime}`), {
         ...slot,
         appointmentTime: '07:50',
         blockTime,
@@ -769,12 +781,12 @@ describe('appointment slot reservations', () => {
 
   it('rejects an orphan slot without a matching lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
-    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-loja-06-2026-10-20-08:00'), slot));
+    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot));
   });
 
   it('lets an administrator backfill a slot for an existing lead', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
-    await assertSucceeds(setDoc(doc(db, 'appointmentSlots', 'slot-loja-06-2026-10-15-09:30'), {
+    await assertSucceeds(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-15-09:30'), {
       storeId: 'loja-06',
       appointmentDate: '2026-10-15',
       appointmentTime: '09:30',
@@ -786,11 +798,60 @@ describe('appointment slot reservations', () => {
     }));
   });
 
-  it('rejects reading slots from another store', async () => {
+  it('lets Surubim stores read their shared clinic slots', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'appointmentSlots'),
+      where('storeId', '==', 'loja-02'),
+      where('appointmentDate', '==', '2026-10-20')
+    )));
+  });
+
+  it('lets a Surubim captor query the combined clinic occupancy', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'appointmentSlots', 'legacy-loja-02-slot'), {
+        ...slot,
+        storeId: 'loja-02'
+      });
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'appointmentSlots'),
+      where('storeId', 'in', ['loja-02', 'loja-06']),
+      where('appointmentDate', '==', '2026-10-20')
+    )));
+  });
+
+  it('prevents Loja 02 and Loja 06 from reserving the same clinic block', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await Promise.all([
+        setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
+      ]);
+    });
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const loja02Lead = {
+      ...lead,
+      capturedByUid: 'manager-uid',
+      capturedByName: 'Gestor Teste',
+      storeId: 'loja-02'
+    };
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', 'lead-loja-02'), loja02Lead);
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+      ...slot,
+      storeId: 'loja-02',
+      leadId: 'lead-loja-02',
+      capturedByUid: 'manager-uid'
+    });
+    await assertFails(batch.commit());
+  });
+
+  it('rejects reading slots from an independent store', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(getDocs(query(
       collection(db, 'appointmentSlots'),
-      where('storeId', '==', 'loja-02'),
+      where('storeId', '==', 'loja-04'),
       where('appointmentDate', '==', '2026-10-20')
     )));
   });

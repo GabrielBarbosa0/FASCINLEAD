@@ -60,6 +60,28 @@ service cloud.firestore {
       );
     }
 
+    function isSurubimSharedStore(storeId) {
+      return storeId in ['loja-02', 'loja-06'];
+    }
+
+    function userHasScheduleStore(storeId) {
+      return userHasStore(storeId)
+        || (isSurubimSharedStore(storeId) && (
+          userHasStore('loja-02') || userHasStore('loja-06')
+        ));
+    }
+
+    function managerHasScheduleStore(storeId) {
+      return managerHasStore(storeId)
+        || (isSurubimSharedStore(storeId) && (
+          managerHasStore('loja-02') || managerHasStore('loja-06')
+        ));
+    }
+
+    function appointmentResourceId(storeId) {
+      return isSurubimSharedStore(storeId) ? 'consultorio-surubim' : storeId;
+    }
+
     function permittedStoreIds() {
       return ('storeIds' in userProfile()) ? userProfile().storeIds : [userProfile().storeId];
     }
@@ -265,7 +287,7 @@ service cloud.firestore {
         && data.leadId is string
         && data.capturedByUid is string
         && data.createdAt is timestamp
-        && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.blockTime;
+        && slotId == 'slot-' + appointmentResourceId(data.storeId) + '-' + data.appointmentDate + '-' + data.blockTime;
     }
 
     function validCaptorCorrectionData(data) {
@@ -514,7 +536,7 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow get: if isPrimaryAdmin() || (activeUser() && (
-        userHasStore(storeId) || managerHasStore(storeId) || isAdmin()
+        userHasScheduleStore(storeId) || managerHasScheduleStore(storeId) || isAdmin()
       ));
       allow list: if activeUser() || isPrimaryAdmin();
       allow write: if isAdmin();
@@ -592,8 +614,8 @@ service cloud.firestore {
 
     match /appointmentSlots/{slotId} {
       allow get, list: if activeUser() && (
-        (userHasStore(resource.data.storeId) && hasPermission('leads.create'))
-        || (managerHasStore(resource.data.storeId) && hasPermission('appointments.view'))
+        (userHasScheduleStore(resource.data.storeId) && hasPermission('leads.create'))
+        || (managerHasScheduleStore(resource.data.storeId) && hasPermission('appointments.view'))
         || isAdmin()
       );
       allow create: if activeUser()

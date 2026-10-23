@@ -59,6 +59,10 @@ function blockTimes(startTime, durationMinutes) {
   });
 }
 
+function appointmentResourceId(storeId) {
+  return ['loja-02', 'loja-06'].includes(storeId) ? 'consultorio-surubim' : storeId;
+}
+
 function slotFields(lead, leadId, blockTime, durationMinutes, createdAt) {
   return {
     storeId: { stringValue: stringField(lead, 'storeId') },
@@ -91,7 +95,7 @@ function buildMigration(leads, slots, stores) {
     const durationMinutes = integerField(lead, 'appointmentDurationMinutes') || storeDurations.get(storeId) || 20;
     appointments += 1;
     blockTimes(appointmentTime, durationMinutes).forEach((blockTime) => {
-      const slotId = `slot-${storeId}-${appointmentDate}-${blockTime}`;
+      const slotId = `slot-${appointmentResourceId(storeId)}-${appointmentDate}-${blockTime}`;
       const existing = slotsById.get(slotId);
       if (existing && stringField(existing, 'leadId') !== leadId) {
         conflicts.push({ slotId, existingLeadId: stringField(existing, 'leadId'), ignoredLeadId: leadId });

@@ -126,7 +126,9 @@ describe('store schedule helpers', () => {
 
   it('reserves every ten-minute block required by a service', () => {
     expect(appointmentBlockTimes('08:10', 30)).toEqual(['08:10', '08:20', '08:30']);
-    expect(appointmentSlotId('loja-06', '2026-10-22', '08:20')).toBe('slot-loja-06-2026-10-22-08:20');
+    expect(appointmentSlotId('loja-06', '2026-10-22', '08:20')).toBe('slot-consultorio-surubim-2026-10-22-08:20');
+    expect(appointmentSlotId('loja-02', '2026-10-22', '08:20')).toBe('slot-consultorio-surubim-2026-10-22-08:20');
+    expect(appointmentSlotId('loja-04', '2026-10-22', '08:20')).toBe('slot-loja-04-2026-10-22-08:20');
   });
 
   it('uses persisted blocks to prevent partial overlaps', () => {

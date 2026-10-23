@@ -1,3 +1,5 @@
+import { appointmentResourceId } from './stores.js';
+
 export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   schedulingMode: 'controlled',
   appointmentDurationMinutes: 20,
@@ -103,7 +105,7 @@ export function appointmentBlockTimes(appointmentTime, durationMinutes) {
 }
 
 export function appointmentSlotId(storeId, appointmentDate, blockTime) {
-  return `slot-${storeId}-${appointmentDate}-${blockTime}`;
+  return `slot-${appointmentResourceId(storeId)}-${appointmentDate}-${blockTime}`;
 }
 
 function normalizeLimitedDayRules(value, legacyWeekdays, legacyCapacity) {

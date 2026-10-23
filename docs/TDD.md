@@ -4,7 +4,7 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.4 |
+| Versao | 2.5 |
 | Status | Em implementacao |
 | Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
@@ -221,9 +221,9 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O cargo MEI pode ser limitado a dias especificos e cotas diferentes para manha e tarde em cada dia.
 - A cota consumida e determinada pelo horario do atendimento agendado, nao pelo horario em que o captador realizou o cadastro.
 - O alerta de atraso e o limite para sugerir reagendamento sao tempos separados.
-- Regra operacional confirmada para a proxima evolucao: Loja 02 e Loja 06 compartilham a agenda do consultorio de Surubim. Um horario ocupado por qualquer uma das duas lojas deve ficar indisponivel para ambas.
+- Loja 02 e Loja 06 compartilham a agenda do consultorio de Surubim. Um horario ocupado por qualquer uma das duas lojas fica indisponivel para ambas.
 - Loja 04 - Carpina e Loja 05 - Limoeiro permanecem com agendas independentes. O compartilhamento nao altera a loja de destino do lead, sua atribuicao, seus relatorios ou suas permissoes.
-- Esta agenda compartilhada ainda nao esta implementada: o modelo atual continua reservando blocos por `storeId` e devera migrar para um identificador de recurso ou grupo de agenda.
+- As reservas de Loja 02 e Loja 06 usam a chave de recurso `consultorio-surubim`; a consulta de disponibilidade le os blocos originados pelas duas lojas, inclusive os registros anteriores a esta regra.
 
 ### RF-12 - Triagem oftalmologica
 
@@ -240,9 +240,9 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Cada loja configura os dias e horarios em que o transporte esta disponivel.
 - Em acessos multi-loja, o formulario aguarda a configuracao da unidade de destino antes de liberar os campos, evitando usar a escala padrao ou a resposta atrasada de outra loja.
 - Um agendamento com transporte so pode usar data e intervalo integralmente compativeis com essa escala.
-- Regra operacional confirmada para a proxima evolucao: Loja 02 e Loja 06 compartilham o mesmo transporte de Surubim, incluindo escala e disponibilidade. Uma reserva ou alteracao de capacidade nesse recurso deve ser refletida para as duas lojas.
+- Loja 02 e Loja 06 compartilham o mesmo transporte de Surubim, incluindo escala e disponibilidade. Uma alteracao nessa configuracao e gravada para as duas lojas.
 - Loja 04 - Carpina e Loja 05 - Limoeiro permanecem com configuracoes de transporte independentes.
-- O compartilhamento do transporte ainda nao esta implementado: a configuracao atual permanece armazenada por loja ate a introducao de um identificador de recurso ou grupo de transporte.
+- Durante a leitura, o sistema combina a configuracao de transporte de Surubim e prefere a configuracao ativa. Isso preserva dados anteriores ate que as duas lojas sejam novamente salvas e fiquem convergentes.
 - Capacidade do veiculo, numero minimo de passageiros e fechamento de viagens permanecem pendentes de definicao operacional.
 
 ### RF-14 - Relatorios e dashboard
@@ -468,7 +468,7 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
 
 #### Reservas de horario em `appointmentSlots`
 
-Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos.
+Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{recursoDeAgenda}-{data}-{hora}`), sem nome, telefone ou observacoes. O recurso e `consultorio-surubim` para Loja 02 e Loja 06 e corresponde ao proprio `storeId` para Loja 04 e Loja 05. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos, inclusive entre as duas lojas de Surubim.
 
 No fluxo online atual, o cadastro e todos os blocos exigidos pelo servico sao gravados no mesmo lote. Se qualquer bloco ja estiver ocupado, o lote inteiro falha e o usuario escolhe outro horario. O cadastro offline nunca inclui data, horario ou documentos em `appointmentSlots`.
 
@@ -549,7 +549,7 @@ O identificador do documento sera o UID entregue pelo Firebase Authentication.
 
 `allowedEmails` e a autorizacao administrativa; `users` e o perfil materializado para o UID autenticado. Alteracoes de cargo, permissoes, unidades e estado sao propagadas para ambos quando o usuario ja realizou o primeiro login. A exclusao de um acesso remove `allowedEmails`, mas inativa o documento historico em `users`.
 
-As regras do Firestore autorizam leitura da agenda e criacao de leads somente quando o `storeId` de destino pertence a `storeIds` do usuario, ou quando o usuario e Administrador. A mesma verificacao protege os blocos de horario em `appointmentSlots`.
+As regras do Firestore autorizam leitura da agenda e criacao de leads somente quando o `storeId` de destino pertence a `storeIds` do usuario, ou quando o usuario e Administrador. Para a disponibilidade compartilhada, usuarios da Loja 02 ou Loja 06 podem ler os blocos e as configuracoes de agenda da outra unidade de Surubim, sem ampliar seu acesso aos leads ou relatorios da outra loja. A chave compartilhada protege os blocos em `appointmentSlots` contra reservas simultaneas.
 
 ### 7.5 Colecao `interests`
 
@@ -1081,7 +1081,7 @@ O MVP estara apto para piloto quando:
 | ADR-023 | Manter Administrador com todas as permissoes | Evita bloquear acidentalmente a administracao e a recuperacao operacional |
 | ADR-024 | Separar escala da loja, oftalmologista e transporte | Cada recurso possui disponibilidade semanal independente e precisa |
 | ADR-025 | Separar unidades permitidas do usuario e loja de destino do lead | Suporta gestores multi-loja e MEI externo sem perder o isolamento e a atribuicao operacional de cada captacao |
-| ADR-026 | Compartilhar agenda do consultorio e transporte entre Loja 02 e Loja 06 | As duas unidades ficam em Surubim e utilizam os mesmos recursos; Loja 04 e Loja 05 permanecem independentes. Decisao operacional aprovada, com implementacao pendente |
+| ADR-026 | Compartilhar agenda do consultorio e transporte entre Loja 02 e Loja 06 | As duas unidades ficam em Surubim e utilizam os mesmos recursos; Loja 04 e Loja 05 permanecem independentes |
 
 ## 20. Pendencias de produto e operacao
 
@@ -1093,7 +1093,6 @@ O MVP estara apto para piloto quando:
 - A senha inicial padrao devera ser substituida futuramente por convite ou senha temporaria de uso unico?
 - Qual sera a estrategia definitiva de hospedagem e custo da API local e da Callable Function?
 - Quais alertas, auditoria e backups serao exigidos antes do piloto ampliado?
-- Migrar reservas e configuracoes de Loja 02 e Loja 06 de `storeId` para grupos de recursos compartilhados de Surubim, cobrindo agenda do consultorio e transporte sem alterar a loja de destino dos leads.
 
 Essas decisoes nao impedem a evolucao tecnica, mas devem ser respondidas antes do uso ampliado com dados reais.
 

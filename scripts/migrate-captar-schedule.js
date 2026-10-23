@@ -220,7 +220,7 @@ function buildWrites(data, existingLeadIds, existingSlotIds) {
       currentDocument: { exists: false }
     });
 
-    const slotId = `slot-loja-06-${appointmentDate}-${appointmentTime}`;
+    const slotId = `slot-consultorio-surubim-${appointmentDate}-${appointmentTime}`;
     if (!existingSlotIds.has(slotId)) {
       writes.push({
         update: {
