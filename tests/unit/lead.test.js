@@ -104,7 +104,6 @@ describe('lead validation', () => {
       appointmentServiceId: 'service-eye-exam',
       appointmentServiceName: 'Exame de vista',
       appointmentDurationMinutes: 30,
-      appointmentReservation: { status: 'confirmed', reason: '', requestedDate: '', requestedTime: '' },
       ametropiaIds: ['myopia', 'astigmatism'],
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyIds: ['glaucoma', 'diabetes'],
@@ -118,57 +117,6 @@ describe('lead validation', () => {
     });
     expect(result.data).not.toHaveProperty('consentGiven');
     expect(result.data).not.toHaveProperty('consentAtClient');
-  });
-
-  it('preserves an offline appointment request without confirming the schedule', () => {
-    const result = createLeadDocument({
-      ...validInput,
-      deferAppointment: true,
-      appointmentReservationReason: 'offline',
-      needsTransport: 'true',
-      hasCompanion: 'true',
-      transportEnabled: true,
-      transportAllowedWeekdays: [5]
-    }, profile, 'installation-test');
-
-    expect(result.isValid).toBe(true);
-    expect(result.data).toMatchObject({
-      appointmentDate: '',
-      appointmentTime: '',
-      appointmentReservation: {
-        status: 'pending',
-        reason: 'offline',
-        requestedDate: '2026-10-02',
-        requestedTime: '14:30'
-      },
-      appointmentServiceName: 'Exame de vista',
-      needsTransport: true,
-      transportSeats: 2
-    });
-    expect(result.data).not.toHaveProperty('appointmentAttendance');
-  });
-
-  it('preserves an offline lead without inventing a requested appointment', () => {
-    const result = createLeadDocument({
-      ...validInput,
-      appointmentDate: '',
-      appointmentTime: '',
-      deferAppointment: true,
-      appointmentReservationReason: 'offline'
-    }, profile, 'installation-test');
-
-    expect(result.isValid).toBe(true);
-    expect(result.data).toMatchObject({
-      appointmentDate: '',
-      appointmentTime: '',
-      appointmentReservation: {
-        status: 'pending',
-        reason: 'offline',
-        requestedDate: '',
-        requestedTime: ''
-      },
-      appointmentServiceName: 'Exame de vista'
-    });
   });
 
   it('stores transport customers and companions as separate seat counts', () => {

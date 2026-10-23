@@ -105,7 +105,6 @@ service cloud.firestore {
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
-          'appointmentReservation',
           'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
           'followUpContactedAt', 'followUpContactedByUid',
           'followUpContactedByName', 'followUpContactedAppointmentKey',
@@ -264,14 +263,6 @@ service cloud.firestore {
         && slotId == 'slot-' + data.storeId + '-' + data.appointmentDate + '-' + data.blockTime;
     }
 
-    function appointmentSlotMatchesLead(data) {
-      let lead = getAfter(/databases/$(database)/documents/leads/$(data.leadId)).data;
-      return lead.storeId == data.storeId
-        && lead.appointmentDate == data.appointmentDate
-        && lead.appointmentTime == data.appointmentTime
-        && lead.capturedByUid == data.capturedByUid;
-    }
-
     function validCaptorCorrectionData(data) {
       return data.fullName is string
         && data.fullName.size() >= 2
@@ -374,7 +365,6 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentReservation',
           'appointmentAttendance', 'notes', 'updatedAtServer'
         ])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
@@ -426,7 +416,6 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
               'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-              'appointmentReservation',
               'appointmentAttendance', 'updatedAtServer'
             ]))
         );
@@ -463,7 +452,6 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentReservation',
           'appointmentAttendance', 'notes', 'updatedAtServer'
         ]);
     }
@@ -609,7 +597,11 @@ service cloud.firestore {
           request.resource.data.storeId == userProfile().storeId
           && request.resource.data.capturedByUid == request.auth.uid
         ))
-        && appointmentSlotMatchesLead(request.resource.data);
+        && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.storeId == request.resource.data.storeId
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentDate == request.resource.data.appointmentDate
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
       allow update: if activeUser()
         && resource.data.leadId == request.resource.data.leadId
         && validAppointmentSlot(slotId, request.resource.data)
@@ -617,7 +609,11 @@ service cloud.firestore {
           request.resource.data.storeId == userProfile().storeId
           && request.resource.data.capturedByUid == request.auth.uid
         ))
-        && appointmentSlotMatchesLead(request.resource.data);
+        && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.storeId == request.resource.data.storeId
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentDate == request.resource.data.appointmentDate
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
+        && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
       allow delete: if isAdmin()
         || (activeUser()
           && resource.data.capturedByUid == request.auth.uid

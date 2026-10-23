@@ -17,100 +17,8 @@ import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
-import { listLocalLeads, markLocalLeadError, preserveLocalLead, removeLocalLeads, subscribeToLocalLeads } from './local-lead-outbox.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
-const activeWrites = new Set();
-
-export function mergeLeadSources(remoteLeads, localLeads) {
-  const merged = new Map((localLeads || []).map((lead) => [lead.id, {
-    ...lead,
-    syncState: lead.syncState || 'pending',
-    fromCache: true
-  }]));
-  for (const lead of remoteLeads || []) {
-    const local = merged.get(lead.id);
-    merged.set(lead.id, lead.syncState === 'synced' && local?.syncState !== 'error'
-      ? lead
-      : local?.syncState === 'error'
-        ? { ...lead, ...local, fromCache: lead.fromCache }
-      : { ...local, ...lead, syncState: lead.syncState || local?.syncState || 'pending' });
-  }
-  return [...merged.values()].sort((left, right) => (
-    String(right.capturedAtClient || '').localeCompare(String(left.capturedAtClient || ''))
-  ));
-}
-
-function trackWrite(writePromise, id, onRemoteError) {
-  let tracked;
-  tracked = writePromise.catch(async (error) => {
-    try {
-      await markLocalLeadError(id, error?.message);
-    } finally {
-      onRemoteError?.(error);
-    }
-    throw error;
-  }).finally(() => activeWrites.delete(tracked));
-  activeWrites.add(tracked);
-  tracked.catch(() => {});
-  return tracked;
-}
-
-function retryLeadData(localLead) {
-  const {
-    id,
-    syncState,
-    syncError,
-    fromCache,
-    localUpdatedAt,
-    createdAtServer,
-    updatedAtServer,
-    ...data
-  } = localLead;
-  return {
-    id,
-    data: {
-      ...data,
-      createdAtServer: createdAtServer || serverTimestamp(),
-      updatedAtServer: serverTimestamp()
-    }
-  };
-}
-
-async function retryFailedLocalLeads(capturedByUid) {
-  const failedLeads = (await listLocalLeads(capturedByUid)).filter((lead) => lead.syncState === 'error');
-  return failedLeads.map((localLead) => {
-    const retry = retryLeadData(localLead);
-    const write = (async () => {
-      await setDoc(doc(db, 'leads', retry.id), retry.data, { merge: true });
-      if (retry.data.appointmentSchedulingMode !== 'controlled'
-        || !retry.data.appointmentDate
-        || !retry.data.appointmentTime) {
-        await removeLocalLeads([retry.id]);
-        return;
-      }
-      const durationMinutes = Number(retry.data.appointmentDurationMinutes) || 20;
-      const blocks = reservationBlocks(
-        retry.data.storeId,
-        retry.data.appointmentDate,
-        retry.data.appointmentTime,
-        durationMinutes
-      );
-      const batch = writeBatch(db);
-      blocks.forEach((block) => setReservationBlock(batch, block, {
-        storeId: retry.data.storeId,
-        appointmentDate: retry.data.appointmentDate,
-        appointmentTime: retry.data.appointmentTime,
-        durationMinutes,
-        leadId: retry.id,
-        capturedByUid: retry.data.capturedByUid
-      }));
-      await batch.commit();
-      await removeLocalLeads([retry.id]);
-    })();
-    return trackWrite(write, retry.id);
-  });
-}
 
 function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
   return appointmentBlockTimes(appointmentTime, durationMinutes).map((blockTime) => ({
@@ -155,49 +63,21 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     limit(100)
   );
 
-  let remoteLeads = [];
-  let localLeads = [];
-  let disposed = false;
-  const emit = () => onData(mergeLeadSources(remoteLeads, localLeads));
-  const refreshLocal = async () => {
-    try {
-      localLeads = await listLocalLeads(profile.uid);
-      if (!disposed) emit();
-    } catch (error) {
-      if (!disposed) onError(error);
-    }
-  };
-  const unsubscribeLocal = subscribeToLocalLeads(refreshLocal);
-  refreshLocal();
-
-  const unsubscribeRemote = onSnapshot(
+  return onSnapshot(
     leadsQuery,
     { includeMetadataChanges: true },
     (snapshot) => {
-      remoteLeads = snapshot.docs.map((leadDoc) => ({
+      onData(
+        snapshot.docs.map((leadDoc) => ({
           id: leadDoc.id,
           ...leadDoc.data(),
           syncState: leadDoc.metadata.hasPendingWrites ? 'pending' : 'synced',
-          fromCache: snapshot.metadata.fromCache
-        }));
-      if (!snapshot.metadata.fromCache) {
-        const failedLocalIds = new Set(localLeads
-          .filter((lead) => lead.syncState === 'error')
-          .map((lead) => lead.id));
-        const confirmedIds = remoteLeads
-          .filter((lead) => lead.syncState === 'synced' && !failedLocalIds.has(lead.id))
-          .map((lead) => lead.id);
-        removeLocalLeads(confirmedIds).catch(onError);
-      }
-      emit();
+          fromCache: leadDoc.metadata.fromCache
+        }))
+      );
     },
     onError
   );
-  return () => {
-    disposed = true;
-    unsubscribeLocal();
-    unsubscribeRemote();
-  };
 }
 
 export function saveLead(input, profile, demoMode, onRemoteError) {
@@ -225,8 +105,7 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
     createdAtServer: serverTimestamp(),
     updatedAtServer: serverTimestamp()
   };
-  const localLead = { id, ...result.data, syncState: 'pending', fromCache: true };
-  let remoteWrite;
+  let writePromise;
   if (input.schedulingMode === 'controlled' && result.data.appointmentDate && result.data.appointmentTime) {
     const durationMinutes = Number(input.appointmentDurationMinutes) || 20;
     const blocks = reservationBlocks(profile.storeId, result.data.appointmentDate, result.data.appointmentTime, durationMinutes);
@@ -240,16 +119,12 @@ export function saveLead(input, profile, demoMode, onRemoteError) {
       leadId: id,
       capturedByUid: profile.uid
     }));
-    remoteWrite = () => batch.commit();
+    writePromise = batch.commit();
   } else {
-    remoteWrite = () => setDoc(doc(db, 'leads', id), leadData);
+    writePromise = setDoc(doc(db, 'leads', id), leadData);
   }
 
-  const writePromise = trackWrite(
-    preserveLocalLead(localLead).then(remoteWrite),
-    id,
-    onRemoteError
-  );
+  writePromise.catch(onRemoteError);
   return { ...result, id, writePromise };
 }
 
@@ -278,15 +153,15 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     existingLead.appointmentDate !== result.data.appointmentDate
     || existingLead.appointmentTime !== result.data.appointmentTime
   );
-  const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
-    && existingLead.appointmentDate && existingLead.appointmentTime;
-  const newControlled = result.data.appointmentSchedulingMode === 'controlled'
-    && result.data.appointmentDate && result.data.appointmentTime;
   const leadUpdate = {
     ...result.data,
     ...(appointmentChanged && existingLead.appointmentAttendance === 'missed' ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
+  const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
+    && existingLead.appointmentDate && existingLead.appointmentTime;
+  const newControlled = result.data.appointmentSchedulingMode === 'controlled'
+    && result.data.appointmentDate && result.data.appointmentTime;
   const oldBlocks = oldControlled
     ? reservationBlocks(existingLead.storeId, existingLead.appointmentDate, existingLead.appointmentTime, existingLead.appointmentDurationMinutes || 20)
     : [];
@@ -296,41 +171,8 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   const newIds = new Set(newBlocks.map((block) => block.id));
   const reservationChanged = oldBlocks.length !== newBlocks.length
     || oldBlocks.some((block) => !newIds.has(block.id));
-  const localLead = {
-    ...(existingLead || {}),
-    id,
-    ...result.data,
-    syncState: 'pending',
-    fromCache: true
-  };
-  let remoteWrite;
-  if (existingLead && !oldControlled && newControlled && reservationChanged) {
-    remoteWrite = async () => {
-      await setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
-      const reservationBatch = writeBatch(db);
-      newBlocks.forEach((block) => setReservationBlock(reservationBatch, block, {
-        storeId: existingLead.storeId,
-        appointmentDate: result.data.appointmentDate,
-        appointmentTime: result.data.appointmentTime,
-        durationMinutes: result.data.appointmentDurationMinutes,
-        leadId: id,
-        capturedByUid: existingLead.capturedByUid
-      }));
-      try {
-        await reservationBatch.commit();
-      } catch (error) {
-        await setDoc(doc(db, 'leads', id), {
-          appointmentDate: existingLead.appointmentDate || '',
-          appointmentTime: existingLead.appointmentTime || '',
-          appointmentReservation: existingLead.appointmentReservation || {
-            status: 'pending', reason: 'offline', requestedDate: '', requestedTime: ''
-          },
-          updatedAtServer: serverTimestamp()
-        }, { merge: true });
-        throw error;
-      }
-    };
-  } else if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
+  let writePromise;
+  if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
     oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
@@ -342,16 +184,12 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
       leadId: id,
       capturedByUid: existingLead.capturedByUid
     }));
-    remoteWrite = () => batch.commit();
+    writePromise = batch.commit();
   } else {
-    remoteWrite = () => setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
+    writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
   }
 
-  const writePromise = trackWrite(
-    preserveLocalLead(localLead).then(remoteWrite),
-    id,
-    onRemoteError
-  );
+  writePromise.catch(onRemoteError);
   return { ...result, id, writePromise };
 }
 
@@ -388,14 +226,9 @@ export function markDemoFollowUpContact(id, profile) {
   return true;
 }
 
-export async function synchronizeNow(demoMode, capturedByUid = '') {
+export async function synchronizeNow(demoMode) {
   if (demoMode || !isFirebaseConfigured) return { demo: true };
   await enableNetwork(db);
-  const retryWrites = capturedByUid ? await retryFailedLocalLeads(capturedByUid) : [];
-  const writes = [...new Set([...activeWrites, ...retryWrites])];
-  const results = await Promise.allSettled([waitForPendingWrites(db), ...writes]);
-  if (results.some((result) => result.status === 'rejected')) {
-    throw new Error('Um ou mais cadastros foram recusados pela nuvem e continuam salvos neste aparelho.');
-  }
+  await waitForPendingWrites(db);
   return { demo: false };
 }

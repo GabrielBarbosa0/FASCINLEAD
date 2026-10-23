@@ -270,11 +270,6 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
   if (!validation.isValid) return { ...validation, data: null };
 
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
-  const requestedAppointmentDate = input.appointmentDate?.trim() || '';
-  const requestedAppointmentTime = input.appointmentTime?.trim() || '';
-  const deferredAppointment = input.deferAppointment === true;
-  const appointmentDate = deferredAppointment ? '' : requestedAppointmentDate;
-  const appointmentTime = deferredAppointment ? '' : requestedAppointmentTime;
 
   return {
     errors: {},
@@ -306,28 +301,16 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,
-      appointmentDate,
-      appointmentTime,
-      ...(deferredAppointment ? {
-        appointmentReservation: {
-          status: 'pending',
-          reason: ['conflict', 'confirming'].includes(input.appointmentReservationReason)
-            ? input.appointmentReservationReason
-            : 'offline',
-          requestedDate: requestedAppointmentDate,
-          requestedTime: requestedAppointmentTime
-        },
-        appointmentSchedulingMode: 'controlled',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
-      } : appointmentDate ? {
-        appointmentReservation: { status: 'confirmed', reason: '', requestedDate: '', requestedTime: '' },
+      appointmentDate: input.appointmentDate?.trim() || '',
+      appointmentTime: input.appointmentTime?.trim() || '',
+      ...(input.appointmentDate?.trim() ? {
         appointmentAttendance: 'pending',
         appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
-        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20
-      } : {}),
-      ...((appointmentDate || deferredAppointment) && input.appointmentServiceId ? {
-        appointmentServiceId: String(input.appointmentServiceId),
-        appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
+        appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
+        ...(input.appointmentServiceId ? {
+          appointmentServiceId: String(input.appointmentServiceId),
+          appointmentServiceName: String(input.appointmentServiceName || 'Exame de vista').trim().slice(0, 80)
+        } : {})
       } : {}),
       notes: input.notes?.trim() || '',
       source: 'street',
@@ -347,11 +330,6 @@ export function createLeadUpdate(input) {
   if (!validation.isValid) return { ...validation, data: null };
 
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
-  const requestedAppointmentDate = input.appointmentDate?.trim() || '';
-  const requestedAppointmentTime = input.appointmentTime?.trim() || '';
-  const deferredAppointment = input.deferAppointment === true;
-  const appointmentDate = deferredAppointment ? '' : requestedAppointmentDate;
-  const appointmentTime = deferredAppointment ? '' : requestedAppointmentTime;
   return {
     errors: {},
     isValid: true,
@@ -382,17 +360,9 @@ export function createLeadUpdate(input) {
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,
-      appointmentDate,
-      appointmentTime,
-      appointmentReservation: {
-        status: deferredAppointment ? 'pending' : appointmentDate ? 'confirmed' : '',
-        reason: deferredAppointment && ['conflict', 'confirming'].includes(input.appointmentReservationReason)
-          ? input.appointmentReservationReason
-          : deferredAppointment ? 'offline' : '',
-        requestedDate: deferredAppointment ? requestedAppointmentDate : '',
-        requestedTime: deferredAppointment ? requestedAppointmentTime : ''
-      },
-      ...((appointmentDate || deferredAppointment) && input.schedulingMode ? {
+      appointmentDate: input.appointmentDate?.trim() || '',
+      appointmentTime: input.appointmentTime?.trim() || '',
+      ...(input.appointmentDate?.trim() && input.schedulingMode ? {
         appointmentSchedulingMode: input.schedulingMode === 'controlled' ? 'controlled' : 'free',
         appointmentDurationMinutes: Number(input.appointmentDurationMinutes) || 20,
         ...(input.appointmentServiceId ? {
