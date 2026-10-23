@@ -50,6 +50,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
   await expect(page.getByRole('heading', { name: 'Cadastro' })).toBeVisible();
+  await expect(page.locator('[data-offline-capture-notice]')).toBeHidden();
   await expect(page.getByLabel('RG', { exact: true })).toHaveAttribute('placeholder', '0.000.000');
   const standardContactLayout = await page.locator('#lead-form').evaluate((form) => {
     const phone = form.elements.phone.getBoundingClientRect();

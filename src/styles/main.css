@@ -246,6 +246,10 @@ svg {
   margin-top: 12px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .notice {
   display: flex;
   align-items: flex-start;
