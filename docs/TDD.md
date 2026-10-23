@@ -4,7 +4,7 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.2 |
+| Versao | 2.4 |
 | Status | Em implementacao |
 | Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
@@ -75,6 +75,7 @@ Campos minimos propostos:
 
 | Campo | Obrigatorio | Regra |
 | --- | --- | --- |
+| Loja de destino | Sim | Fixa para captador de uma unidade; escolhida entre as unidades permitidas para Administrador, Gestor multi-loja e MEI |
 | Nome | Sim | Entre 2 e 120 caracteres |
 | Telefone/WhatsApp | Sim | Normalizado para telefone brasileiro |
 | RG | Nao | Texto normalizado; placeholder `0.000.000` |
@@ -100,7 +101,7 @@ O sistema preenchera automaticamente:
 
 - identificador do registro;
 - colaborador responsavel;
-- loja do colaborador;
+- loja de destino escolhida ou vinculada ao colaborador;
 - data e hora da captacao no dispositivo;
 - origem `rua`;
 - versao do esquema e versao do aplicativo.
@@ -108,6 +109,8 @@ O sistema preenchera automaticamente:
 Receita, fotos e geolocalizacao exata nao fazem parte do MVP. CPF, RG e os dados clinicos estritamente necessarios a triagem foram incorporados e devem receber o mesmo tratamento de seguranca e minimizacao dos demais dados pessoais.
 
 Novos cadastros exigem data de nascimento tanto na interface quanto nas regras do Firestore. Registros legados sem essa informacao continuam consultaveis e podem ser corrigidos ou reagendados; quando a data for informada, ela tambem sera validada nas edicoes.
+
+Ao trocar a loja de destino durante um novo cadastro, o formulario preserva os dados pessoais, endereco, interesse, triagem, transporte e observacoes. Data e horario sao limpos porque dependem da agenda da nova unidade; o servico permanece selecionado somente quando tambem estiver disponivel nela.
 
 ### RF-03 - Operacao offline
 
@@ -218,6 +221,9 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O cargo MEI pode ser limitado a dias especificos e cotas diferentes para manha e tarde em cada dia.
 - A cota consumida e determinada pelo horario do atendimento agendado, nao pelo horario em que o captador realizou o cadastro.
 - O alerta de atraso e o limite para sugerir reagendamento sao tempos separados.
+- Regra operacional confirmada para a proxima evolucao: Loja 02 e Loja 06 compartilham a agenda do consultorio de Surubim. Um horario ocupado por qualquer uma das duas lojas deve ficar indisponivel para ambas.
+- Loja 04 - Carpina e Loja 05 - Limoeiro permanecem com agendas independentes. O compartilhamento nao altera a loja de destino do lead, sua atribuicao, seus relatorios ou suas permissoes.
+- Esta agenda compartilhada ainda nao esta implementada: o modelo atual continua reservando blocos por `storeId` e devera migrar para um identificador de recurso ou grupo de agenda.
 
 ### RF-12 - Triagem oftalmologica
 
@@ -232,7 +238,11 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O lead informa se precisa de transporte e se levara um acompanhante, limitado a um.
 - O consumo de capacidade e representado por `transportSeats`: um assento para o cliente e dois com acompanhante.
 - Cada loja configura os dias e horarios em que o transporte esta disponivel.
+- Em acessos multi-loja, o formulario aguarda a configuracao da unidade de destino antes de liberar os campos, evitando usar a escala padrao ou a resposta atrasada de outra loja.
 - Um agendamento com transporte so pode usar data e intervalo integralmente compativeis com essa escala.
+- Regra operacional confirmada para a proxima evolucao: Loja 02 e Loja 06 compartilham o mesmo transporte de Surubim, incluindo escala e disponibilidade. Uma reserva ou alteracao de capacidade nesse recurso deve ser refletida para as duas lojas.
+- Loja 04 - Carpina e Loja 05 - Limoeiro permanecem com configuracoes de transporte independentes.
+- O compartilhamento do transporte ainda nao esta implementado: a configuracao atual permanece armazenada por loja ate a introducao de um identificador de recurso ou grupo de transporte.
 - Capacidade do veiculo, numero minimo de passageiros e fechamento de viagens permanecem pendentes de definicao operacional.
 
 ### RF-14 - Relatorios e dashboard
@@ -245,6 +255,11 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 ### RF-15 - Perfis e permissoes
 
 - O sistema fornece os perfis padrao Colaborador, MEI, Gestor de unidades, Atendente de balcao e Administrador.
+- Colaborador e Atendente de balcao ficam vinculados a uma unidade operacional, usada automaticamente nos novos cadastros.
+- Gestores podem receber uma ou mais unidades permitidas; quando possuirem mais de uma, escolhem a loja de destino em cada captacao. A unidade principal sempre pertence a essa lista e muda automaticamente quando a unidade principal anterior e desmarcada.
+- MEI e um captador externo sem loja principal operacional. O acesso define uma ou mais unidades permitidas, e a loja de destino e obrigatoria em cada novo cadastro.
+- Administradores possuem acesso a todas as unidades e tambem escolhem explicitamente a loja de destino ao cadastrar um lead.
+- Todo lead conserva um unico `storeId`; o vinculo multi-loja pertence ao usuario e nunca torna o lead compartilhado entre lojas.
 - Perfis nao administrativos podem ter permissoes ativadas ou desativadas individualmente.
 - Perfis personalizados podem ser criados, editados e inativados com nome, alcance e permissoes proprias.
 - Os perfis padrao possuem acao de restauracao; Administrador conserva todas as permissoes.
@@ -410,7 +425,7 @@ FASCINLEAD/
 
 ### 6.2 Navegacao mobile
 
-A barra inferior e montada conforme as permissoes. Ela pode exibir `Inicio`, `Novo`, `Cadastros`, `Retornos`, `Sync` e `Gestao`, limitada aos destinos aplicaveis ao perfil. A acao principal `Novo` deve ficar disponivel em um toque para quem possui `leads.create`.
+A barra inferior e montada conforme as permissoes. Ela pode exibir `Inicio`, `Novo`, `Cadastros`, `Retornos`, `Sync` e `Gestao`, limitada aos destinos aplicaveis ao perfil. A acao principal `Novo` deve ficar disponivel em um toque para quem possui `leads.create`. O cabecalho identifica a unidade unica, a quantidade de lojas permitidas ou o acesso a todas as unidades.
 
 ### 6.3 Estado de conectividade
 
@@ -508,6 +523,8 @@ O identificador do documento sera o e-mail normalizado em letras minusculas.
 
 Essa colecao resolve a autorizacao do primeiro acesso: o e-mail e liberado antes do login, e o usuario autenticado cria seu perfil somente se os dados coincidirem com a autorizacao.
 
+`storeIds` representa as unidades que o usuario pode acessar e usar como destino. Para perfis vinculados a uma unica loja, `storeId` e `storeIds[0]` coincidem. Para MEI, `storeId` e mantido apenas como compatibilidade interna e recebe a primeira unidade permitida; a interface nao apresenta essa unidade como loja principal. Administradores recebem todas as unidades.
+
 ### 7.4 Colecao `users`
 
 O identificador do documento sera o UID entregue pelo Firebase Authentication.
@@ -531,6 +548,8 @@ O identificador do documento sera o UID entregue pelo Firebase Authentication.
 ```
 
 `allowedEmails` e a autorizacao administrativa; `users` e o perfil materializado para o UID autenticado. Alteracoes de cargo, permissoes, unidades e estado sao propagadas para ambos quando o usuario ja realizou o primeiro login. A exclusao de um acesso remove `allowedEmails`, mas inativa o documento historico em `users`.
+
+As regras do Firestore autorizam leitura da agenda e criacao de leads somente quando o `storeId` de destino pertence a `storeIds` do usuario, ou quando o usuario e Administrador. A mesma verificacao protege os blocos de horario em `appointmentSlots`.
 
 ### 7.5 Colecao `interests`
 
@@ -1046,7 +1065,7 @@ O MVP estara apto para piloto quando:
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
-| ADR-010 | Disponibilizar as lojas 02, 04, 05 e 06 | Sao as unidades definidas para a operacao inicial do FascinLead |
+| ADR-010 | Disponibilizar Loja 02 - Surubim, Loja 04 - Carpina, Loja 05 - Limoeiro e Loja 06 - Surubim | Sao as unidades e cidades definidas para a operacao inicial do FascinLead |
 | ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em CRM |
 | ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
 | ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
@@ -1061,6 +1080,8 @@ O MVP estara apto para piloto quando:
 | ADR-022 | Modelar autorizacao com perfis e permissoes granulares | Permite cargos personalizados sem multiplicar papeis fixos nas regras e na interface |
 | ADR-023 | Manter Administrador com todas as permissoes | Evita bloquear acidentalmente a administracao e a recuperacao operacional |
 | ADR-024 | Separar escala da loja, oftalmologista e transporte | Cada recurso possui disponibilidade semanal independente e precisa |
+| ADR-025 | Separar unidades permitidas do usuario e loja de destino do lead | Suporta gestores multi-loja e MEI externo sem perder o isolamento e a atribuicao operacional de cada captacao |
+| ADR-026 | Compartilhar agenda do consultorio e transporte entre Loja 02 e Loja 06 | As duas unidades ficam em Surubim e utilizam os mesmos recursos; Loja 04 e Loja 05 permanecem independentes. Decisao operacional aprovada, com implementacao pendente |
 
 ## 20. Pendencias de produto e operacao
 
@@ -1072,6 +1093,7 @@ O MVP estara apto para piloto quando:
 - A senha inicial padrao devera ser substituida futuramente por convite ou senha temporaria de uso unico?
 - Qual sera a estrategia definitiva de hospedagem e custo da API local e da Callable Function?
 - Quais alertas, auditoria e backups serao exigidos antes do piloto ampliado?
+- Migrar reservas e configuracoes de Loja 02 e Loja 06 de `storeId` para grupos de recursos compartilhados de Surubim, cobrindo agenda do consultorio e transporte sem alterar a loja de destino dos leads.
 
 Essas decisoes nao impedem a evolucao tecnica, mas devem ser respondidas antes do uso ampliado com dados reais.
 

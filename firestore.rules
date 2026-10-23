@@ -53,6 +53,13 @@ service cloud.firestore {
       );
     }
 
+    function userHasStore(storeId) {
+      return activeUser() && (
+        userProfile().storeId == storeId
+        || ('storeIds' in userProfile() && storeId in userProfile().storeIds)
+      );
+    }
+
     function permittedStoreIds() {
       return ('storeIds' in userProfile()) ? userProfile().storeIds : [userProfile().storeId];
     }
@@ -507,7 +514,7 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow get: if isPrimaryAdmin() || (activeUser() && (
-        userProfile().storeId == storeId || managerHasStore(storeId) || isAdmin()
+        userHasStore(storeId) || managerHasStore(storeId) || isAdmin()
       ));
       allow list: if activeUser() || isPrimaryAdmin();
       allow write: if isAdmin();
@@ -537,9 +544,7 @@ service cloud.firestore {
         && hasPermission('leads.create')
         && validLead(request.resource.data)
         && request.resource.data.capturedByUid == request.auth.uid
-        && (isAdmin()
-          || request.resource.data.storeId == userProfile().storeId
-          || managerHasStore(request.resource.data.storeId));
+        && (isAdmin() || userHasStore(request.resource.data.storeId));
 
       allow get, list: if activeUser() && (
         (resource.data.capturedByUid == request.auth.uid && hasPermission('leads.view_own'))
@@ -587,14 +592,14 @@ service cloud.firestore {
 
     match /appointmentSlots/{slotId} {
       allow get, list: if activeUser() && (
-        (resource.data.storeId == userProfile().storeId && hasPermission('leads.create'))
+        (userHasStore(resource.data.storeId) && hasPermission('leads.create'))
         || (managerHasStore(resource.data.storeId) && hasPermission('appointments.view'))
         || isAdmin()
       );
       allow create: if activeUser()
         && validAppointmentSlot(slotId, request.resource.data)
         && (isAdmin() || managerHasStore(request.resource.data.storeId) || (
-          request.resource.data.storeId == userProfile().storeId
+          userHasStore(request.resource.data.storeId)
           && request.resource.data.capturedByUid == request.auth.uid
         ))
         && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))
@@ -606,7 +611,7 @@ service cloud.firestore {
         && resource.data.leadId == request.resource.data.leadId
         && validAppointmentSlot(slotId, request.resource.data)
         && (isAdmin() || managerHasStore(request.resource.data.storeId) || (
-          request.resource.data.storeId == userProfile().storeId
+          userHasStore(request.resource.data.storeId)
           && request.resource.data.capturedByUid == request.auth.uid
         ))
         && existsAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId))

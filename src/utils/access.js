@@ -36,11 +36,17 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
   const roleProfileId = String(values.roleProfileId || '');
   const selectedProfile = roleProfiles.find((profile) => profile.id === roleProfileId && profile.active !== false);
   const role = selectedProfile?.baseRole || String(values.role || '');
+  const isMei = selectedProfile?.id === 'system-mei';
   const password = options.requirePassword && role !== 'admin'
     ? DEFAULT_TEAM_PASSWORD
     : requestedPassword;
-  const storeId = String(values.storeId || '').trim().toLowerCase();
+  let storeId = String(values.storeId || '').trim().toLowerCase();
   const requestedStoreIds = Array.isArray(values.storeIds) ? values.storeIds : [values.storeIds].filter(Boolean);
+  const normalizedRequestedStoreIds = [...new Set(requestedStoreIds.map((item) => String(item).trim().toLowerCase()))];
+  if (isMei) storeId = normalizedRequestedStoreIds[0] || '';
+  if (role === 'manager' && normalizedRequestedStoreIds.length && !normalizedRequestedStoreIds.includes(storeId)) {
+    storeId = normalizedRequestedStoreIds[0];
+  }
   const errors = {};
 
   if (displayName.length < 2 || displayName.length > 120) {
@@ -70,14 +76,16 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
   }
 
   if (!STORE_IDS.has(storeId)) {
-    errors.storeId = 'Escolha uma loja valida.';
+    if (isMei) errors.storeIds = 'Escolha ao menos uma unidade permitida.';
+    else errors.storeId = 'Escolha uma loja valida.';
   }
 
   const storeIds = role === 'admin'
     ? [...STORE_IDS]
-    : role === 'manager'
-      ? [...new Set([storeId, ...requestedStoreIds.map((item) => String(item).trim().toLowerCase())])]
+    : role === 'manager' || isMei
+      ? [...new Set([storeId, ...normalizedRequestedStoreIds].filter(Boolean))]
       : [storeId];
+  if (isMei && !storeIds.length) errors.storeIds = 'Escolha ao menos uma unidade permitida.';
   if (storeIds.some((item) => !STORE_IDS.has(item))) errors.storeIds = 'Escolha apenas unidades validas.';
 
   return {

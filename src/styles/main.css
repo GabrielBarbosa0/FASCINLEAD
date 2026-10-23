@@ -340,6 +340,27 @@ svg {
   gap: 8px;
 }
 
+.store-indicator {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid #c9d7e8;
+  border-radius: 6px;
+  color: var(--primary);
+  background: #f3f7fc;
+  font-size: 0.73rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.store-indicator svg {
+  width: 15px;
+  height: 15px;
+}
+
 .connectivity,
 .mode-badge,
 .status-badge {
@@ -375,6 +396,24 @@ svg {
 .mode-badge {
   color: #795100;
   background: var(--amber-soft);
+}
+
+@media (max-width: 440px) {
+  .header-inner {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .store-indicator,
+  .connectivity {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
 }
 
 .icon-button,

@@ -33,6 +33,16 @@ beforeEach(async () => {
         storeId: 'loja-06',
         active: true
       }),
+      setDoc(doc(db, 'users', 'mei-uid'), {
+        email: 'mei@example.com',
+        displayName: 'Captador MEI',
+        role: 'captor',
+        roleProfileId: 'system-mei',
+        permissions: ['leads.create', 'leads.view_own', 'leads.edit_own'],
+        storeId: 'loja-02',
+        storeIds: ['loja-02', 'loja-05'],
+        active: true
+      }),
       setDoc(doc(db, 'users', 'outro-uid'), {
         email: 'outro@example.com',
         displayName: 'Outro Captador',
@@ -133,6 +143,27 @@ describe('lead correction rules', () => {
       createdAtServer: Timestamp.now(),
       updatedAtServer: Timestamp.now()
     }));
+  });
+
+  it('lets a MEI create leads only for permitted destination stores', async () => {
+    const db = authenticatedDb('mei-uid', 'mei@example.com');
+    const lead = {
+      fullName: 'Cliente do MEI',
+      phone: '+5581999995678',
+      phoneSearch: '81999995678',
+      birthDate: '1985-04-12',
+      notes: '',
+      source: 'street',
+      schemaVersion: 1,
+      capturedByUid: 'mei-uid',
+      capturedByName: 'Captador MEI',
+      capturedAtClient: '2026-09-28T13:00:00.000Z',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    };
+
+    await assertSucceeds(setDoc(doc(db, 'leads', 'mei-permitted-store'), { ...lead, storeId: 'loja-05' }));
+    await assertFails(setDoc(doc(db, 'leads', 'mei-blocked-store'), { ...lead, storeId: 'loja-06' }));
   });
 
   it('rejects a new lead without a birth date', async () => {

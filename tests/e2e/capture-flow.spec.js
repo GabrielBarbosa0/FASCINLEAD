@@ -13,6 +13,7 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
   await expect(page.locator('.profile-card').getByText('Atendente de balcao', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
@@ -38,11 +39,59 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await expect(page.getByText('Seu perfil nao possui acesso aos dados gerenciais.')).toHaveCount(0);
 });
 
+test('requires a destination store for a multi-store MEI capture', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'mei'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).click();
+
+  const store = page.getByLabel('Loja de destino');
+  await expect(store).toHaveValue('');
+  await expect(store.locator('option')).toHaveCount(5);
+  await expect(store.locator('option[value="loja-02"]')).toHaveText('Loja 02 - Surubim');
+  await expect(store.locator('option[value="loja-04"]')).toHaveText('Loja 04 - Carpina');
+  await expect(store.locator('option[value="loja-05"]')).toHaveText('Loja 05 - Limoeiro');
+  await expect(store.locator('option[value="loja-06"]')).toHaveText('Loja 06 - Surubim');
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeDisabled();
+  await store.selectOption('loja-02');
+  await expect(store).toHaveValue('loja-02');
+  await expect(page.getByLabel('Servico do agendamento')).toBeEnabled();
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
+  await page.getByLabel('Nome *').fill('Cliente preservado');
+  await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByLabel('RG', { exact: true }).fill('1234567');
+  await page.getByLabel('CPF', { exact: true }).fill('52998224725');
+  await page.getByLabel('Data de nascimento *').fill('1960-04-12');
+  await page.getByLabel('Como prefere ser chamado').fill('Cliente');
+  await page.getByLabel('Catarata', { exact: true }).check();
+  await page.getByLabel('Ja realizou cirurgia nos olhos? *').selectOption('yes');
+  await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
+  await page.getByLabel('Observacao rapida').fill('Manter estas informacoes');
+  const serviceId = await page.getByLabel('Servico do agendamento').inputValue();
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 7);
+  await page.getByLabel('Data do pre-agendamento').fill(futureDate.toISOString().slice(0, 10));
+
+  await store.selectOption('loja-04');
+  await expect(page.getByLabel('Nome *')).toHaveValue('Cliente preservado');
+  await expect(page.getByLabel('Telefone ou WhatsApp *')).toHaveValue('(81) 99999-1234');
+  await expect(page.getByLabel('RG', { exact: true })).toHaveValue('1234567');
+  await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
+  await expect(page.getByLabel('Data de nascimento *')).toHaveValue('1960-04-12');
+  await expect(page.getByLabel('Como prefere ser chamado')).toHaveValue('Cliente');
+  await expect(page.getByLabel('Catarata', { exact: true })).toBeChecked();
+  await expect(page.getByLabel('Ja realizou cirurgia nos olhos? *')).toHaveValue('yes');
+  await expect(page.getByLabel('Qual cirurgia? *')).toHaveValue('cataract');
+  await expect(page.getByLabel('Observacao rapida')).toHaveValue('Manter estas informacoes');
+  await expect(page.getByLabel('Servico do agendamento')).toHaveValue(serviceId);
+  await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('');
+});
+
 test('captures and lists a lead in development mode', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'FascinLead' })).toBeVisible();
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
   await page.screenshot({
     path: testInfo.outputPath('home.png'),
     fullPage: true
@@ -158,6 +207,7 @@ test('routes cataract clients to configured ophthalmology days', async ({ page }
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
 
   await page.getByLabel('Data de nascimento').fill('1960-01-01');
   await expect(page.getByLabel('Ja realizou cirurgia nos olhos? *')).toBeVisible();
@@ -253,6 +303,7 @@ test('opens goal creation in a modal from the goals heading', async ({ page }, t
 test('configures multiple permitted stores for a manager access', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await expect(page.getByLabel('Loja: Todas as unidades')).toHaveText(/Todas/);
   await page.getByRole('button', { name: /Acessos da equipe/ }).click();
 
   await page.getByRole('button', { name: 'Novo acesso' }).click();
@@ -275,6 +326,16 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await page.getByLabel('Loja 06').check();
   await expect(page.getByLabel('Loja 02')).toBeChecked();
   await expect(page.getByLabel('Loja 06')).toBeChecked();
+  await page.getByLabel('Loja 02').uncheck();
+  await expect(page.getByLabel('Unidade principal')).toHaveValue('loja-06');
+  await expect(page.getByLabel('Loja 02')).not.toBeChecked();
+  await expect(page.getByLabel('Loja 06')).toBeChecked();
+  await page.getByLabel('Perfil / cargo').selectOption('system-mei');
+  await expect(page.getByLabel('Unidade principal')).toBeHidden();
+  await expect(page.getByText('Unidades permitidas', { exact: true })).toBeVisible();
+  for (const store of ['Loja 02', 'Loja 04', 'Loja 05', 'Loja 06']) {
+    await expect(page.getByLabel(store)).toBeChecked();
+  }
   await page.screenshot({ path: testInfo.outputPath('access-store-picker.png'), fullPage: true });
 });
 
@@ -523,6 +584,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
 
   async function createAppointment(name, date, time) {
     await page.getByRole('button', { name: 'Novo', exact: true }).click();
+    await page.getByLabel('Loja de destino').selectOption('loja-06');
     await page.getByLabel('Nome *').fill(name);
     await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
     await page.getByLabel('Data de nascimento *').fill('1985-04-12');
@@ -1141,6 +1203,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.screenshot({ path: testInfo.outputPath('schedule-settings.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toBeVisible();
   await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
   await page.getByLabel('Transporte', { exact: true }).selectOption('true');
@@ -1171,6 +1234,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await timeSelect.selectOption('08:00');
   await page.getByRole('button', { name: 'Salvar cadastro' }).click();
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
   await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(0);
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:10"]')).toHaveCount(0);
@@ -1358,6 +1422,7 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   await page.screenshot({ path: testInfo.outputPath('service-catalog.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
   await page.getByLabel('Servico do agendamento').selectOption({ label: 'Avaliacao especializada - 40 min' });
   const date = new Date();
   date.setDate(date.getDate() + 1);

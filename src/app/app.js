@@ -184,12 +184,14 @@ const state = {
     loaded: false,
     loading: false,
     error: '',
+    storeId: '',
     settings: { ...DEFAULT_STORE_SCHEDULE },
     appointmentDate: '',
     appointments: [],
     services: [],
     serviceId: '',
-    triage: {}
+    triage: {},
+    draft: {}
   },
   leadDetailSchedule: {
     loading: false,
@@ -301,7 +303,7 @@ const demoProfile = {
   displayName: 'Equipe Fascinante',
   email: 'modo.de.desenvolvimento@local',
   role: 'captor',
-  storeId: 'loja-teste',
+  storeId: 'loja-06',
   active: true
 };
 
@@ -319,7 +321,8 @@ function createDemoProfile() {
       roleProfileId: mei.id,
       roleProfileName: mei.name,
       permissions: [...mei.permissions],
-      storeId: 'loja-06'
+      storeId: 'loja-06',
+      storeIds: STORES.map((store) => store.id)
     };
   }
   if (role === 'receptionist') {
@@ -558,6 +561,13 @@ function currentPageTitle() {
 
 function headerView() {
   const online = navigator.onLine;
+  const storeSummary = formatAccessStoreSummary(state.profile);
+  const storeCount = profileStoreIds(state.profile).length;
+  const storeIndicator = storeSummary.short === 'TODAS'
+    ? 'Todas'
+    : storeCount > 1
+      ? `${storeCount} lojas`
+      : storeSummary.short;
   return `
     <header class="app-header">
       <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
@@ -567,6 +577,9 @@ function headerView() {
         </div>
         <div class="header-actions">
           ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
+          <span class="store-indicator" title="${escapeHtml(storeSummary.full)}" aria-label="Loja: ${escapeHtml(storeSummary.full)}">
+            <i data-lucide="building-2"></i><span>${escapeHtml(storeIndicator)}</span>
+          </span>
           <span class="connectivity ${online ? 'is-online' : 'is-offline'}">
             <i data-lucide="${online ? 'wifi' : 'wifi-off'}"></i>${online ? 'Online' : 'Offline'}
           </span>
@@ -713,11 +726,33 @@ function appointmentTimeField() {
   </div>`;
 }
 
+function isMeiProfile(profile = state.profile) {
+  return profile?.roleProfileId === 'system-mei';
+}
+
+function captureStoreIds(profile = state.profile) {
+  return profileStoreIds(profile).filter((storeId) => STORES.some((store) => store.id === storeId));
+}
+
+function requiresCaptureStoreChoice(profile = state.profile) {
+  return profile?.role === 'admin' || isMeiProfile(profile) || captureStoreIds(profile).length > 1;
+}
+
+function selectedNewLeadStoreId() {
+  return state.newLeadSchedule.storeId
+    || (requiresCaptureStoreChoice() ? '' : state.profile?.storeId || '');
+}
+
+function newLeadCaptureProfile() {
+  return { ...state.profile, storeId: selectedNewLeadStoreId() };
+}
+
 function selectedNewLeadService() {
-  const available = servicesForStore(state.newLeadSchedule.services, state.profile?.storeId);
+  const storeId = selectedNewLeadStoreId();
+  const available = servicesForStore(state.newLeadSchedule.services, storeId);
   return available.find((service) => service.id === state.newLeadSchedule.serviceId)
     || available[0]
-    || defaultAppointmentService(state.profile?.storeId || '', state.newLeadSchedule.settings.appointmentDurationMinutes);
+    || defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes);
 }
 
 function ametropiaOptions(selectedIds = []) {
@@ -902,6 +937,37 @@ function leadFormValues(form) {
   };
 }
 
+const NEW_LEAD_DRAFT_FIELDS = [
+  'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
+  'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'appointmentServiceId',
+  'ametropiaIds', 'pathologyIds', 'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
+  'careRouteOverride', 'needsTransport', 'hasCompanion', 'notes'
+];
+
+function captureNewLeadDraft(form) {
+  const values = leadFormValues(form);
+  return Object.fromEntries(NEW_LEAD_DRAFT_FIELDS
+    .filter((name) => Object.hasOwn(values, name))
+    .map((name) => [name, values[name]]));
+}
+
+function restoreNewLeadDraft(form, draft = {}) {
+  NEW_LEAD_DRAFT_FIELDS.forEach((name) => {
+    if (!Object.hasOwn(draft, name) || name === 'appointmentServiceId') return;
+    const controls = [...form.querySelectorAll(`[name="${name}"]`)];
+    if (!controls.length) return;
+    const values = Array.isArray(draft[name]) ? draft[name].map(String) : [String(draft[name] ?? '')];
+    controls.forEach((control) => {
+      if (control.type === 'checkbox' || control.type === 'radio') control.checked = values.includes(control.value);
+      else control.value = values[0];
+    });
+  });
+  if (draft.eyeSurgeryStatus === 'yes' && form.elements.eyeSurgeryType) {
+    form.elements.eyeSurgeryType.disabled = false;
+    form.elements.eyeSurgeryType.value = draft.eyeSurgeryType || '';
+  }
+}
+
 function bindExclusiveOptions(form, fieldName) {
   const inputs = [...form.querySelectorAll(`[name="${fieldName}"]`)];
   inputs.forEach((input) => input.addEventListener('change', () => {
@@ -942,9 +1008,15 @@ function newLeadView() {
       <div class="empty-state"><i data-lucide="wifi-off"></i><strong>Cadastro offline desativado</strong><p>Conecte-se a internet para iniciar um novo cadastro. Esta protecao evita registros incompletos enquanto o modo offline esta em refinamento.</p></div>`;
   }
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
+  const selectedStoreId = selectedNewLeadStoreId();
+  const allowedStoreIds = captureStoreIds();
+  const storeChoice = requiresCaptureStoreChoice();
+  const storeOptions = STORES.filter((store) => allowedStoreIds.includes(store.id))
+    .map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.displayLabel}</option>`)
+    .join('');
   const selectedService = selectedNewLeadService();
-  const availableServices = servicesForStore(state.newLeadSchedule.services, state.profile.storeId);
-  const serviceOptions = (availableServices.length ? availableServices : [selectedService])
+  const availableServices = servicesForStore(state.newLeadSchedule.services, selectedStoreId);
+  const serviceOptions = (availableServices.length ? availableServices : selectedStoreId ? [selectedService] : [])
     .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
     .join('');
   return `
@@ -953,6 +1025,15 @@ function newLeadView() {
     </section>
     <form id="lead-form" class="form-panel" novalidate>
       <div class="notice notice-warning" data-offline-capture-notice ${navigator.onLine ? 'hidden' : ''}><i data-lucide="wifi-off"></i><span>Cadastro offline ativo. Os dados do lead serao preservados, mas data e horario so poderao ser escolhidos com internet.</span></div>
+      <div class="field" data-field="storeId">
+        <label for="capture-store">Loja de destino <span aria-hidden="true">*</span></label>
+        <select id="capture-store" name="storeId" required ${storeChoice ? '' : 'aria-disabled="true" tabindex="-1"'}>
+          ${storeChoice ? '<option value="">Selecione a loja</option>' : ''}${storeOptions}
+        </select>
+        <small>${storeChoice ? 'Os servicos, horarios e limites serao carregados para esta unidade.' : 'Unidade definida no acesso deste colaborador.'}</small>
+        <small class="field-error"></small>
+      </div>
+      ${selectedStoreId && !state.newLeadSchedule.loaded ? '<div class="notice notice-info" data-schedule-loading><i data-lucide="refresh-cw"></i><span>Carregando agenda, transporte e horarios desta loja...</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
       ${triageConfigFields(state.newLeadSchedule.settings)}
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
@@ -1010,7 +1091,7 @@ function newLeadView() {
         </div>
         <div class="field" data-field="appointmentServiceId">
           <label for="appointmentServiceId">Servico do agendamento</label>
-          <select id="appointmentServiceId" name="appointmentServiceId">${serviceOptions}</select>
+          <select id="appointmentServiceId" name="appointmentServiceId" ${selectedStoreId ? '' : 'disabled'}><option value="">${selectedStoreId ? 'Selecione o servico' : 'Escolha primeiro a loja'}</option>${serviceOptions}</select>
           <small class="field-error"></small>
         </div>
       </div>
@@ -1027,7 +1108,7 @@ function newLeadView() {
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
       ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine ? '' : 'disabled'} /><small class="schedule-date-status">${navigator.onLine ? '' : 'Conecte-se para escolher uma data.'}</small><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine && selectedStoreId ? '' : 'disabled'} /><small class="schedule-date-status">${!navigator.onLine ? 'Conecte-se para escolher uma data.' : !selectedStoreId ? 'Escolha primeiro a loja de destino.' : ''}</small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
       <div class="field" data-field="notes">
@@ -1270,7 +1351,7 @@ function managementView() {
     .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
 
   const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
-  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${filters.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${filters.storeId === store.id ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const captorOptions = captors.map(([uid, name]) => `<option value="${escapeHtml(uid)}" ${filters.capturedByUid === uid ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
 
   const tableRows = pageRecords.map((lead) => `<tr>
@@ -1542,7 +1623,7 @@ function appointmentsView() {
   const transportSeats = transportCustomers.reduce((total, lead) => total + (Number(lead.transportSeats) || (lead.hasCompanion ? 2 : 1)), 0);
   const selectedDateCanBeScheduled = selectedDate >= toLocalDateInput(new Date());
   const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
-  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${storeId === store.id ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const cells = days.map((day) => {
     const items = groups[day.date] || [];
     const first = items[0];
@@ -1680,7 +1761,7 @@ function appointmentCreateDialog(allowedStores) {
   const schedule = appointmentCreateSchedule();
   const selectedService = appointmentCreateService();
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${draft.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
-  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${store.id === storeId ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = allowedStores.map((store) => `<option value="${store.id}" ${store.id === storeId ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const availableServices = servicesForStore(state.appointmentCreate.services, storeId);
   const serviceOptions = (availableServices.length ? availableServices : [selectedService])
     .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
@@ -1796,7 +1877,7 @@ function scheduleSettingsView() {
   const { records, selectedStoreId, loading, saving } = state.settings;
   const selected = records.find((item) => item.id === selectedStoreId)
     || { ...STORES.find((item) => item.id === selectedStoreId), ...DEFAULT_STORE_SCHEDULE };
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${store.id === selectedStoreId ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const limitedDayRuleRows = WEEKDAY_OPTIONS.map((day) => {
     const rule = selected.limitedDayRules.find((item) => item.weekday === day.id);
     return `<div class="schedule-rule-row ${rule ? 'is-active' : ''}" data-limited-day-row="${day.id}">
@@ -2065,7 +2146,7 @@ function accessView() {
   const selectedStoreId = editingAccess?.storeId || state.profile.storeId || STORES[0]?.id;
   const selectedRoleProfileId = editingAccess?.roleProfileId || systemRoleProfileForRole(editingAccess?.role || 'captor').id;
   const selectedStoreIds = editingAccess?.storeIds || [selectedStoreId];
-  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${selectedStoreId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = STORES.map((store) => `<option value="${store.id}" ${selectedStoreId === store.id ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const storeChecks = STORES.map((store) => `<label class="access-store-option checkbox-label"><input type="checkbox" name="storeIds" value="${store.id}" ${selectedStoreIds.includes(store.id) ? 'checked' : ''} /><span>${store.label}</span></label>`).join('');
   const roleProfileOptions = state.settings.roleProfiles.map((profile) => `<option value="${escapeHtml(profile.id)}" data-base-role="${escapeHtml(profile.baseRole)}" ${selectedRoleProfileId === profile.id ? 'selected' : ''}>${escapeHtml(profile.name)}</option>`).join('');
   const rows = accesses.map((access) => {
@@ -2110,7 +2191,7 @@ function accessView() {
           ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" value="${DEFAULT_TEAM_PASSWORD}" readonly required /><small data-access-password-help>Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.</small><small class="field-error"></small></div>`}
           <div class="field" data-field="role"><label for="access-role-profile">Perfil / cargo</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
           <div class="field" data-field="phone"><label for="access-phone">Telefone</label><input id="access-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" value="${escapeHtml(formatBrazilianPhone(editingAccess?.phone || ''))}" placeholder="(81) 99999-9999" required /><small class="field-error"></small></div>
-          <div class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
+          <div id="access-primary-store-field" class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
           <div class="field" data-field="savwinCode"><label for="access-savwin-code">Codigo SavWin</label><input id="access-savwin-code" name="savwinCode" maxlength="30" value="${escapeHtml(editingAccess?.savwinCode || '')}" placeholder="Opcional" /><small class="field-error"></small></div>
           <fieldset id="access-stores-field" class="field access-store-picker access-field-wide" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
         </div>
@@ -2165,7 +2246,7 @@ function goalsView() {
   const totalCaptured = records.reduce((total, goal) => total + goal.completed, 0);
   const selectedGroup = groups.find((group) => group.id === pendingDeleteGroupId);
   const goalStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
-  const storeOptions = goalStores.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.label}</option>`).join('');
+  const storeOptions = goalStores.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
   const memberOptions = visibleMembers.length
     ? visibleMembers.map((member) => `<label class="goal-member-option">
         <input type="checkbox" name="assigneeUids" value="${escapeHtml(member.uid)}" ${draft.assigneeUids.includes(member.uid) ? 'checked' : ''} />
@@ -2396,10 +2477,31 @@ function bindPageEvents() {
     const phoneInput = form.elements.phone;
     const notesInput = form.elements.notes;
     const appointmentDateInput = form.elements.appointmentDate;
+    restoreNewLeadDraft(form, state.newLeadSchedule.draft);
+    document.querySelector('#notes-count').textContent = notesInput.value.length;
     bindCpfInput(form);
     bindBirthDateInput(form);
     phoneInput.addEventListener('input', () => { phoneInput.value = formatBrazilianPhone(phoneInput.value); });
     notesInput.addEventListener('input', () => { document.querySelector('#notes-count').textContent = notesInput.value.length; });
+    form.elements.storeId?.addEventListener('change', () => {
+      const storeId = form.elements.storeId.value;
+      if (!captureStoreIds().includes(storeId)) return;
+      state.newLeadSchedule.draft = state.newLeadSchedule.loaded
+        ? captureNewLeadDraft(form)
+        : state.newLeadSchedule.draft;
+      stopNewLeadScheduleSubscriptions();
+      state.newLeadSchedule.storeId = storeId;
+      state.newLeadSchedule.loaded = false;
+      state.newLeadSchedule.loading = false;
+      state.newLeadSchedule.error = '';
+      state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+      state.newLeadSchedule.appointmentDate = '';
+      state.newLeadSchedule.appointments = [];
+      state.newLeadSchedule.serviceId = '';
+      state.newLeadSchedule.triage = {};
+      render();
+      ensureNewLeadSchedule();
+    });
     form.elements.appointmentServiceId?.addEventListener('change', () => {
       state.newLeadSchedule.serviceId = form.elements.appointmentServiceId.value;
       const service = selectedNewLeadService();
@@ -2421,6 +2523,11 @@ function bindPageEvents() {
       state.newLeadSchedule.triage = values;
       refreshAppointmentTimeControl();
     });
+    if (!selectedNewLeadStoreId() || !state.newLeadSchedule.loaded) {
+      [...form.elements].forEach((control) => {
+        if (control.name !== 'storeId') control.disabled = true;
+      });
+    }
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!navigator.onLine && !state.offlineCapture.enabled) {
@@ -2428,6 +2535,11 @@ function bindPageEvents() {
         return;
       }
       const rawValues = leadFormValues(form);
+      const storeId = rawValues.storeId;
+      if (!captureStoreIds().includes(storeId)) {
+        setFieldErrors(form, { storeId: 'Selecione uma loja permitida.' });
+        return;
+      }
       if (!navigator.onLine) {
         rawValues.appointmentDate = '';
         rawValues.appointmentTime = '';
@@ -2442,7 +2554,7 @@ function bindPageEvents() {
           appointmentDurationMinutes: Number(values.appointmentDurationMinutes)
         }, state.newLeadSchedule.appointments, '', {
           appointmentDate: values.appointmentDate,
-          profile: state.profile
+          profile: { ...state.profile, storeId }
         })
           .find((slot) => slot.time === values.appointmentTime);
         if (!selectedSlot?.available) {
@@ -2453,7 +2565,7 @@ function bindPageEvents() {
       }
       const submitButton = form.querySelector('[type="submit"]');
       submitButton.disabled = true;
-      const result = saveLead(values, state.profile, state.demoMode, () => {
+      const result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
         if (!controlledAppointment) {
           state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
           render();
@@ -2475,6 +2587,7 @@ function bindPageEvents() {
         }
       }
       form.reset();
+      state.newLeadSchedule.draft = {};
       navigate('leads');
       showToast(state.demoMode
         ? 'Cadastro salvo somente neste navegador.'
@@ -2738,8 +2851,12 @@ function bindPageEvents() {
       const selected = state.settings.roleProfiles.find((profile) => profile.id === accessForm.elements.roleProfileId.value);
       const manager = selected?.baseRole === 'manager';
       const administrator = selected?.baseRole === 'admin';
+      const mei = selected?.id === 'system-mei';
+      const multiStore = manager || mei;
       const picker = document.querySelector('#access-stores-field');
-      picker.hidden = !manager;
+      const primaryStoreField = document.querySelector('#access-primary-store-field');
+      picker.hidden = !multiStore;
+      primaryStoreField.hidden = mei;
       if (creatingAccess) {
         const passwordInput = accessForm.elements.password;
         const passwordHelp = accessForm.querySelector('[data-access-password-help]');
@@ -2750,13 +2867,41 @@ function bindPageEvents() {
           ? 'Defina uma senha exclusiva para o acesso administrativo.'
           : 'Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.';
       }
-      if (manager && !new FormData(accessForm).getAll('storeIds').length) {
+      if (mei && creatingAccess && new FormData(accessForm).getAll('storeIds').length <= 1) {
+        accessForm.querySelectorAll('[name="storeIds"]').forEach((input) => { input.checked = true; });
+      }
+      const selectedStoreIds = new FormData(accessForm).getAll('storeIds');
+      if (manager) {
         const primary = accessForm.querySelector(`[name="storeIds"][value="${accessForm.elements.storeId.value}"]`);
         if (primary) primary.checked = true;
+      } else if (multiStore && !selectedStoreIds.length) {
+        const primary = accessForm.querySelector(`[name="storeIds"][value="${accessForm.elements.storeId.value}"]`);
+        if (primary) primary.checked = true;
+      }
+      if (mei) {
+        const firstStore = new FormData(accessForm).getAll('storeIds')[0];
+        if (firstStore) accessForm.elements.storeId.value = firstStore;
       }
     };
     accessForm.elements.roleProfileId.addEventListener('change', syncStorePicker);
     accessForm.elements.storeId.addEventListener('change', syncStorePicker);
+    accessForm.querySelectorAll('[name="storeIds"]').forEach((input) => input.addEventListener('change', () => {
+      const selected = state.settings.roleProfiles.find((profile) => profile.id === accessForm.elements.roleProfileId.value);
+      const selectedStoreIds = new FormData(accessForm).getAll('storeIds');
+      if (selected?.id === 'system-mei') {
+        const firstStore = selectedStoreIds[0];
+        if (firstStore) accessForm.elements.storeId.value = firstStore;
+        return;
+      }
+      if (selected?.baseRole !== 'manager') return;
+      if (!selectedStoreIds.length) {
+        input.checked = true;
+        return;
+      }
+      if (!selectedStoreIds.includes(accessForm.elements.storeId.value)) {
+        accessForm.elements.storeId.value = selectedStoreIds[0];
+      }
+    }));
     accessForm.elements.phone.addEventListener('input', () => {
       accessForm.elements.phone.value = formatBrazilianPhone(accessForm.elements.phone.value);
     });
@@ -4017,7 +4162,7 @@ function refreshAppointmentTimeControl() {
       },
       appointments,
       '',
-      { appointmentDate, profile: state.profile }
+      { appointmentDate, profile: newLeadCaptureProfile() }
     )
     : [];
   const availableSlots = slots.filter((slot) => slot.available && (!needsTransport || isTransportAppointmentAllowed(
@@ -4069,7 +4214,9 @@ function startDayAppointmentsSubscription() {
   }
 
   if (state.demoMode) {
-    state.newLeadSchedule.appointments = state.leads.filter((lead) => lead.appointmentDate === appointmentDate);
+    state.newLeadSchedule.appointments = state.leads.filter((lead) => (
+      lead.storeId === selectedNewLeadStoreId() && lead.appointmentDate === appointmentDate
+    ));
     state.newLeadSchedule.loading = false;
     refreshAppointmentTimeControl();
     return;
@@ -4079,7 +4226,7 @@ function startDayAppointmentsSubscription() {
   refreshAppointmentTimeControl();
   try {
     state.unsubscribeDayAppointments = subscribeToDayAppointments(
-      state.profile,
+      newLeadCaptureProfile(),
       appointmentDate,
       (appointments) => {
         state.newLeadSchedule.appointments = appointments;
@@ -4091,7 +4238,8 @@ function startDayAppointmentsSubscription() {
         state.newLeadSchedule.loading = false;
         state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
         refreshAppointmentTimeControl();
-      }
+      },
+      selectedNewLeadStoreId()
     );
   } catch {
     state.newLeadSchedule.loading = false;
@@ -4102,15 +4250,19 @@ function startDayAppointmentsSubscription() {
 
 async function ensureNewLeadSchedule() {
   if (state.route !== 'new' || !state.profile || state.newLeadSchedule.loaded || state.newLeadSchedule.loading) return;
+  const storeId = selectedNewLeadStoreId();
   state.newLeadSchedule.loading = true;
   if (state.demoMode) {
-    const configured = state.settings.records.find((item) => item.id === state.profile.storeId);
+    const configured = state.settings.records.find((item) => item.id === storeId);
     state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...(configured || {}) };
-    state.newLeadSchedule.services = servicesForStore(state.settings.services, state.profile.storeId);
-    if (!state.newLeadSchedule.services.length) {
-      state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
+    state.newLeadSchedule.services = [...state.settings.services];
+    if (storeId && !servicesForStore(state.newLeadSchedule.services, storeId).length) {
+      state.newLeadSchedule.services.push(defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes));
     }
-    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0].id;
+    const availableServices = servicesForStore(state.newLeadSchedule.services, storeId);
+    state.newLeadSchedule.serviceId = availableServices.some((service) => service.id === state.newLeadSchedule.draft.appointmentServiceId)
+      ? state.newLeadSchedule.draft.appointmentServiceId
+      : availableServices[0]?.id || '';
     state.newLeadSchedule.loaded = true;
     state.newLeadSchedule.loading = false;
     render();
@@ -4118,32 +4270,56 @@ async function ensureNewLeadSchedule() {
   }
   try {
     state.newLeadSchedule.services = await loadAppointmentServices(state.profile);
-    if (!servicesForStore(state.newLeadSchedule.services, state.profile.storeId).length) {
-      state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
+    if (storeId && !servicesForStore(state.newLeadSchedule.services, storeId).length) {
+      state.newLeadSchedule.services.push(defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes));
     }
-    state.newLeadSchedule.serviceId = servicesForStore(state.newLeadSchedule.services, state.profile.storeId)[0]?.id || '';
+    const availableServices = servicesForStore(state.newLeadSchedule.services, storeId);
+    state.newLeadSchedule.serviceId = availableServices.some((service) => service.id === state.newLeadSchedule.draft.appointmentServiceId)
+      ? state.newLeadSchedule.draft.appointmentServiceId
+      : availableServices[0]?.id || '';
   } catch {
-    state.newLeadSchedule.services = [defaultAppointmentService(state.profile.storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)];
-    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0].id;
+    state.newLeadSchedule.services = storeId ? [defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)] : [];
+    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0]?.id || '';
+  }
+  if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
+  if (!storeId) {
+    state.newLeadSchedule.loaded = true;
+    state.newLeadSchedule.loading = false;
+    render();
+    return;
   }
   try {
     state.unsubscribeStoreSchedule = subscribeToStoreSchedule(
-      state.profile,
+      newLeadCaptureProfile(),
       (settings) => {
+        if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
+        const firstLoad = !state.newLeadSchedule.loaded;
         state.newLeadSchedule.settings = settings;
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
+        state.newLeadSchedule.error = '';
+        if (firstLoad) {
+          render();
+          return;
+        }
         refreshNewLeadAmetropiaField();
         refreshAppointmentTimeControl();
       },
       () => {
+        if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
+        const firstLoad = !state.newLeadSchedule.loaded;
         state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
         state.newLeadSchedule.error = 'Usando a configuracao padrao da agenda.';
+        if (firstLoad) {
+          render();
+          return;
+        }
         refreshNewLeadAmetropiaField();
         refreshAppointmentTimeControl();
-      }
+      },
+      storeId
     );
   } catch {
     state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
@@ -4415,12 +4591,14 @@ async function handleAction(action) {
       loaded: false,
       loading: false,
       error: '',
+      storeId: '',
       settings: { ...DEFAULT_STORE_SCHEDULE },
       appointmentDate: '',
       appointments: [],
       services: [],
       serviceId: '',
-      triage: {}
+      triage: {},
+      draft: {}
     };
     state.leadDetailSchedule = {
       loading: false,
@@ -5145,9 +5323,11 @@ export async function startApp() {
     if (state.route !== 'new') {
       stopNewLeadScheduleSubscriptions();
       state.newLeadSchedule.loaded = false;
+      state.newLeadSchedule.storeId = '';
       state.newLeadSchedule.appointmentDate = '';
       state.newLeadSchedule.appointments = [];
       state.newLeadSchedule.triage = {};
+      state.newLeadSchedule.draft = {};
     } else if (previousRoute !== 'new') {
       state.newLeadSchedule.loaded = false;
     }

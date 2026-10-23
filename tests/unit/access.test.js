@@ -59,6 +59,37 @@ describe('access validation', () => {
     expect(result.data.storeIds).toEqual(['loja-06', 'loja-02']);
   });
 
+  it('moves the manager primary store when only another permitted store remains', () => {
+    const result = validateAccess({
+      displayName: 'Gestor da Loja 06',
+      email: 'gestor06@example.com',
+      phone: '81999999999',
+      role: 'manager',
+      storeId: 'loja-02',
+      storeIds: ['loja-06']
+    });
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.storeId).toBe('loja-06');
+    expect(result.data.storeIds).toEqual(['loja-06']);
+  });
+
+  it('treats MEI as an external captor with multiple permitted stores', () => {
+    const roleProfiles = [{ id: 'system-mei', baseRole: 'captor', active: true }];
+    const result = validateAccess({
+      displayName: 'Captadora MEI',
+      email: 'mei@example.com',
+      phone: '81999999999',
+      roleProfileId: 'system-mei',
+      storeId: 'loja-06',
+      storeIds: ['loja-02', 'loja-05']
+    }, roleProfiles);
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.storeId).toBe('loja-02');
+    expect(result.data.storeIds).toEqual(['loja-02', 'loja-05']);
+  });
+
   it('uses the standard initial password for new non-admin access', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',

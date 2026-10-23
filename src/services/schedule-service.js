@@ -16,20 +16,20 @@ function permissionError(message) {
   return error;
 }
 
-export function subscribeToStoreSchedule(profile, onData, onError) {
-  if (!isFirebaseConfigured || !profile?.storeId) throw permissionError('Configuracao de agenda indisponivel.');
-  return onSnapshot(doc(db, 'stores', profile.storeId), (snapshot) => {
+export function subscribeToStoreSchedule(profile, onData, onError, storeId = profile?.storeId) {
+  if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId)) throw permissionError('Configuracao de agenda indisponivel.');
+  return onSnapshot(doc(db, 'stores', storeId), (snapshot) => {
     onData(normalizeStoreSchedule(snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE));
   }, onError);
 }
 
-export function subscribeToDayAppointments(profile, appointmentDate, onData, onError) {
-  if (!isFirebaseConfigured || !profile?.storeId || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate || '')) {
+export function subscribeToDayAppointments(profile, appointmentDate, onData, onError, storeId = profile?.storeId) {
+  if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId) || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate || '')) {
     throw permissionError('Data de agendamento indisponivel.');
   }
   const dayQuery = query(
     collection(db, 'appointmentSlots'),
-    where('storeId', '==', profile.storeId),
+    where('storeId', '==', storeId),
     where('appointmentDate', '==', appointmentDate)
   );
   return onSnapshot(dayQuery, (snapshot) => {
