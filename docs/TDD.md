@@ -117,7 +117,7 @@ Ao trocar a loja de destino durante um novo cadastro, o formulario preserva os d
 - O cadastro offline e uma capacidade experimental por loja, desativada por padrao.
 - Com a capacidade desativada, novos cadastros exigem conexao.
 - Um administrador pode ativar a capacidade em `Configuracoes > Agenda > Cadastro offline`.
-- Quando ativa, a capacidade permite salvar somente os dados do lead sem conexao; data e horario permanecem bloqueados e vazios.
+- Quando ativa, a capacidade permite salvar somente os dados do lead sem conexao; data e horario ficam ocultos e vazios.
 - O lead offline aparece imediatamente em `Meus cadastros` como `Aguardando agendamento`; nao existe uma pagina separada de sincronizacao.
 - A sincronizacao confirma somente o cadastro. Ela nao preenche data ou horario e nao cria blocos em `appointmentSlots`.
 - A mudanca de conectividade com o formulario aberto nao pode apagar os demais campos preenchidos.
@@ -716,7 +716,7 @@ O Firestore e inicializado com cache persistente em IndexedDB. Para impedir que 
 
 O agendamento nao opera offline:
 
-1. Sem conexao, data e horario ficam desabilitados e vazios.
+1. Sem conexao, data e horario ficam ocultos e vazios.
 2. Ao voltar online, o captador abre o cadastro e consulta a disponibilidade atual.
 3. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
 4. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.

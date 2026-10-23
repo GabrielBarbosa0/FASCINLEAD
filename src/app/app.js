@@ -1105,7 +1105,7 @@ function newLeadView() {
       </fieldset>
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
       ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
-      <div class="field-row appointment-fields">
+      <div class="field-row appointment-fields" data-online-appointment ${navigator.onLine ? '' : 'hidden'}>
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine && selectedStoreId ? '' : 'disabled'} /><small class="schedule-date-status">${!navigator.onLine ? 'Conecte-se para escolher uma data.' : !selectedStoreId ? 'Escolha primeiro a loja de destino.' : ''}</small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
@@ -2417,6 +2417,7 @@ function handleConnectivityChange() {
   const online = navigator.onLine;
   const blocked = !online && !state.offlineCapture.enabled;
   const notice = form.querySelector('[data-offline-capture-notice]');
+  const appointmentFields = form.querySelector('[data-online-appointment]');
   const dateInput = form.elements.appointmentDate;
   const submitButton = form.querySelector('[type="submit"]');
   if (notice) {
@@ -2429,7 +2430,8 @@ function handleConnectivityChange() {
     state.newLeadSchedule.appointmentDate = '';
     dateInput.value = '';
   }
-  dateInput.disabled = !online;
+  if (appointmentFields) appointmentFields.hidden = !online;
+  dateInput.disabled = !online || !selectedNewLeadStoreId();
   submitButton.disabled = blocked;
   refreshAppointmentTimeControl();
   createIcons({ icons: appIcons });

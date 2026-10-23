@@ -1289,8 +1289,8 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await expect(page.locator('#lead-form')).toBeVisible();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeDisabled();
-  await expect(page.getByLabel('Horario disponivel')).toBeDisabled();
+  await expect(page.getByLabel('Data do pre-agendamento')).toBeHidden();
+  await expect(page.getByLabel('Horario disponivel')).toBeHidden();
   await expect(page.getByText(/somente os dados do lead serao salvos/i)).toBeVisible();
   await page.getByLabel('Nome *').fill('Cliente Offline');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999990000');
