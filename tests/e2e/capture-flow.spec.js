@@ -915,6 +915,18 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(page.getByText('Outra Captadora', { exact: true })).not.toBeVisible();
   await expect(page.locator('.status-badge', { hasText: 'Reagendamento recomendado' }).first()).toBeVisible();
   await expect(page.getByText('Oferecer uma nova data', { exact: true }).first()).toBeVisible();
+  await page.locator('[data-follow-up-filter="captors"]').click();
+  await expect(page.locator('.follow-up-captor-card')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Ver retornos aguardando de Ana Captadora' }).click();
+  const captorDialog = page.getByRole('dialog', { name: 'Ana Captadora' });
+  await expect(captorDialog).toBeVisible();
+  await expect(captorDialog.getByText('1 lead(s) aguardando contato')).toBeVisible();
+  await expect(captorDialog.getByText('Cliente Aguardando', { exact: true })).toBeVisible();
+  await expect(captorDialog.getByRole('link', { name: 'Chamar no WhatsApp' })).toBeVisible();
+  await expect(captorDialog.getByRole('button', { name: 'Reagendar' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('captor-pending-follow-ups-dialog.png'), fullPage: true });
+  await captorDialog.getByRole('button', { name: 'Fechar' }).first().click();
+  await expect(captorDialog).not.toBeVisible();
   await page.locator('[data-follow-up-filter="contacted"]').click();
   await expect(page.getByText('Cliente Contatado', { exact: true })).toBeVisible();
   await expect(page.getByText('Cliente Aguardando', { exact: true })).not.toBeVisible();

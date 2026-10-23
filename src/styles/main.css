@@ -638,6 +638,34 @@ svg {
   font-size: 0.78rem;
 }
 
+.follow-up-captor-open {
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.follow-up-captor-open strong,
+.follow-up-captor-open span {
+  display: block;
+}
+
+.follow-up-captor-open span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.follow-up-captor-open:hover strong,
+.follow-up-captor-open:focus-visible strong {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
 .follow-up-captor-card dl {
   display: flex;
   gap: 16px;
@@ -665,6 +693,21 @@ svg {
 .follow-up-team-list {
   display: grid;
   gap: 18px;
+}
+
+.follow-up-captor-dialog {
+  width: min(calc(100% - 32px), 860px);
+}
+
+.follow-up-captor-dialog-content {
+  min-height: 0;
+  padding: 18px 22px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.follow-up-captor-dialog-content .follow-up-item {
+  box-shadow: none;
 }
 
 .follow-up-team-group {

@@ -201,6 +201,7 @@ const state = {
     records: [],
     truncated: false,
     filter: 'all',
+    selectedCaptorId: '',
     settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
@@ -1106,20 +1107,34 @@ function followUpsView() {
   const contactedCount = allRecords.filter(isFollowUpContacted).length;
   const captorGroups = [...allRecords.reduce((groups, lead) => {
     const key = lead.capturedByUid || lead.capturedByName || 'captor';
-    if (!groups.has(key)) groups.set(key, { name: lead.capturedByName || 'Captador nao informado', records: [] });
+    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador nao informado', records: [] });
     groups.get(key).records.push(lead);
     return groups;
   }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const visibleCaptorGroups = [...records.reduce((groups, lead) => {
     const key = lead.capturedByUid || lead.capturedByName || 'captor';
-    if (!groups.has(key)) groups.set(key, { name: lead.capturedByName || 'Captador nao informado', records: [] });
+    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador nao informado', records: [] });
     groups.get(key).records.push(lead);
     return groups;
   }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const captorSummary = captorGroups.map((group) => {
     const groupContacted = group.records.filter(isFollowUpContacted).length;
-    return `<article class="follow-up-captor-card"><span class="avatar">${escapeHtml(profileInitials(group.name))}</span><div><strong>${escapeHtml(group.name)}</strong><span>${group.records.length} retorno(s)</span></div><dl><div><dt>Aguardando</dt><dd>${group.records.length - groupContacted}</dd></div><div><dt>Iniciados</dt><dd>${groupContacted}</dd></div></dl></article>`;
+    return `<article class="follow-up-captor-card"><span class="avatar">${escapeHtml(profileInitials(group.name))}</span><button class="follow-up-captor-open" type="button" data-follow-up-captor="${escapeHtml(group.id)}" aria-label="Ver retornos aguardando de ${escapeHtml(group.name)}"><strong>${escapeHtml(group.name)}</strong><span>${group.records.length} retorno(s)</span></button><dl><div><dt>Aguardando</dt><dd>${group.records.length - groupContacted}</dd></div><div><dt>Iniciados</dt><dd>${groupContacted}</dd></div></dl></article>`;
   }).join('');
+  const selectedCaptor = captorGroups.find((group) => group.id === state.followUps.selectedCaptorId);
+  const selectedCaptorPending = selectedCaptor?.records.filter((lead) => !isFollowUpContacted(lead)) || [];
+  const captorDialog = selectedCaptor ? `<dialog id="follow-up-captor-dialog" class="appointment-create-dialog follow-up-captor-dialog" aria-labelledby="follow-up-captor-title">
+      <div class="appointment-create-header">
+        <div><span>RETORNOS PENDENTES</span><h2 id="follow-up-captor-title">${escapeHtml(selectedCaptor.name)}</h2><p>${selectedCaptorPending.length} lead(s) aguardando contato</p></div>
+        <button class="icon-button" type="button" data-follow-up-captor-close aria-label="Fechar"><i data-lucide="circle-x"></i></button>
+      </div>
+      <div class="follow-up-captor-dialog-content follow-up-list">
+        ${selectedCaptorPending.length
+          ? selectedCaptorPending.map(renderItem).join('')
+          : '<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum contato aguardando</strong><p>Todos os retornos deste captador ja tiveram o contato iniciado.</p></div>'}
+      </div>
+      <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-follow-up-captor-close>Fechar</button></div>
+    </dialog>` : '';
   const items = records.length
     ? (managerView && activeFilter === 'captors'
       ? `<section class="follow-up-captor-summary">${captorSummary}</section>`
@@ -1139,7 +1154,8 @@ function followUpsView() {
       <button class="metric metric-success follow-up-metric-filter ${activeFilter === 'contacted' ? 'is-active' : ''}" type="button" data-follow-up-filter="contacted" aria-pressed="${activeFilter === 'contacted'}"><span>Contato iniciado</span><strong>${contactedCount}</strong><i data-lucide="message-circle"></i></button>
       <button class="metric follow-up-metric-filter ${activeFilter === 'captors' ? 'is-active' : ''}" type="button" data-follow-up-filter="captors" aria-pressed="${activeFilter === 'captors'}"><span>Captadores</span><strong>${captorGroups.length}</strong><i data-lucide="users"></i></button>
     </section>` : ''}
-    <section class="${managerView ? 'follow-up-team-list' : 'follow-up-list'}">${items}</section>`;
+    <section class="${managerView ? 'follow-up-team-list' : 'follow-up-list'}">${items}</section>
+    ${captorDialog}`;
 }
 
 function leadDetailView() {
@@ -3653,6 +3669,11 @@ function bindPageEvents() {
       }
     });
   }
+
+  const followUpCaptorDialog = document.querySelector('#follow-up-captor-dialog');
+  followUpCaptorDialog?.addEventListener('cancel', () => {
+    state.followUps.selectedCaptorId = '';
+  });
 }
 
 function subscribeProfileLeads() {
@@ -3718,6 +3739,7 @@ function startFollowUpScheduleSubscription() {
     records: [],
     truncated: false,
     filter: state.followUps.filter || 'all',
+    selectedCaptorId: '',
     settingsByStore: {},
     settings: { ...DEFAULT_STORE_SCHEDULE }
   };
@@ -4397,6 +4419,7 @@ async function handleAction(action) {
       records: [],
       truncated: false,
       filter: 'all',
+      selectedCaptorId: '',
       settingsByStore: {},
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
@@ -4777,6 +4800,19 @@ export async function startApp() {
         }
       }
     }
+    const followUpCaptorButton = event.target.closest('[data-follow-up-captor]');
+    if (followUpCaptorButton) {
+      state.followUps.selectedCaptorId = followUpCaptorButton.dataset.followUpCaptor;
+      render();
+      requestAnimationFrame(() => document.querySelector('#follow-up-captor-dialog')?.showModal());
+      return;
+    }
+    const closeFollowUpCaptorButton = event.target.closest('[data-follow-up-captor-close]');
+    if (closeFollowUpCaptorButton) {
+      closeFollowUpCaptorButton.closest('dialog')?.close();
+      state.followUps.selectedCaptorId = '';
+      return;
+    }
     const followUpFilterButton = event.target.closest('[data-follow-up-filter]');
     if (followUpFilterButton) {
       state.followUps.filter = followUpFilterButton.dataset.followUpFilter;
@@ -4800,6 +4836,9 @@ export async function startApp() {
           state.followUps.records = state.followUps.records.map((item) => item.id === lead.id ? { ...item, ...contactUpdate } : item);
           if (state.followUps.filter === 'waiting') state.followUps.filter = 'contacted';
           render();
+          if (state.followUps.selectedCaptorId) {
+            requestAnimationFrame(() => document.querySelector('#follow-up-captor-dialog')?.showModal());
+          }
         } catch {
           showToast('O WhatsApp foi aberto, mas o contato nao foi registrado.', 'warning', 'circle-alert');
         }
@@ -4812,6 +4851,7 @@ export async function startApp() {
       const lead = [...state.followUps.records, ...state.leads]
         .find((item) => item.id === followUpRescheduleButton.dataset.followUpReschedule);
       if (lead) {
+        state.followUps.selectedCaptorId = '';
         state.management.records = [lead, ...state.management.records.filter((item) => item.id !== lead.id)];
         navigate('management-lead', lead.id);
       }
