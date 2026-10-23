@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   BarChart3,
   BellRing,
+  BrushCleaning,
   Building2,
   BusFront,
   CalendarDays,
@@ -32,6 +33,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Settings,
   ShieldCheck,
   Stethoscope,
   Target,
@@ -79,6 +81,7 @@ const appIcons = {
   ArrowLeft,
   BarChart3,
   BellRing,
+  BrushCleaning,
   Building2,
   BusFront,
   CalendarDays,
@@ -109,6 +112,7 @@ const appIcons = {
   RefreshCw,
   Save,
   Search,
+  Settings,
   ShieldCheck,
   Stethoscope,
   Target,
@@ -636,7 +640,7 @@ function homeView() {
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       ${isAdmin() ? `<button class="action-card" type="button" data-route="settings">
-        <span class="action-icon"><i data-lucide="wrench"></i></span>
+        <span class="action-icon"><i data-lucide="settings"></i></span>
         <span><strong>Configuracoes</strong><small>Agenda e preferencias do sistema</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
@@ -1305,7 +1309,7 @@ function managementView() {
       <div class="management-heading-actions">
         ${hasAccess('appointments.view') ? '<button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>' : ''}
         ${hasAccess('followups.team') ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
-        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="wrench"></i><span>Configuracoes</span></button>' : ''}
+        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="settings"></i><span>Configuracoes</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         ${hasAccess('dashboard.view') ? '<button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>' : ''}
         ${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>' : ''}
@@ -1752,7 +1756,7 @@ function serviceCatalogSettingsView() {
   const { services, saving, serviceEditorOpen, editingServiceId, pendingDeleteServiceId } = state.settings;
   const editing = services.find((service) => service.id === editingServiceId) || null;
   const rows = services.map((service) => `<article class="service-catalog-row ${service.active ? '' : 'is-inactive'}">
-    <span class="service-catalog-icon"><i data-lucide="stethoscope"></i></span>
+    <span class="service-catalog-icon"><i data-lucide="${service.name.toLocaleLowerCase('pt-BR').includes('limpeza') ? 'brush-cleaning' : 'stethoscope'}"></i></span>
     <div class="service-catalog-name"><strong>${escapeHtml(service.name)}</strong><span>${escapeHtml(service.storeIds.map(storeLabel).join(' · '))}</span></div>
     <div class="service-catalog-duration"><span>Duracao</span><strong>${service.durationMinutes} min</strong></div>
     <span class="status-badge status-${service.active ? 'success' : 'neutral'}">${service.active ? 'Ativo' : 'Inativo'}</span>

@@ -217,6 +217,7 @@ A estrutura sera criada durante a fundacao do projeto e podera receber pequenos 
 | --- | --- |
 | [Technical Design Document](docs/TDD.md) | Escopo, arquitetura, requisitos, modelo de dados, seguranca, testes e implantacao |
 | [Plano futuro de pre-atendimento clinico](docs/PLANO-PRE-ATENDIMENTO-CLINICO.md) | Separacao entre captacao, recepcao e atendimento medico; agenda clinica, alertas e privacidade |
+| [Plano futuro de evolucoes operacionais](docs/PLANO-EVOLUCOES-OPERACIONAIS.md) | Historico do lead, duplicidades, confirmacoes, lista de espera, alertas e busca global |
 | [Guia para agentes](AGENTS.md) | Contexto e regras obrigatorias para pessoas e agentes de IA que alterarem o repositorio |
 
 Leia o `AGENTS.md` e o TDD antes de iniciar qualquer desenvolvimento.

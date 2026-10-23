@@ -1064,6 +1064,7 @@ O MVP estara apto para piloto quando:
 
 ## 20. Pendencias de produto e operacao
 
+- As ideias de historico do lead, deteccao de duplicidade, confirmacao de agendamento, motivos de perda, lista de espera, alertas de capacidade e busca global estao registradas no [plano futuro de evolucoes operacionais](PLANO-EVOLUCOES-OPERACIONAIS.md). Elas nao representam funcionalidades implementadas.
 - Qual sera o prazo definitivo de retencao e exclusao?
 - Qual e a capacidade de passageiros de cada veiculo?
 - Qual e o numero minimo de leads para fechar uma viagem e qual acao ocorre quando esse minimo nao e atingido?
