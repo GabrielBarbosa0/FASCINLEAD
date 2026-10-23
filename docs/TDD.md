@@ -4,16 +4,24 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 1.2 |
+| Versao | 2.0 |
 | Status | Em implementacao |
-| Data | 15/10/2026 |
+| Data | 22/10/2026 |
 | Responsavel | Oticas Fascinante |
+
+### Manutencao deste documento
+
+- O TDD e a fonte tecnica principal do FascinLead e descreve o comportamento implementado, nao apenas intencoes futuras.
+- Toda entrega que altere arquitetura, fluxo offline, autorizacao, modelo de dados, agenda, integracoes, seguranca ou requisitos permanentes deve atualizar este arquivo na mesma alteracao.
+- Decisoes ainda nao implementadas devem ser identificadas como proposta ou pendencia; nao podem ser descritas como comportamento atual.
+- A versao deve subir quando houver mudanca estrutural. A data deve refletir a ultima revisao funcional relevante.
+- Codigo, regras do Firestore e testes prevalecem como evidencia durante auditorias; divergencias encontradas devem ser reconciliadas no TDD antes de concluir a tarefa.
 
 ## 1. Visao geral
 
-O FascinLead sera uma aplicacao web progressiva (PWA) para substituir fichas de papel usadas por colaboradores durante a captacao de potenciais clientes na rua.
+O FascinLead e uma aplicacao web progressiva (PWA) para substituir fichas de papel usadas por colaboradores durante a captacao de potenciais clientes na rua.
 
-O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao for restabelecida, os registros pendentes serao sincronizados com a nuvem. O produto nao sera um CRM completo: seu foco e registrar, consultar e encaminhar contatos captados para a equipe responsavel.
+O sistema permite o cadastro rapido mesmo sem internet. Quando a conexao e restabelecida, os registros pendentes sao sincronizados com a nuvem. A reserva de data e horario exige confirmacao online da agenda para evitar dupla ocupacao. O produto nao e um CRM completo: seu foco e registrar, consultar, agendar e encaminhar contatos captados para a equipe responsavel.
 
 ### 1.1 Objetivos
 
@@ -23,7 +31,7 @@ O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao
 - Identificar colaborador, loja, data e origem de cada captacao.
 - Centralizar os registros na nuvem quando houver conexao.
 - Entregar uma interface simples para celular e instalavel como aplicativo.
-- Permanecer, inicialmente, dentro dos recursos gratuitos do Firebase.
+- Manter o consumo do Firebase previsivel e dentro das cotas definidas para o piloto, aprovando previamente qualquer recurso faturavel.
 - Permitir encaminhamento incremental e seguro dos leads para CRMs externos, sem transformar o FascinLead em CRM.
 
 ### 1.2 Fora do escopo
@@ -42,22 +50,24 @@ O sistema devera permitir o cadastro rapido mesmo sem internet. Quando a conexao
 
 | Perfil | Responsabilidade | Permissoes iniciais |
 | --- | --- | --- |
-| Captador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios cadastros; acompanhar as proprias metas |
-| Atendente de balcao | Acompanhar a agenda da unidade | Criar agendamentos, consultar a agenda, corrigir os proprios cadastros e registrar comparecimento ou falta |
-| Gestor | Acompanhar a captacao de uma loja | Consultar e exportar os registros, criar metas e acompanhar apenas a propria equipe |
-| Administrador | Administrar o FascinLead | Gerenciar usuarios, lojas, metas e consultar todos os registros |
+| Colaborador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios cadastros; realizar retornos e acompanhar as proprias metas |
+| MEI | Atuar como captador externo | Mesmas permissoes iniciais do colaborador, com dias e cotas de agendamento configuraveis por loja e periodo do dia |
+| Atendente de balcao | Operar a agenda da unidade | Criar cadastros, consultar a agenda e registrar comparecimento ou falta |
+| Gestor de unidades | Acompanhar unidades permitidas | Consultar e exportar registros, administrar metas, agenda, relatorios e retornos conforme as permissoes ativas |
+| Administrador | Administrar o FascinLead | Todas as permissoes sempre ativas; gerencia acessos, cargos, configuracoes, metas e todos os registros |
 
-As permissoes devem ser aplicadas pelas regras do Firestore. Ocultar botoes na interface nao substitui a autorizacao no banco.
+Os perfis padrao podem ter permissoes restauradas ao padrao; perfis personalizados possuem nome, alcance (`own` ou `stores`) e permissoes editaveis. O perfil Administrador nao pode perder permissoes. As permissoes sao aplicadas pelas regras do Firestore; ocultar botoes na interface nao substitui a autorizacao no banco.
 
 ## 3. Requisitos funcionais
 
 ### RF-01 - Autenticacao
 
-- O acesso sera feito por uma conta Google.
+- O acesso pode ser feito por e-mail e senha ou por uma conta Google autorizada.
 - O primeiro login de um dispositivo exige internet.
 - Apenas e-mails previamente autorizados poderao utilizar o sistema.
 - A sessao devera permanecer salva no dispositivo para usos posteriores.
 - Usuarios inativos deverao perder acesso na proxima verificacao online.
+- Contas operacionais criadas pela administracao recebem inicialmente a senha padrao `mudar123`, exceto o administrador; o usuario pode altera-la pelo fluxo de recuperacao de senha.
 
 ### RF-02 - Novo cadastro
 
@@ -67,11 +77,21 @@ Campos minimos propostos:
 | --- | --- | --- |
 | Nome | Sim | Entre 2 e 120 caracteres |
 | Telefone/WhatsApp | Sim | Normalizado para telefone brasileiro |
+| RG | Nao | Texto normalizado; placeholder `0.000.000` |
+| CPF | Nao | Validado quando informado |
+| Data de nascimento | Nao | Calcula a idade para regras de triagem |
+| Sexo | Nao | Valor enumerado |
 | Apelido | Nao | Ate 60 caracteres |
+| Rua e numero | Nao | Numero vazio e normalizado como `S/N` |
 | Bairro | Nao | Ate 80 caracteres |
 | Cidade | Nao | Ate 80 caracteres |
 | UF | Nao | Duas letras; padrao configuravel por loja |
 | Interesse principal | Nao | Opcao de uma lista administrada pelo sistema |
+| Servico | Nao | Servico ativo e disponivel na unidade, com duracao propria |
+| Ametropias | Nao | Exibicao configuravel por loja |
+| Patologias | Nao | Opcoes clinicas usadas pela triagem |
+| Cirurgia nos olhos | Condicional | Obrigatoria a partir da idade configurada; informa o tipo quando a resposta for positiva |
+| Transporte | Nao | Sem transporte ou com transporte; aceita no maximo um acompanhante |
 | Data do pre-agendamento | Nao | Data prevista; exige horario quando informada |
 | Horario do pre-agendamento | Nao | Horario previsto; exige data quando informado |
 | Observacao rapida | Nao | Ate 500 caracteres |
@@ -85,12 +105,14 @@ O sistema preenchera automaticamente:
 - origem `rua`;
 - versao do esquema e versao do aplicativo.
 
-CPF, dados de saude, receita, fotos e geolocalizacao exata nao farao parte do MVP. Isso reduz digitacao, exposicao de dados pessoais e complexidade de conformidade.
+Receita, fotos e geolocalizacao exata nao fazem parte do MVP. CPF, RG e os dados clinicos estritamente necessarios a triagem foram incorporados e devem receber o mesmo tratamento de seguranca e minimizacao dos demais dados pessoais.
 
 ### RF-03 - Operacao offline
 
 - O formulario devera abrir e salvar sem conexao depois que o aplicativo tiver sido carregado ao menos uma vez.
 - Um registro salvo offline devera aparecer imediatamente em `Meus cadastros`.
+- Sem conexao confirmada com o Firestore, data e horario ficam bloqueados e vazios; o usuario salva o lead, nao um agendamento.
+- O lead sem agenda aparece em `Meus cadastros` e em `Sync` como `Aguardando agendamento`.
 - O usuario devera enxergar claramente se cada item esta pendente, sincronizando, sincronizado ou com erro.
 - Fechar e reabrir o aplicativo nao podera apagar registros pendentes.
 
@@ -103,6 +125,8 @@ A sincronizacao sera tentada:
 - quando o navegador disparar o evento `online`;
 - quando o aplicativo voltar ao primeiro plano;
 - pelo comando manual `Sincronizar agora`.
+
+`navigator.onLine` e apenas um sinal de interface. A liberacao dos campos da agenda exige um snapshot do servidor (`fromCache === false`) tanto para a configuracao da loja quanto para os compromissos do dia.
 
 O navegador nao garante execucao quando o PWA estiver completamente fechado. Portanto, o sistema nao dependera de Background Sync para cumprir sua funcao principal.
 
@@ -174,6 +198,54 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O modo controlado e o padrao e oferece ao captador somente intervalos livres que caibam integralmente no expediente.
 - Um intervalo ocupado deixa de ser oferecido aos demais captadores assim que o agendamento aparece no Firestore.
 
+### RF-10 - Servicos e reserva por blocos
+
+- Administradores cadastram, editam, ativam, inativam e excluem servicos.
+- Cada servico possui nome, duracao em multiplos de 10 minutos e unidades atendidas.
+- A agenda usa blocos basicos de 10 minutos. Um servico ocupa a quantidade necessaria de blocos consecutivos.
+- O inicio pode ocorrer em qualquer bloco livre no qual o servico caiba integralmente no expediente.
+- As cotas contam clientes/agendamentos, nao blocos de tempo.
+- Agendamentos anteriores ao modelo por blocos sao preservados e considerados no calculo de ocupacao.
+
+### RF-11 - Configuracao detalhada da agenda
+
+- Cada loja possui escala semanal propria, com dias ativos e horarios de inicio e fim independentes.
+- Limites de vagas podem ser configurados por dia da semana, com capacidade diferente em cada dia.
+- O cargo MEI pode ser limitado a dias especificos e cotas diferentes para manha e tarde em cada dia.
+- A cota consumida e determinada pelo horario do atendimento agendado, nao pelo horario em que o captador realizou o cadastro.
+- O alerta de atraso e o limite para sugerir reagendamento sao tempos separados.
+
+### RF-12 - Triagem oftalmologica
+
+- A partir da idade configurada, inicialmente 55 anos, o formulario exige informar se o cliente realizou cirurgia nos olhos.
+- Quando a resposta for positiva, o tipo da cirurgia e obrigatorio.
+- Catarata informada como patologia ou cirurgia encaminha automaticamente ao oftalmologista, salvo alteracao manual por perfil autorizado.
+- A agenda oftalmologica possui escala semanal propria por loja e mostra apenas dias e horarios compativeis.
+- Novos criterios clinicos devem ser adicionados por configuracao e validacao, sem espalhar condicionais pela interface.
+
+### RF-13 - Transporte
+
+- O lead informa se precisa de transporte e se levara um acompanhante, limitado a um.
+- O consumo de capacidade e representado por `transportSeats`: um assento para o cliente e dois com acompanhante.
+- Cada loja configura os dias e horarios em que o transporte esta disponivel.
+- Um agendamento com transporte so pode usar data e intervalo integralmente compativeis com essa escala.
+- Capacidade do veiculo, numero minimo de passageiros e fechamento de viagens permanecem pendentes de definicao operacional.
+
+### RF-14 - Relatorios e dashboard
+
+- Perfis autorizados consultam indicadores por periodo, unidade e captador.
+- Os relatorios exibem cadastros, agendamentos, comparecimentos, faltas e taxa de comparecimento.
+- A analise inclui distribuicao de agendamentos por dia da semana e periodo do dia.
+- O seletor de periodo usa data inicial, data final e aplicacao explicita do intervalo.
+
+### RF-15 - Perfis e permissoes
+
+- O sistema fornece os perfis padrao Colaborador, MEI, Gestor de unidades, Atendente de balcao e Administrador.
+- Perfis nao administrativos podem ter permissoes ativadas ou desativadas individualmente.
+- Perfis personalizados podem ser criados, editados e inativados com nome, alcance e permissoes proprias.
+- Os perfis padrao possuem acao de restauracao; Administrador conserva todas as permissoes.
+- Dependencias de permissao sao normalizadas, por exemplo relatorios e dashboard exigem acesso a gestao.
+
 ## 4. Requisitos nao funcionais
 
 | Categoria | Requisito |
@@ -188,7 +260,7 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 | Privacidade | Coleta minima e ausencia de dados pessoais em logs tecnicos |
 | Manutencao | JavaScript modular, formatacao automatica e testes dos fluxos criticos |
 
-## 5. Arquitetura proposta
+## 5. Arquitetura implementada
 
 ```text
 +------------------------------+
@@ -226,14 +298,15 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 | Ferramentas | Node.js LTS, npm e Vite | Servidor local, empacotamento e build estatico |
 | Icones | Lucide | Biblioteca consistente, leve e acessivel |
 | PWA | Web App Manifest e Service Worker | Instalacao, cache do app shell e abertura offline |
-| Login | Firebase Authentication com Google | Login conhecido e persistencia de sessao |
+| Login | Firebase Authentication com Google e E-mail/Senha | Login conhecido, contas operacionais e persistencia de sessao |
 | Dados | Cloud Firestore | Persistencia offline no navegador e sincronizacao automatica |
 | Hospedagem | Firebase Hosting | HTTPS, CDN e deploy estatico |
+| Funcao administrativa | Firebase Functions callable | Redefinicao de senha de membros por administrador, sem expor credenciais privilegiadas no cliente |
 | Testes unitarios | Vitest | Integracao simples com o Vite |
 | Testes de interface | Playwright | Validacao dos fluxos online, offline e responsivos |
 | Testes locais Firebase | Firebase Emulator Suite | Testes sem consumir cota e validacao das regras |
 
-Nao serao utilizados Cloud Functions, Cloud Run, Storage ou extensoes pagas no MVP.
+Cloud Run, Storage e extensoes pagas nao fazem parte do MVP. Firebase Functions e usada somente para a operacao administrativa de senha; sua publicacao exige confirmar previamente o plano e o custo do projeto Firebase.
 
 ### 5.2 API de integracao com CRM
 
@@ -243,36 +316,43 @@ A API nao faz parte do bundle da PWA nem do GitHub Pages. A versao local usa Fir
 
 O contrato inicial e versionado em `/api/v1` e documentado em `docs/fascinlead-api.openapi.yaml`. CPF e informacoes de saude ficam excluidos por padrao e exigem habilitacao no servidor e solicitacao explicita do consumidor.
 
-### 5.3 Estrutura inicial de diretorios
+### 5.3 Estrutura atual de diretorios
 
 ```text
 FASCINLEAD/
 |-- docs/
-|   `-- TDD.md
+|   |-- TDD.md
+|   |-- PLANO-PRE-ATENDIMENTO-CLINICO.md
+|   `-- PLANO-SERVICOS-AGENDA.md
+|-- functions/
+|   `-- index.js
 |-- public/
 |   |-- icons/
 |   |-- manifest.webmanifest
 |   `-- offline.html
+|-- scripts/
+|   |-- migrate-appointment-blocks.js
+|   |-- migrate-appointment-services.js
+|   |-- reset-team-default-password.js
+|   `-- sync-captar-team.js
+|-- server/
+|   |-- fascinlead-api.js
+|   |-- lead-api-contract.js
+|   `-- savwin-local-proxy.js
 |-- src/
 |   |-- app/
-|   |   |-- router.js
-|   |   `-- state.js
-|   |-- components/
+|   |   |-- app.js
+|   |   |-- pwa.js
+|   |   `-- router.js
 |   |-- firebase/
 |   |   |-- auth.js
-|   |   |-- config.js
-|   |   |-- firestore.js
-|   |   `-- sync.js
-|   |-- pages/
-|   |   |-- login.js
-|   |   |-- home.js
-|   |   |-- new-lead.js
-|   |   |-- leads.js
-|   |   |-- sync.js
-|   |   `-- management.js
+|   |   `-- client.js
 |   |-- services/
 |   |   |-- lead-service.js
-|   |   `-- export-service.js
+|   |   |-- schedule-service.js
+|   |   |-- service-catalog-service.js
+|   |   |-- role-profile-service.js
+|   |   `-- demais servicos de dominio
 |   |-- styles/
 |   |-- utils/
 |   `-- main.js
@@ -292,7 +372,7 @@ FASCINLEAD/
 
 ### 6.1 Telas do MVP
 
-1. `Login`: entrar com Google e informar quando a conta nao estiver autorizada.
+1. `Login`: entrar com Google ou e-mail e senha e informar quando a conta nao estiver autorizada.
 2. `Inicio`: atalhos, usuario/loja, conectividade e quantidade pendente.
 3. `Novo`: formulario curto de cadastro.
 4. `Cadastros`: lista pesquisavel dos registros do colaborador.
@@ -323,6 +403,20 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
   "defaultState": "PE",
   "schedulingMode": "controlled",
   "appointmentDurationMinutes": 20,
+  "storeHoursRules": [{ "weekday": 1, "openingTime": "08:00", "closingTime": "18:00" }],
+  "noShowGraceMinutes": 5,
+  "rescheduleAfterMinutes": 30,
+  "automaticPendingFollowUp": false,
+  "showAmetropiaFields": false,
+  "limitedDaysEnabled": false,
+  "limitedDayRules": [{ "weekday": 3, "capacity": 10 }],
+  "meiQuotaEnabled": false,
+  "meiQuotaRules": [{ "weekday": 3, "morningQuota": 4, "afternoonQuota": 6 }],
+  "ophthalmologyRoutingEnabled": true,
+  "ophthalmologyMinimumAge": 55,
+  "ophthalmologyHoursRules": [{ "weekday": 6, "openingTime": "08:00", "closingTime": "12:00" }],
+  "transportEnabled": false,
+  "transportHoursRules": [],
   "openingTime": "08:00",
   "closingTime": "18:00",
   "active": true,
@@ -333,13 +427,16 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
 
 #### Reservas de horario em `appointmentSlots`
 
-Cada horario controlado possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. O lead e a reserva sao criados no mesmo lote; uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao do mesmo intervalo por captadores simultaneos.
+Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{storeId}-{data}-{hora}`), sem nome, telefone ou observacoes. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos.
+
+O cadastro e a reserva nao sao mais criados no mesmo lote. Primeiro o lead e persistido sem horario confirmado; depois um lote atualiza o lead e cria todos os blocos. Se a reserva falhar, o lead permanece salvo com `appointmentReservation.status = pending` e aparece em `Sync`.
 
 ```json
 {
   "storeId": "loja-06",
   "appointmentDate": "2026-10-20",
   "appointmentTime": "08:00",
+  "blockTime": "08:00",
   "durationMinutes": 20,
   "leadId": "uuid-do-lead",
   "capturedByUid": "firebase-uid",
@@ -347,7 +444,22 @@ Cada horario controlado possui um documento minimo e deterministico (`slot-{stor
 }
 ```
 
-### 7.2 Colecao `allowedEmails`
+### 7.2 Colecao `appointmentServices`
+
+```json
+{
+  "name": "Exame de vista",
+  "durationMinutes": 20,
+  "storeIds": ["loja-02", "loja-04", "loja-05", "loja-06"],
+  "active": true,
+  "createdAt": "Timestamp",
+  "updatedAt": "Timestamp"
+}
+```
+
+Somente servicos ativos e associados a unidade aparecem em novos cadastros. A exclusao remove o servico do catalogo, mas nao apaga o nome e a duracao copiados para leads anteriores.
+
+### 7.3 Colecao `allowedEmails`
 
 O identificador do documento sera o e-mail normalizado em letras minusculas.
 
@@ -365,7 +477,7 @@ O identificador do documento sera o e-mail normalizado em letras minusculas.
 
 Essa colecao resolve a autorizacao do primeiro acesso: o e-mail e liberado antes do login, e o usuario autenticado cria seu perfil somente se os dados coincidirem com a autorizacao.
 
-### 7.3 Colecao `users`
+### 7.4 Colecao `users`
 
 O identificador do documento sera o UID entregue pelo Firebase Authentication.
 
@@ -382,7 +494,7 @@ O identificador do documento sera o UID entregue pelo Firebase Authentication.
 }
 ```
 
-### 7.4 Colecao `interests`
+### 7.5 Colecao `interests`
 
 ```json
 {
@@ -392,7 +504,7 @@ O identificador do documento sera o UID entregue pelo Firebase Authentication.
 }
 ```
 
-### 7.5 Colecao `leads`
+### 7.6 Colecao `leads`
 
 O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempotente: repetir o envio do mesmo cadastro atualiza o mesmo documento e nao cria outra linha.
 
@@ -402,6 +514,8 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "preferredName": "Maria",
   "phone": "+5581999999999",
   "phoneSearch": "81999999999",
+  "customerCpf": "52998224725",
+  "customerRg": "1.234.567",
   "birthDate": "1985-04-12",
   "sex": "female",
   "street": "Rua das Flores",
@@ -411,12 +525,30 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "state": "PE",
   "interestId": "oculos-completo",
   "interestLabel": "Oculos completo",
+  "appointmentServiceId": "service-id",
+  "appointmentServiceName": "Exame de vista",
+  "appointmentDurationMinutes": 20,
+  "appointmentSchedulingMode": "controlled",
   "appointmentDate": "2026-10-02",
   "appointmentTime": "14:30",
+  "appointmentReservation": {
+    "status": "confirmed",
+    "reason": "",
+    "requestedDate": "",
+    "requestedTime": ""
+  },
   "appointmentAttendance": "pending",
   "appointmentAttendanceUpdatedAt": "Timestamp opcional",
   "appointmentAttendanceUpdatedByUid": "firebase-uid-gestor opcional",
   "notes": "Prefere contato pela manha",
+  "ametropiaIds": ["myopia"],
+  "pathologyIds": ["cataract"],
+  "eyeSurgeryStatus": "yes",
+  "eyeSurgeryType": "cataract",
+  "careRoute": "ophthalmologist",
+  "needsTransport": true,
+  "hasCompanion": false,
+  "transportSeats": 1,
   "source": "street",
   "capturedAtClient": "2026-09-28T13:45:00.000Z",
   "createdAtServer": "Timestamp ou null enquanto offline",
@@ -432,7 +564,24 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
 
 `phoneSearch` facilita a busca autorizada, mas nao deve ser exibido como campo separado. Nao sera criada uma chave unica baseada no telefone, pois uma mesma pessoa pode ser abordada legitimamente em momentos diferentes.
 
-### 7.6 Colecao `goals`
+Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem vazios e `appointmentReservation` usa `status: pending`, `reason: offline` e solicitacao vazia. `reason: confirming` representa uma reserva em confirmacao; `reason: conflict` informa que os blocos solicitados foram ocupados por outra gravacao.
+
+### 7.7 Colecao `roleProfiles`
+
+```json
+{
+  "name": "Supervisor de atendimento",
+  "scope": "stores",
+  "baseRole": "manager",
+  "permissions": ["management.view", "appointments.view"],
+  "system": false,
+  "active": true
+}
+```
+
+Perfis do sistema usam IDs estaveis (`system-captor`, `system-mei`, `system-manager`, `system-receptionist` e `system-admin`). Perfis personalizados sao documentos do Firestore. O administrador sempre recebe todas as permissoes conhecidas independentemente do vetor salvo.
+
+### 7.8 Colecao `goals`
 
 Cada documento representa a meta individual de um captador. Uma atribuicao em massa compartilha o mesmo `groupId`, mas cria documentos independentes para preservar autorizacao e leitura simples.
 
@@ -456,7 +605,7 @@ Cada documento representa a meta individual de um captador. Uma atribuicao em ma
 
 O progresso nao e gravado no documento. Ele e calculado a partir dos leads sincronizados para evitar contadores divergentes e operacoes privilegiadas no plano Spark.
 
-### 7.7 Indices previstos
+### 7.9 Indices
 
 - `leads`: `capturedByUid ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedAtClient DESC`.
@@ -479,6 +628,16 @@ O Firestore sera inicializado com cache persistente em IndexedDB. Ao salvar:
 6. Quando houver conexao, o SDK envia a escrita ao Firestore.
 7. O item passa para `Sincronizado` depois da confirmacao remota.
 
+O agendamento segue um fluxo deliberadamente diferente:
+
+1. Sem snapshot confirmado do servidor, data e horario ficam desabilitados.
+2. O lead offline e gravado com `appointmentReservation.status = pending` e sem data ou horario solicitado.
+3. Ao voltar online, o captador abre o lead e consulta a disponibilidade atual.
+4. Online, o sistema persiste primeiro o lead pendente com UUID definitivo.
+5. Somente depois da confirmacao remota tenta reservar, em lote, todos os blocos de 10 minutos e confirmar o horario no lead.
+6. Se algum bloco estiver ocupado, o lote falha, mas o documento do lead permanece e muda para `reason = conflict`.
+7. Se a conexao oscilar durante a confirmacao, o lead permanece em `Sync` para conclusao posterior.
+
 ### 8.2 Estados exibidos
 
 | Estado | Significado | Acao disponivel |
@@ -487,6 +646,8 @@ O Firestore sera inicializado com cache persistente em IndexedDB. Ao salvar:
 | Sincronizando | Envio em andamento | Aguardar |
 | Sincronizado | Confirmado pelo Firestore | Nenhuma |
 | Erro | Rejeitado por permissao, validacao ou falha nao transitoria | Ver detalhe e tentar novamente |
+| Aguardando agendamento | Lead preservado sem data e horario | Conectar, contatar o cliente e escolher um horario |
+| Horario ocupado | Lead preservado, mas a reserva perdeu uma disputa | Escolher outra data ou horario |
 
 O estado de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento.
 
@@ -502,7 +663,9 @@ A acao devera:
 
 ### 8.4 Conflitos
 
-O MVP adota `ultima alteracao confirmada vence` para edicoes do mesmo documento. Como cada captador manipula principalmente os proprios registros, a possibilidade de conflito e pequena. Uma futura necessidade de edicao simultanea exigira versao do documento ou transacoes.
+Edicoes comuns do mesmo documento usam a ultima alteracao aceita. Reservas de agenda nao usam `ultima escrita vence`: documentos deterministico de `appointmentSlots` impedem sobrescrever blocos ocupados. A falha da reserva nunca deve excluir o lead, que permanece na lista e em `Sync`.
+
+Transporte, escala da loja, agenda oftalmologica, limite diario e cotas do MEI sao validados novamente no momento da escolha do horario. A interface filtra opcoes, enquanto regras e lotes do Firestore protegem a disputa entre dispositivos.
 
 ### 8.5 Duplicidade
 
@@ -540,12 +703,14 @@ Ao detectar nova versao, o aplicativo avisara o usuario e aplicara a atualizacao
 ### 10.1 Primeiro acesso
 
 1. O administrador cadastra o e-mail em `allowedEmails`.
-2. O colaborador acessa online e escolhe `Entrar com Google`.
+2. O colaborador acessa online com Google ou e-mail e senha.
 3. O sistema exige e-mail verificado e consulta a autorizacao.
 4. O perfil em `users/{uid}` e criado com os mesmos `role` e `storeId` autorizados.
 5. A sessao passa a ser persistida no navegador.
 
 O login Google usara popup em computadores e celulares. No GitHub Pages, o redirecionamento entre dominios pode perder o estado da autenticacao por restricoes modernas de armazenamento do navegador. Em navegadores internos de outros aplicativos, a interface orientara abrir o FascinLead diretamente no Chrome ou Safari quando o popup for bloqueado.
+
+No fluxo por senha, a administracao cria a conta com senha inicial padrao, exceto para o administrador, e o Firebase envia verificacao de e-mail. A troca administrativa de senha usa uma Callable Function protegida por autenticacao e verificacao do perfil administrador. Recuperacao individual usa o e-mail do Firebase Authentication.
 
 ### 10.2 Principios das regras do Firestore
 
@@ -553,8 +718,10 @@ O login Google usara popup em computadores e celulares. No GitHub Pages, o redir
 - Exigir usuario autenticado, verificado, ativo e previamente autorizado.
 - Captador cria registros apenas com seu proprio UID e sua loja.
 - Captador le e altera apenas registros proprios.
-- Gestor le registros apenas da loja vinculada.
+- Gestor le registros apenas das unidades permitidas em `storeIds`.
 - Administrador acessa todas as lojas e configuracoes.
+- Permissoes granulares complementam `role` e `roleProfileId`; nenhuma permissao de interface amplia o que as regras autorizam.
+- Blocos de agenda somente podem ser criados para um lead e uma unidade permitidos e nao podem substituir uma reserva existente.
 - Nenhum cliente pode elevar seu proprio perfil, trocar `storeId` ou alterar `role`.
 - Validar chaves permitidas, tipos, limites de texto e valores enumerados.
 - Permitir exclusao definitiva de `leads` somente para administradores.
@@ -580,7 +747,8 @@ A chave web publica do Firebase identifica o projeto, mas nao concede acesso adm
 
 ### 11.2 LGPD e operacao
 
-- Coletar apenas dados necessarios ao contato comercial.
+- Coletar apenas dados necessarios a captacao, pre-agendamento, transporte e triagem aprovada.
+- CPF, RG, patologias, ametropias e historico cirurgico sao dados pessoais ou sensiveis e exigem acesso restrito, finalidade definida e revisao periodica da necessidade.
 - Definir responsavel interno por solicitacoes de acesso, correcao e exclusao.
 - Definir prazo de retencao antes da producao; proposta inicial: revisar ou excluir cadastros sem evolucao apos 180 dias.
 - Orientar usuarios a protegerem o aparelho com senha ou biometria.
@@ -588,9 +756,11 @@ A chave web publica do Firebase identifica o projeto, mas nao concede acesso adm
 
 O FascinLead nao registra um campo especifico de consentimento. A empresa deve validar a base legal aplicavel ao tratamento dos contatos e definir o prazo de retencao antes do uso real.
 
-## 12. Uso do plano gratuito Firebase
+## 12. Uso e custo do Firebase
 
-O MVP sera desenhado para o plano Spark. Segundo a documentacao oficial consultada em setembro de 2026, login social esta disponivel sem custo, e Firestore e Hosting possuem cotas gratuitas. No Firestore, a cota publicada inclui 1 GiB armazenado, 50 mil leituras por dia, 20 mil escritas por dia, 20 mil exclusoes por dia e 10 GiB de saida por mes, sujeita a alteracoes do Firebase.
+O aplicativo principal continua desenhado para baixo consumo de Authentication, Firestore e Hosting. Segundo a documentacao oficial consultada em setembro de 2026, esses produtos possuem cotas gratuitas sujeitas a alteracoes do Firebase. Os numeros devem ser revistos antes de cada implantacao, em vez de serem tratados como contrato permanente neste documento.
+
+A Callable Function de redefinicao administrativa de senha e uma excecao ao frontend estatico. Antes de publica-la, a equipe deve confirmar os requisitos atuais de faturamento, definir alertas de custo e limitar seu uso a administradores autenticados. Sem essa funcao publicada, captacao, sincronizacao, agenda e gestao de dados continuam operacionais; apenas a troca administrativa direta de senha fica indisponivel.
 
 Medidas para controlar consumo:
 
@@ -610,7 +780,7 @@ No Spark, atingir uma cota pode interromper aquele recurso ate o fim do periodo 
 | Situacao | Comportamento esperado |
 | --- | --- |
 | Sem internet ao abrir pela primeira vez | Explicar que o primeiro acesso requer conexao |
-| Conta Google nao autorizada | Bloquear dados e orientar contato com o administrador |
+| Conta nao autorizada | Bloquear dados e orientar contato com o administrador |
 | Falha ao salvar localmente | Nao limpar o formulario e exibir acao para tentar novamente |
 | Permissao revogada | Bloquear novas operacoes e encerrar dados protegidos da sessao |
 | Quota Firebase excedida | Preservar pendencias locais e informar indisponibilidade temporaria |
@@ -629,6 +799,10 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - estados de sincronizacao;
 - geracao e escapamento do CSV;
 - verificacao de permissoes na interface.
+- calculo de blocos consecutivos, escalas semanais e duracao por servico;
+- limites diarios e cotas do MEI por manha e tarde;
+- triagem oftalmologica, transporte e retornos;
+- serializacao de leads pendentes sem data e horario.
 
 ### 14.2 Regras e integracao
 
@@ -639,6 +813,9 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - lead invalido e rejeitado;
 - UUID repetido nao cria duplicata;
 - escrita offline reaparece apos reiniciar a pagina e sincroniza ao voltar online.
+- lead offline sem agenda e aceito com `appointmentReservation` pendente;
+- reserva concorrente nao sobrescreve blocos ocupados e nao remove o lead;
+- administrador conserva todas as permissoes e demais perfis respeitam o escopo configurado;
 - API rejeita token ausente ou invalido;
 - API pagina os leads e valida filtros, lojas e cursores;
 - CPF e informacoes de saude nao aparecem na resposta padrao.
@@ -649,6 +826,9 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - instalacao do PWA;
 - cadastro online;
 - cadastro e consulta offline;
+- data e horario bloqueados quando a agenda nao foi confirmada pelo servidor;
+- lead offline listado em Cadastros e Sync e agendado depois da reconexao;
+- disputa de horario entre dispositivos preserva o lead perdedor;
 - retorno da conexao e confirmacao da sincronizacao;
 - correcao de cadastro pendente;
 - busca por nome e telefone;
@@ -677,12 +857,13 @@ Um projeto de homologacao separado e desejavel quando o volume ou a equipe aumen
 
 1. Criar projeto Firebase da empresa.
 2. Escolher a localizacao do Firestore mais adequada antes de criar o banco; essa decisao nao deve ser tratada como facilmente reversivel.
-3. Habilitar o provedor Google no Authentication.
+3. Habilitar os provedores Google e E-mail/Senha no Authentication.
 4. Configurar dominios autorizados.
 5. Criar Firestore e publicar regras e indices.
 6. Configurar Firebase Hosting e cabecalhos de seguranca.
 7. Cadastrar lojas e os primeiros administradores.
-8. Executar testes e publicar o build estatico.
+8. Quando a redefinicao administrativa de senha for usada, publicar a Callable Function e validar plano, regiao e custo.
+9. Executar testes e publicar o build estatico.
 
 ### 15.3 Deploy
 
@@ -704,7 +885,7 @@ O primeiro deploy podera ser manual pelo Firebase CLI. Automatizacao por GitHub 
 - estrutura Vite e identidade visual;
 - PWA instalavel e app shell offline;
 - Firebase Emulator Suite;
-- login Google e autorizacao por e-mail;
+- login Google ou E-mail/Senha e autorizacao por e-mail;
 - regras iniciais do Firestore.
 
 ### Fase 2 - Captacao offline
@@ -755,7 +936,7 @@ O MVP estara apto para piloto quando:
 | ADR-003 | Usar Firestore como armazenamento local e remoto | SDK oferece cache persistente e sincronizacao offline |
 | ADR-004 | Manter o aplicativo principal sem backend obrigatorio | Captacao, operacao offline e telas continuam independentes da API de integracao |
 | ADR-005 | Autorizar e-mails antes do primeiro acesso | Login Google sozinho nao restringe contas a colaboradores |
-| ADR-006 | Nao coletar CPF no MVP | Nao e necessario para o cadastro e aumenta o risco de privacidade |
+| ADR-006 | Coletar CPF e RG apenas como campos opcionais | Atende a operacao sem bloquear a captacao e exige tratamento reforcado de privacidade |
 | ADR-007 | Nao depender de sincronizacao em segundo plano | Navegadores, especialmente no iOS, nao garantem execucao com o app fechado |
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
@@ -767,18 +948,25 @@ O MVP estara apto para piloto quando:
 | ADR-015 | Exibir os pre-agendamentos em agenda mensal derivada dos leads | Oferece visao operacional ao gestor sem duplicar dados nem transformar o sistema em um CRM ou agenda de confirmacoes |
 | ADR-016 | Configurar intervalos de atendimento no documento da loja | Mantem regras diferentes por unidade e permite calcular os horarios livres sem duplicar a agenda |
 | ADR-017 | Expor uma API versionada e somente leitura para CRMs | Separa captacao de operacao comercial, permite sincronizacao incremental e preserva um contrato estavel |
+| ADR-018 | Usar blocos atomicos de 10 minutos para a agenda | Permite combinar servicos com duracoes diferentes e impedir sobreposicoes parciais |
+| ADR-019 | Nao permitir reservar agenda offline | Disponibilidade, transporte, cotas e escalas dependem do estado atual do servidor |
+| ADR-020 | Persistir o lead antes de reservar os blocos | Uma disputa de horario pode falhar sem apagar os dados captados |
+| ADR-021 | Exigir snapshot do servidor para liberar data e horario | `navigator.onLine` pode indicar rede local sem acesso real ao Firebase |
+| ADR-022 | Modelar autorizacao com perfis e permissoes granulares | Permite cargos personalizados sem multiplicar papeis fixos nas regras e na interface |
+| ADR-023 | Manter Administrador com todas as permissoes | Evita bloquear acidentalmente a administracao e a recuperacao operacional |
+| ADR-024 | Separar escala da loja, oftalmologista e transporte | Cada recurso possui disponibilidade semanal independente e precisa |
 
-## 20. Questoes para fechar antes do desenvolvimento
+## 20. Pendencias de produto e operacao
 
-- Quais e-mails terao perfil de administrador, gestor e captador?
-- Nome e telefone sao suficientes como campos obrigatorios?
-- Quais opcoes devem existir em `Interesse principal`?
-- O gestor podera corrigir registros ou apenas consultar e exportar?
 - Qual sera o prazo definitivo de retencao e exclusao?
-- A visao gerencial faz parte do primeiro piloto ou da fase seguinte?
-- Qual logotipo e conjunto final de icones serao usados? A cor principal ja definida e `#003070`.
+- Qual e a capacidade de passageiros de cada veiculo?
+- Qual e o numero minimo de leads para fechar uma viagem e qual acao ocorre quando esse minimo nao e atingido?
+- Havera mais patologias ou cirurgias que encaminham obrigatoriamente ao oftalmologista?
+- A senha inicial padrao devera ser substituida futuramente por convite ou senha temporaria de uso unico?
+- Qual sera a estrategia definitiva de hospedagem e custo da API local e da Callable Function?
+- Quais alertas, auditoria e backups serao exigidos antes do piloto ampliado?
 
-Essas decisoes nao impedem a criacao da fundacao tecnica, mas devem ser respondidas antes do uso com dados reais.
+Essas decisoes nao impedem a evolucao tecnica, mas devem ser respondidas antes do uso ampliado com dados reais.
 
 ## 21. Referencias tecnicas
 
