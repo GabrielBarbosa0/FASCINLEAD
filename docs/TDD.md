@@ -316,23 +316,37 @@ A API nao faz parte do bundle da PWA nem do GitHub Pages. A versao local usa Fir
 
 O contrato inicial e versionado em `/api/v1` e documentado em `docs/fascinlead-api.openapi.yaml`. CPF e informacoes de saude ficam excluidos por padrao e exigem habilitacao no servidor e solicitacao explicita do consumidor.
 
-### 5.3 Estrutura atual de diretorios
+O proxy local do SavWin segue a mesma fronteira: ele existe apenas no servidor de desenvolvimento Vite, depende de credenciais mantidas fora do bundle e alimenta uma consulta experimental no Dashboard. Nem o proxy, nem a API `/api/v1`, nem a fundacao `leadSales` estao disponiveis numa publicacao puramente estatica.
+
+### 5.3 Canais de publicacao
+
+- `Firebase Hosting`: canal previsto para producao, configurado em `firebase.json`, com regras, indices e Functions publicados separadamente quando aplicavel.
+- `GitHub Pages`: demonstracao estatica gerada por `npm run build:pages` e publicada pelo workflow `.github/workflows/deploy-pages.yml` apos os testes unitarios.
+- Servidor Vite local: unico canal que inclui os middlewares da API de CRM e do proxy SavWin.
+
+A publicacao do frontend nao publica automaticamente regras, indices ou Functions. Cada artefato deve ser implantado e validado de forma explicita no ambiente correto.
+
+### 5.4 Estrutura atual de diretorios
 
 ```text
 FASCINLEAD/
+|-- .github/
+|   `-- workflows/deploy-pages.yml
 |-- docs/
+|   |-- fascinlead-api.openapi.yaml
+|   |-- ORCAMENTO-INFRAESTRUTURA.md
 |   |-- TDD.md
 |   |-- PLANO-PRE-ATENDIMENTO-CLINICO.md
 |   `-- PLANO-SERVICOS-AGENDA.md
 |-- functions/
 |   `-- index.js
 |-- public/
-|   |-- icons/
-|   |-- manifest.webmanifest
-|   `-- offline.html
+|   |-- favicon.svg
+|   `-- LOGO OTICAS FASCINANTE.png
 |-- scripts/
 |   |-- migrate-appointment-blocks.js
 |   |-- migrate-appointment-services.js
+|   |-- migrate-captar-schedule.js
 |   |-- reset-team-default-password.js
 |   `-- sync-captar-team.js
 |-- server/
@@ -378,14 +392,17 @@ FASCINLEAD/
 4. `Cadastros`: lista pesquisavel dos registros do colaborador.
 5. `Sincronizacao`: totais, ultimo envio, erros e acao manual.
 6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
-7. `Acessos`: autorizacao, alteracao de perfil/loja e bloqueio de usuarios por administradores.
-8. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
-9. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
-10. `Configuracoes`: modo de agenda, duracao da consulta, expediente e tolerancia para faltas por loja, restritos a administradores.
+7. `Dashboard`: indicadores do periodo e consulta local experimental ao SavWin.
+8. `Relatorios`: indicadores, agrupamentos por unidade/captador e distribuicoes por dia e periodo do dia.
+9. `Acessos`: autorizacao, alteracao de perfil, unidades, telefone, codigo SavWin e bloqueio de usuarios por administradores.
+10. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
+11. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
+12. `Metas`: criacao em modal, edicao, duplicacao, exclusao e acompanhamento individual ou da equipe.
+13. `Configuracoes`: agenda, servicos, perfis e permissoes, restritos a administradores.
 
 ### 6.2 Navegacao mobile
 
-A barra inferior tera quatro destinos: `Inicio`, `Novo`, `Cadastros` e `Sync`. A acao principal `Novo` deve ficar disponivel em um toque a partir de qualquer tela principal.
+A barra inferior e montada conforme as permissoes. Ela pode exibir `Inicio`, `Novo`, `Cadastros`, `Retornos`, `Sync` e `Gestao`, limitada aos destinos aplicaveis ao perfil. A acao principal `Novo` deve ficar disponivel em um toque para quem possui `leads.create`.
 
 ### 6.3 Estado de conectividade
 
@@ -468,7 +485,12 @@ O identificador do documento sera o e-mail normalizado em letras minusculas.
   "email": "colaborador@exemplo.com",
   "displayName": "Nome do colaborador",
   "role": "captor",
+  "roleProfileId": "system-captor",
+  "permissions": ["leads.create", "leads.view_own", "leads.edit_own"],
   "storeId": "store-id",
+  "storeIds": ["store-id"],
+  "phone": "+5581999999999",
+  "savwinCode": "codigo-opcional",
   "active": true,
   "createdAt": "Timestamp",
   "createdBy": "uid-admin"
@@ -487,12 +509,19 @@ O identificador do documento sera o UID entregue pelo Firebase Authentication.
   "displayName": "Nome do colaborador",
   "photoUrl": "https://...",
   "role": "captor",
+  "roleProfileId": "system-captor",
+  "permissions": ["leads.create", "leads.view_own", "leads.edit_own"],
   "storeId": "store-id",
+  "storeIds": ["store-id"],
+  "phone": "+5581999999999",
+  "savwinCode": "codigo-opcional",
   "active": true,
   "createdAt": "Timestamp",
   "lastLoginAt": "Timestamp"
 }
 ```
+
+`allowedEmails` e a autorizacao administrativa; `users` e o perfil materializado para o UID autenticado. Alteracoes de cargo, permissoes, unidades e estado sao propagadas para ambos quando o usuario ja realizou o primeiro login. A exclusao de um acesso remove `allowedEmails`, mas inativa o documento historico em `users`.
 
 ### 7.5 Colecao `interests`
 
@@ -581,7 +610,39 @@ Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem va
 
 Perfis do sistema usam IDs estaveis (`system-captor`, `system-mei`, `system-manager`, `system-receptionist` e `system-admin`). Perfis personalizados sao documentos do Firestore. O administrador sempre recebe todas as permissoes conhecidas independentemente do vetor salvo.
 
-### 7.8 Colecao `goals`
+### 7.8 Colecao `leadSales` - fundacao experimental
+
+O repositorio possui servico e regras para associar, por lead, um CPF e uma venda consultada no SavWin. Essa fundacao ainda nao e importada pela interface principal e nao deve ser tratada como funcionalidade entregue.
+
+```json
+{
+  "leadId": "uuid-do-lead",
+  "storeId": "loja-06",
+  "capturedByUid": "firebase-uid",
+  "customerCpf": "52998224725",
+  "purchaseInterest": true,
+  "matchStatus": "interest_registered ou sale_linked",
+  "savwinStoreCode": "06",
+  "savwinOsNumber": "",
+  "savwinSaleCode": "",
+  "savwinCustomerCode": "",
+  "savwinSaleDate": "2026-10-22",
+  "savwinSaleValue": 0,
+  "createdByUid": "uid-gestor",
+  "createdAt": "Timestamp",
+  "updatedByUid": "uid-gestor",
+  "updatedAt": "Timestamp",
+  "schemaVersion": 1
+}
+```
+
+Antes de ligar esse recurso a uma tela, devem ser aprovados escopo, base legal, permissao granular, retencao, relatorios e o impacto na afirmacao de que o FascinLead nao realiza conciliacao de vendas.
+
+### 7.9 Colecao `accessAuditEvents`
+
+A Callable Function registra redefinicoes administrativas de senha com acao, UID/e-mail do administrador, UID/e-mail do alvo e data do servidor. A colecao nao possui acesso pelo cliente nas regras atuais; leitura e retencao dependem de operacao administrativa pelo Firebase Admin/Console.
+
+### 7.10 Colecao `goals`
 
 Cada documento representa a meta individual de um captador. Uma atribuicao em massa compartilha o mesmo `groupId`, mas cria documentos independentes para preservar autorizacao e leitura simples.
 
@@ -605,12 +666,15 @@ Cada documento representa a meta individual de um captador. Uma atribuicao em ma
 
 O progresso nao e gravado no documento. Ele e calculado a partir dos leads sincronizados para evitar contadores divergentes e operacoes privilegiadas no plano Spark.
 
-### 7.9 Indices
+### 7.11 Indices
 
 - `leads`: `capturedByUid ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, capturedByUid ASC, capturedAtClient DESC`.
 - `leads`: `storeId ASC, appointmentDate ASC`.
+- `leads`: `storeId ASC, updatedAtServer ASC` para a API incremental.
+- `appointmentSlots`: `storeId ASC, appointmentDate ASC`.
+- `appointmentServices`: `storeIds ARRAY_CONTAINS, active ASC`.
 
 Novos indices somente deverao ser adicionados a partir de consultas reais. Cada tela de gestao deve exigir periodo para evitar consultas amplas.
 
@@ -678,12 +742,11 @@ Transporte, escala da loja, agenda oftalmologica, limite diario e cotas do MEI s
 
 ### 9.1 App shell
 
-O Service Worker armazenara os arquivos necessarios para abrir a interface:
+O Service Worker gerado pelo `vite-plugin-pwa` precacheia os artefatos versionados produzidos no build e usa `index.html` como fallback de navegacao. Isso permite reabrir o app shell ja instalado sem rede.
 
-- HTML principal;
-- CSS e JavaScript versionados;
-- icones e fontes locais;
-- pagina de contingencia offline.
+- HTML principal e chunks versionados de CSS e JavaScript;
+- favicon e demais ativos incluidos no build;
+- manifest da PWA.
 
 Dados dos clientes permanecerao sob responsabilidade do cache persistente do Firestore, sem duplicacao no Cache Storage.
 
@@ -691,12 +754,12 @@ Dados dos clientes permanecerao sob responsabilidade do cache persistente do Fir
 
 | Recurso | Estrategia |
 | --- | --- |
-| Arquivos versionados do build | Cache first |
-| HTML de entrada | Network first com fallback em cache |
-| Icones e fontes locais | Stale while revalidate |
+| Arquivos e ativos versionados do build | Precache gerenciado pelo Workbox |
+| Navegacao da SPA | Fallback para `index.html` precacheado |
+| Recursos externos em tempo de execucao | Sem regra customizada de `runtimeCaching` |
 | Firestore e Authentication | SDK oficial; nao interceptar no Service Worker |
 
-Ao detectar nova versao, o aplicativo avisara o usuario e aplicara a atualizacao apenas quando for seguro recarregar a tela, evitando perda de formulario em edicao.
+O registro usa o modo `prompt`: ao detectar nova versao, o aplicativo avisa o usuario e somente ativa o novo Service Worker apos confirmacao. `skipWaiting` permanece desativado para evitar recarga silenciosa durante um formulario em edicao.
 
 ## 10. Autenticacao e autorizacao
 
@@ -710,7 +773,9 @@ Ao detectar nova versao, o aplicativo avisara o usuario e aplicara a atualizacao
 
 O login Google usara popup em computadores e celulares. No GitHub Pages, o redirecionamento entre dominios pode perder o estado da autenticacao por restricoes modernas de armazenamento do navegador. Em navegadores internos de outros aplicativos, a interface orientara abrir o FascinLead diretamente no Chrome ou Safari quando o popup for bloqueado.
 
-No fluxo por senha, a administracao cria a conta com senha inicial padrao, exceto para o administrador, e o Firebase envia verificacao de e-mail. A troca administrativa de senha usa uma Callable Function protegida por autenticacao e verificacao do perfil administrador. Recuperacao individual usa o e-mail do Firebase Authentication.
+No fluxo por senha, a administracao salva primeiro a autorizacao e depois tenta criar a conta em uma instancia secundaria do Firebase Authentication, preservando a sessao do administrador. Contas operacionais recebem `mudar123`; administradores exigem senha propria. O Firebase envia verificacao de e-mail. Se a conta ja existir ou a criacao falhar, a autorizacao permanece salva e a interface mostra um aviso para tratamento manual.
+
+O backend inclui a Callable Function `updateTeamMemberPassword`, protegida pela validacao do administrador, com revogacao de sessoes e auditoria. Ela ainda nao esta conectada a um comando da interface principal; no estado atual, recuperacao individual usa o e-mail do Firebase Authentication e redefinicoes em massa usam o script administrativo documentado na implantacao.
 
 ### 10.2 Principios das regras do Firestore
 
@@ -774,6 +839,19 @@ Medidas para controlar consumo:
 - nao habilitar produtos que exijam faturamento sem aprovacao formal.
 
 No Spark, atingir uma cota pode interromper aquele recurso ate o fim do periodo aplicavel. O limite deve ser monitorado desde o piloto.
+
+### 12.1 Limites atuais de consulta
+
+| Fluxo | Limite defensivo atual |
+| --- | --- |
+| Gestao, Dashboard e Relatorios | 300 leads por consulta |
+| Agenda mensal | 500 agendamentos |
+| Retornos da equipe | 500 leads elegiveis |
+| Calculo de progresso das metas | 1.000 leads |
+| Lista local de cadastros do captador | 100 leads |
+| API `/api/v1/leads` | ate 100 itens por pagina |
+
+Quando uma consulta de interface atinge o limite, a tela deve sinalizar truncamento e orientar a reducao do periodo. Esses valores sao protecoes operacionais, nao capacidades contratadas, e podem ser revistos junto com paginacao, volume e custo.
 
 ## 13. Tratamento de erros
 
@@ -867,7 +945,21 @@ Um projeto de homologacao separado e desejavel quando o volume ou a equipe aumen
 
 ### 15.3 Deploy
 
-O primeiro deploy podera ser manual pelo Firebase CLI. Automatizacao por GitHub Actions deve ser acrescentada depois, usando credenciais protegidas e revisao antes da publicacao em producao.
+O deploy completo pode ser executado manualmente pelo Firebase CLI. O repositorio tambem possui GitHub Actions para publicar somente o frontend estatico no GitHub Pages quando houver `push` na `main` ou disparo manual. O workflow instala dependencias, executa os testes unitarios, valida a configuracao Firebase e gera o build com a base `/FASCINLEAD/`.
+
+Rules, indices e Callable Functions nao fazem parte desse workflow estatico. A promocao para producao deve executar os testes de regras, revisar o projeto Firebase selecionado e publicar esses componentes separadamente.
+
+### 15.4 Migracoes e rotinas administrativas
+
+| Comando | Finalidade |
+| --- | --- |
+| `npm run migrate:appointment-services` | Preencher o servico de agendamento em registros anteriores |
+| `npm run migrate:appointment-blocks` | Converter agendamentos existentes para reservas em blocos de 10 minutos |
+| `npm run migrate:captar` | Importar agenda do Captar para o FascinLead |
+| `npm run sync:captar-team` | Sincronizar membros da equipe do Captar com os acessos autorizados |
+| `npm run reset:team-passwords` | Aplicar a senha inicial aos usuarios nao administradores existentes |
+
+Todos esses scripts iniciam em `dry-run` e somente gravam com `--apply`. Eles exigem autenticacao previa no Firebase CLI; as rotinas que consultam o Captar tambem exigem suas variaveis de ambiente e usam Playwright. Antes de aplicar em producao, deve-se revisar o resumo do `dry-run`, confirmar o projeto Firebase, garantir backup/exportacao recente e evitar execucoes concorrentes. O reset de senhas revoga sessoes existentes e nunca deve atingir administradores.
 
 ## 16. Observabilidade e suporte
 
@@ -877,6 +969,15 @@ O primeiro deploy podera ser manual pelo Firebase CLI. Automatizacao por GitHub 
 - Monitorar Authentication, Firestore e Hosting pelo Firebase Console.
 - Criar procedimento de suporte para exportar codigo de erro, sem exportar dados do cliente.
 - Manter rotina de backup/exportacao definida antes de ampliar o piloto.
+
+### 16.1 Limitacoes tecnicas conhecidas
+
+- O navegador nao garante sincronizacao com o PWA fechado; pendencias sao retomadas quando o aplicativo volta ao primeiro plano.
+- O selo de conectividade reflete o navegador, enquanto agenda e reservas dependem de leitura confirmada pelo servidor.
+- Uma publicacao estatica nao oferece a API de CRM nem o proxy SavWin local.
+- A Callable Function de senha existe no backend, mas ainda nao possui acao correspondente na interface principal.
+- As consultas gerenciais atuais usam limites defensivos e podem exigir periodos menores ate que todos os fluxos tenham paginacao completa.
+- Capacidade e fechamento de viagens de transporte continuam desabilitados ate a definicao das regras operacionais.
 
 ## 17. Plano de entrega
 
@@ -916,7 +1017,7 @@ O primeiro deploy podera ser manual pelo Firebase CLI. Automatizacao por GitHub 
 
 O MVP estara apto para piloto quando:
 
-1. Um usuario autorizado conseguir entrar com Google.
+1. Um usuario autorizado e com e-mail verificado conseguir entrar com Google ou e-mail e senha.
 2. Um captador conseguir cadastrar um cliente sem internet.
 3. O registro permanecer no aparelho depois de fechar e reabrir o PWA.
 4. O registro sincronizar sem duplicacao quando a internet voltar.
@@ -925,7 +1026,7 @@ O MVP estara apto para piloto quando:
 7. Um usuario de outra loja nao conseguir acessar os dados pelas APIs do Firestore.
 8. O aplicativo informar claramente conectividade, pendencias e erros.
 9. O fluxo funcionar em celular Android e iPhone reais.
-10. Nenhum servico que exija o plano Blaze estiver habilitado.
+10. Nenhum recurso faturavel estiver publicado sem aprovacao formal, limite de acesso e alerta de custo.
 
 ## 19. Decisoes arquiteturais
 
@@ -941,11 +1042,11 @@ O MVP estara apto para piloto quando:
 | ADR-008 | Gerar UUID no dispositivo | Permite salvar offline e repetir o envio sem duplicar o documento |
 | ADR-009 | Usar `#003070` como cor principal | E a cor oficial informada para a marca Oticas Fascinante |
 | ADR-010 | Disponibilizar as lojas 02, 04, 05 e 06 | Sao as unidades definidas para a operacao inicial do FascinLead |
-| ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em agenda ou CRM |
+| ADR-011 | Registrar pre-agendamento opcional e exportar CSV detalhado | Permite encaminhar a captacao com contexto util sem transformar o produto em CRM |
 | ADR-012 | Nao solicitar nem exportar um campo de consentimento | O fornecimento dos dados durante a captacao sera tratado operacionalmente sem uma confirmacao separada no formulario |
 | ADR-013 | Permitir edicao e exclusao global de leads somente para administradores | Viabiliza correcao operacional e remocao de registros sem ampliar o poder dos gestores ou captadores |
 | ADR-014 | Modelar atribuicoes em massa como uma meta individual por captador | Simplifica as regras por usuario, preserva a visibilidade por loja e prepara o progresso para futura gamificacao |
-| ADR-015 | Exibir os pre-agendamentos em agenda mensal derivada dos leads | Oferece visao operacional ao gestor sem duplicar dados nem transformar o sistema em um CRM ou agenda de confirmacoes |
+| ADR-015 | Derivar a agenda mensal dos leads e proteger horarios com `appointmentSlots` | Evita duplicar os dados do cliente e separa a visao operacional da reserva atomica dos blocos |
 | ADR-016 | Configurar intervalos de atendimento no documento da loja | Mantem regras diferentes por unidade e permite calcular os horarios livres sem duplicar a agenda |
 | ADR-017 | Expor uma API versionada e somente leitura para CRMs | Separa captacao de operacao comercial, permite sincronizacao incremental e preserva um contrato estavel |
 | ADR-018 | Usar blocos atomicos de 10 minutos para a agenda | Permite combinar servicos com duracoes diferentes e impedir sobreposicoes parciais |
