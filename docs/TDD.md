@@ -4,7 +4,7 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.1 |
+| Versao | 2.2 |
 | Status | Em implementacao |
 | Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
@@ -79,7 +79,7 @@ Campos minimos propostos:
 | Telefone/WhatsApp | Sim | Normalizado para telefone brasileiro |
 | RG | Nao | Texto normalizado; placeholder `0.000.000` |
 | CPF | Nao | Validado quando informado |
-| Data de nascimento | Nao | Calcula a idade para regras de triagem |
+| Data de nascimento | Sim | Data valida, nao futura; calcula a idade para regras de triagem |
 | Sexo | Nao | Valor enumerado |
 | Apelido | Nao | Ate 60 caracteres |
 | Rua e numero | Nao | Numero vazio e normalizado como `S/N` |
@@ -106,6 +106,8 @@ O sistema preenchera automaticamente:
 - versao do esquema e versao do aplicativo.
 
 Receita, fotos e geolocalizacao exata nao fazem parte do MVP. CPF, RG e os dados clinicos estritamente necessarios a triagem foram incorporados e devem receber o mesmo tratamento de seguranca e minimizacao dos demais dados pessoais.
+
+Novos cadastros exigem data de nascimento tanto na interface quanto nas regras do Firestore. Registros legados sem essa informacao continuam consultaveis e podem ser corrigidos ou reagendados; quando a data for informada, ela tambem sera validada nas edicoes.
 
 ### RF-03 - Operacao offline
 

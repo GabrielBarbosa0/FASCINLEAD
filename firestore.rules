@@ -127,10 +127,8 @@ service cloud.firestore {
           && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))
         ))
         && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
-        && (!('birthDate' in data) || (
-          data.birthDate is string
-          && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
-        ))
+        && data.birthDate is string
+        && data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
         && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
         && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'other'])

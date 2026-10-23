@@ -512,6 +512,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
     await page.getByRole('button', { name: 'Novo', exact: true }).click();
     await page.getByLabel('Nome *').fill(name);
     await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+    await page.getByLabel('Data de nascimento *').fill('1985-04-12');
     await page.getByLabel('Data do pre-agendamento').fill(date);
     await page.getByLabel('Horario disponivel').selectOption(time);
     await page.getByRole('button', { name: 'Salvar cadastro' }).click();
@@ -537,6 +538,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await expect(appointmentDialog.getByLabel('Horario disponivel').locator('option[value="08:20"]')).toHaveCount(0);
   await appointmentDialog.getByLabel('Nome *').fill('Cliente Direto Agenda');
   await appointmentDialog.getByLabel('Telefone ou WhatsApp *').fill('81988887777');
+  await appointmentDialog.getByLabel('Data de nascimento *').fill('1985-04-12');
   await appointmentDialog.getByLabel('Horario disponivel').selectOption('08:40');
   await page.screenshot({ path: testInfo.outputPath('appointment-create-modal.png'), fullPage: true });
   await appointmentDialog.getByRole('button', { name: 'Salvar cadastro' }).click();
@@ -1137,6 +1139,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
 
   await page.getByLabel('Nome *').fill('Cliente Horario Ocupado');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByLabel('Data de nascimento *').fill('1985-04-12');
   await timeSelect.selectOption('08:00');
   await page.getByRole('button', { name: 'Salvar cadastro' }).click();
   await page.getByRole('button', { name: 'Novo', exact: true }).click();

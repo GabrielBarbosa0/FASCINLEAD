@@ -975,8 +975,8 @@ function newLeadView() {
           <small class="field-error"></small>
         </div>
         <div class="field" data-field="birthDate">
-          <label for="birthDate">Data de nascimento</label>
-          <input id="birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" />
+          <label for="birthDate">Data de nascimento <span aria-hidden="true">*</span></label>
+          <input id="birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" required />
           <small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small>
           <small class="field-error"></small>
         </div>
@@ -1675,7 +1675,7 @@ function appointmentCreateDialog(allowedStores) {
         <div class="field-row contact-fields"><div class="field" data-field="phone"><label for="agenda-lead-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="agenda-lead-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" placeholder="(00) 00000-0000" value="${escapeHtml(draft.phone || '')}" required /><small class="field-error"></small></div><div class="field" data-field="customerRg"><label for="agenda-lead-rg">RG</label><input id="agenda-lead-rg" name="customerRg" maxlength="20" autocomplete="off" placeholder="0.000.000" value="${escapeHtml(draft.customerRg || '')}" /><small class="field-error"></small></div></div>
         <div class="field-row identity-fields">
           <div class="field" data-field="customerCpf"><label for="agenda-lead-cpf">CPF</label><input id="agenda-lead-cpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" value="${escapeHtml(draft.customerCpf || '')}" /><small class="field-error"></small></div>
-          <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento</label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" value="${escapeHtml(draft.birthDate || '')}" /><small class="birth-age-hint" data-birth-age>${birthAgeText(draft.birthDate || '')}</small><small class="field-error"></small></div>
+          <div class="field" data-field="birthDate"><label for="agenda-lead-birth-date">Data de nascimento <span aria-hidden="true">*</span></label><input id="agenda-lead-birth-date" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" value="${escapeHtml(draft.birthDate || '')}" required /><small class="birth-age-hint" data-birth-age>${birthAgeText(draft.birthDate || '')}</small><small class="field-error"></small></div>
           <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions(draft.sex || '')}</select><small class="field-error"></small></div>
         </div>
         <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" value="${escapeHtml(draft.preferredName || '')}" /></div>

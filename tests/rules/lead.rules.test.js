@@ -135,6 +135,24 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('rejects a new lead without a birth date', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(setDoc(doc(db, 'leads', 'lead-without-birth-date'), {
+      fullName: 'Novo Cliente',
+      phone: '+5581999995678',
+      phoneSearch: '81999995678',
+      notes: '',
+      source: 'street',
+      schemaVersion: 1,
+      capturedByUid: 'captor-uid',
+      capturedByName: 'Captador Teste',
+      storeId: 'loja-06',
+      capturedAtClient: '2026-09-28T13:00:00.000Z',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets a manager schedule a lead in an additional permitted store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     const batch = writeBatch(db);
@@ -142,6 +160,7 @@ describe('lead correction rules', () => {
       fullName: 'Cliente do Gestor',
       phone: '+5581999995678',
       phoneSearch: '81999995678',
+      birthDate: '1985-04-12',
       notes: '',
       appointmentDate: '2026-10-20',
       appointmentTime: '10:00',
@@ -636,6 +655,7 @@ describe('appointment slot reservations', () => {
     fullName: 'Cliente com horario',
     phone: '+5581999991234',
     phoneSearch: '81999991234',
+    birthDate: '1985-04-12',
     notes: '',
     appointmentDate: '2026-10-20',
     appointmentTime: '08:00',

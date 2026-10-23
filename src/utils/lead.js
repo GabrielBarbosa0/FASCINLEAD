@@ -173,7 +173,7 @@ export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = n
   };
 }
 
-export function validateLeadInput(input) {
+export function validateLeadInput(input, options = {}) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
   const phone = normalizeBrazilianPhone(input.phone);
@@ -189,7 +189,11 @@ export function validateLeadInput(input) {
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF valido.';
   if (customerRg.length > 20) errors.customerRg = 'Use no maximo 20 caracteres.';
-  if (birthDate && calculateAge(birthDate) === null) errors.birthDate = 'Informe uma data de nascimento valida.';
+  if (!birthDate) {
+    if (options.requireBirthDate !== false) errors.birthDate = 'Informe a data de nascimento.';
+  } else if (calculateAge(birthDate) === null) {
+    errors.birthDate = 'Informe uma data de nascimento valida.';
+  }
   if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opcao valida.';
   if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no maximo 120 caracteres.';
   if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no maximo 12 caracteres.';
@@ -266,7 +270,7 @@ export function validateLeadInput(input) {
 }
 
 export function createLeadDocument(input, profile, installationId, now = new Date()) {
-  const validation = validateLeadInput(input);
+  const validation = validateLeadInput(input, { requireBirthDate: true });
   if (!validation.isValid) return { ...validation, data: null };
 
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];
@@ -326,7 +330,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
 }
 
 export function createLeadUpdate(input) {
-  const validation = validateLeadInput(input);
+  const validation = validateLeadInput(input, { requireBirthDate: false });
   if (!validation.isValid) return { ...validation, data: null };
 
   const interest = INTERESTS.find((item) => item.id === input.interestId) || INTERESTS[0];

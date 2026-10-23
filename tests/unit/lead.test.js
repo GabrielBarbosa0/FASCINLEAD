@@ -59,11 +59,12 @@ describe('lead validation', () => {
     expect(validateLeadInput({ ...validInput, customerRg: '1'.repeat(21) }).errors.customerRg).toBeDefined();
   });
 
-  it('calculates age and rejects a future birth date', () => {
+  it('requires a valid birth date and rejects a future date', () => {
     expect(calculateAge('2000-11-10', new Date(2026, 9, 21))).toBe(25);
     expect(calculateAge('2000-10-10', new Date(2026, 9, 21))).toBe(26);
     expect(validateLeadInput({ ...validInput, birthDate: '2999-01-01' }).errors.birthDate).toBeDefined();
-    expect(validateLeadInput({ ...validInput, birthDate: '' }).isValid).toBe(true);
+    expect(validateLeadInput({ ...validInput, birthDate: '' }).errors.birthDate).toBe('Informe a data de nascimento.');
+    expect(createLeadUpdate({ ...validInput, birthDate: '' }).isValid).toBe(true);
   });
 
   it('accepts known sex options and rejects unknown values', () => {
