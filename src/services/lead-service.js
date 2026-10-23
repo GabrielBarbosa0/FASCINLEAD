@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  enableNetwork,
   limit,
   onSnapshot,
   orderBy,
@@ -16,6 +15,7 @@ import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
+import { createId } from '../utils/id.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
 import {
   listOfflineLeads,
@@ -26,6 +26,7 @@ import {
 } from './offline-lead-store.js';
 
 const DEMO_STORAGE_KEY = 'fascinlead:demo-leads';
+let synchronizationPromise = null;
 
 function reservationBlocks(storeId, appointmentDate, appointmentTime, durationMinutes) {
   return appointmentBlockTimes(appointmentTime, durationMinutes).map((blockTime) => ({
@@ -65,6 +66,8 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
 
   let remoteLeads = [];
   let offlineLeads = [];
+  let confirmedRemoteIds = new Set();
+  const removingOfflineIds = new Set();
   const emit = () => {
     const merged = new Map(remoteLeads.map((lead) => [lead.id, lead]));
     offlineLeads.forEach((lead) => merged.set(lead.id, lead));
@@ -72,9 +75,22 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
       String(b.capturedAtClient).localeCompare(String(a.capturedAtClient))
     )));
   };
+  const removeConfirmedOfflineLeads = () => {
+    const confirmedIds = offlineLeads
+      .map((lead) => lead.id)
+      .filter((id) => confirmedRemoteIds.has(id) && !removingOfflineIds.has(id));
+    confirmedIds.forEach((id) => removingOfflineIds.add(id));
+    confirmedIds.forEach((id) => {
+      removeOfflineLead(id).catch((error) => {
+        removingOfflineIds.delete(id);
+        onError(error);
+      });
+    });
+  };
   const unsubscribeOffline = subscribeToOfflineLeads(profile.uid, (leads) => {
     offlineLeads = leads;
     emit();
+    removeConfirmedOfflineLeads();
   }, onError);
   const leadsQuery = query(
     collection(db, 'leads'),
@@ -87,6 +103,9 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     leadsQuery,
     { includeMetadataChanges: true },
     (snapshot) => {
+      confirmedRemoteIds = new Set(snapshot.docs
+        .filter((leadDoc) => !leadDoc.metadata.hasPendingWrites && !leadDoc.metadata.fromCache)
+        .map((leadDoc) => leadDoc.id));
       remoteLeads = snapshot.docs.map((leadDoc) => ({
           id: leadDoc.id,
           ...leadDoc.data(),
@@ -94,6 +113,7 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
           fromCache: leadDoc.metadata.fromCache
         }));
       emit();
+      removeConfirmedOfflineLeads();
     },
     onError
   );
@@ -107,7 +127,7 @@ export function saveLead(input, profile, demoMode, onRemoteError, options = {}) 
   const result = createLeadDocument(input, profile, getInstallationId());
   if (!result.isValid) return result;
 
-  const id = crypto.randomUUID();
+  const id = createId();
 
   if (demoMode || !isFirebaseConfigured) {
     const leads = readDemoLeads();
@@ -281,7 +301,6 @@ async function synchronizeOfflineLeads(profile) {
         createdAtServer: serverTimestamp(),
         updatedAtServer: serverTimestamp()
       });
-      await removeOfflineLead(id);
       synchronized += 1;
     } catch {
       await updateOfflineLeadState(id, 'error');
@@ -293,8 +312,14 @@ async function synchronizeOfflineLeads(profile) {
 
 export async function synchronizeNow(demoMode, profile = null) {
   if (demoMode || !isFirebaseConfigured) return { demo: true };
-  await enableNetwork(db);
-  const offline = await synchronizeOfflineLeads(profile);
-  await waitForPendingWrites(db);
-  return { demo: false, ...offline };
+  if (synchronizationPromise) return synchronizationPromise;
+
+  synchronizationPromise = (async () => {
+    const offline = await synchronizeOfflineLeads(profile);
+    await waitForPendingWrites(db);
+    return { demo: false, ...offline };
+  })().finally(() => {
+    synchronizationPromise = null;
+  });
+  return synchronizationPromise;
 }

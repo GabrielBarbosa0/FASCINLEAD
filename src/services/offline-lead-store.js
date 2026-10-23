@@ -23,10 +23,21 @@ async function runTransaction(mode, operation) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, mode);
     const request = operation(transaction.objectStore(STORE_NAME));
-    request.onsuccess = () => resolve(request.result);
+    let result;
+    request.onsuccess = () => { result = request.result; };
     request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => reject(transaction.error);
+    transaction.oncomplete = () => {
+      database.close();
+      resolve(result);
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || request.error);
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error || request.error || new Error('A gravacao local foi interrompida.'));
+    };
   });
 }
 

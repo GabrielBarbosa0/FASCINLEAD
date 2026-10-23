@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, documentId, getDoc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import {
   appointmentBlockTimes,
@@ -37,18 +37,18 @@ function scheduleWithSharedTransport(storeId, schedulesByStore) {
 export function subscribeToStoreSchedule(profile, onData, onError, storeId = profile?.storeId) {
   if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId)) throw permissionError('Configuracao de agenda indisponivel.');
   const resourceStoreIds = transportResourceStoreIds(storeId);
-  const schedulesByStore = new Map();
-  const unsubscribes = resourceStoreIds.map((resourceStoreId) => onSnapshot(
-    doc(db, 'stores', resourceStoreId),
+  const storesQuery = query(
+    collection(db, 'stores'),
+    where(documentId(), 'in', resourceStoreIds)
+  );
+  return onSnapshot(
+    storesQuery,
     (snapshot) => {
-      schedulesByStore.set(resourceStoreId, snapshot.exists() ? snapshot.data() : DEFAULT_STORE_SCHEDULE);
-      if (schedulesByStore.size === resourceStoreIds.length) {
-        onData(scheduleWithSharedTransport(storeId, schedulesByStore));
-      }
+      const schedulesByStore = new Map(snapshot.docs.map((item) => [item.id, item.data()]));
+      onData(scheduleWithSharedTransport(storeId, schedulesByStore));
     },
     onError
-  ));
-  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+  );
 }
 
 export function subscribeToDayAppointments(profile, appointmentDate, onData, onError, storeId = profile?.storeId) {

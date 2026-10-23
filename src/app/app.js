@@ -6,6 +6,7 @@ import {
   Building2,
   BusFront,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
@@ -85,6 +86,7 @@ const appIcons = {
   Building2,
   BusFront,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
@@ -2548,12 +2550,23 @@ function bindPageEvents() {
       }
       const submitButton = form.querySelector('[type="submit"]');
       submitButton.disabled = true;
-      const result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
-        if (!controlledAppointment) {
-          state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
-          render();
-        }
-      });
+      let result;
+      try {
+        result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
+          if (!controlledAppointment) {
+            state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
+            render();
+          }
+        });
+      } catch {
+        submitButton.disabled = false;
+        showToast(
+          navigator.onLine ? 'Nao foi possivel preparar este cadastro.' : 'Nao foi possivel salvar o cadastro neste aparelho.',
+          'danger',
+          'circle-alert'
+        );
+        return;
+      }
       setFieldErrors(form, result.errors || {});
       if (!result.isValid) {
         submitButton.disabled = false;

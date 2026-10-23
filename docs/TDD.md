@@ -4,7 +4,7 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.6 |
+| Versao | 2.7 |
 | Status | Em implementacao |
 | Data | 23/10/2026 |
 | Responsavel | Oticas Fascinante |
@@ -414,15 +414,14 @@ FASCINLEAD/
 2. `Inicio`: atalhos, usuario/loja, conectividade e quantidade pendente.
 3. `Novo`: formulario curto de cadastro.
 4. `Cadastros`: lista pesquisavel dos registros do colaborador.
-5. `Sincronizacao`: totais, ultimo envio, erros e acao manual.
-6. `Gestao`: filtros, totais e exportacao para perfis autorizados.
-7. `Dashboard`: indicadores do periodo e consulta local experimental ao SavWin.
-8. `Relatorios`: indicadores, agrupamentos por unidade/captador e distribuicoes por dia e periodo do dia.
-9. `Acessos`: autorizacao, alteracao de perfil, unidades, telefone, codigo SavWin e bloqueio de usuarios por administradores.
-10. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
-11. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
-12. `Metas`: criacao em modal, edicao, duplicacao, exclusao e acompanhamento individual ou da equipe.
-13. `Configuracoes`: agenda, servicos, perfis e permissoes, restritos a administradores.
+5. `Gestao`: filtros, totais e exportacao para perfis autorizados.
+6. `Dashboard`: indicadores do periodo e consulta local experimental ao SavWin.
+7. `Relatorios`: indicadores, agrupamentos por unidade/captador e distribuicoes por dia e periodo do dia.
+8. `Acessos`: autorizacao, alteracao de perfil, unidades, telefone, codigo SavWin e bloqueio de usuarios por administradores.
+9. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
+10. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
+11. `Metas`: criacao em modal, edicao, duplicacao, exclusao e acompanhamento individual ou da equipe.
+12. `Configuracoes`: agenda, servicos, perfis e permissoes, restritos a administradores.
 
 ### 6.2 Navegacao mobile
 
@@ -708,7 +707,7 @@ Novos indices somente deverao ser adicionados a partir de consultas reais. Cada 
 O Firestore e inicializado com cache persistente em IndexedDB. Para impedir que uma escrita rejeitada pela nuvem faca o cadastro desaparecer, a aplicacao tambem mantem uma caixa de saida propria em IndexedDB. Quando o cadastro offline estiver habilitado para a loja:
 
 1. O formulario valida e normaliza os dados.
-2. O navegador gera um UUID.
+2. O navegador gera um UUID, com alternativa compativel para navegadores moveis que nao exponham `crypto.randomUUID` em origens HTTP.
 3. Data e horario sao removidos da gravacao offline.
 4. A aplicacao grava o documento na caixa de saida local e o exibe em `Meus cadastros`.
 5. Quando houver conexao, a aplicacao envia o mesmo UUID ao Firestore, sem data e horario.
@@ -736,7 +735,7 @@ Enquanto o formulario de nova captacao estiver aberto, uma mudanca de conectivid
 
 ### 8.3 Processamento automatico da caixa de saida
 
-Ao detectar conexao, o aplicativo habilita a rede do Firestore, envia os cadastros locais do usuario autenticado e aguarda a confirmacao individual. Falhas permanecem na caixa de saida para nova tentativa; nao existe comando manual nem mensagem de sucesso antes da confirmacao do servidor.
+Ao detectar conexao, o aplicativo envia os cadastros locais do usuario autenticado em uma unica execucao de sincronizacao e aguarda a confirmacao individual. Chamadas simultaneas sao consolidadas e a aplicacao nao reinicia a rede do Firestore quando o navegador ja esta online. Falhas permanecem na caixa de saida para nova tentativa; nao existe comando manual nem mensagem de sucesso antes da confirmacao do servidor.
 
 ### 8.4 Conflitos
 
