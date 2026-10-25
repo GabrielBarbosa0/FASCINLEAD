@@ -834,6 +834,27 @@ describe('appointment slot reservations', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('lets the captor create and schedule a local-only lead in one batch', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const localLead = {
+      ...lead,
+      appointmentDate: '2026-10-21',
+      appointmentTime: '08:20',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    };
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', 'local-only-lead'), localLead, { merge: true });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-21-08:20'), {
+      ...slot,
+      appointmentDate: '2026-10-21',
+      appointmentTime: '08:20',
+      blockTime: '08:20',
+      leadId: 'local-only-lead'
+    });
+    await assertSucceeds(batch.commit());
+  });
+
   it('lets a Surubim captor query the combined clinic occupancy', async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'appointmentSlots', 'legacy-loja-02-slot'), {

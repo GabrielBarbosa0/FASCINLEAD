@@ -718,8 +718,10 @@ O agendamento nao opera offline:
 
 1. Sem conexao, data e horario ficam ocultos e vazios.
 2. Ao voltar online, o captador abre o cadastro e consulta a disponibilidade atual.
-3. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
-4. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.
+3. A tela de detalhes usa a escala controlada da loja e exibe somente horarios disponiveis; nao transforma o primeiro agendamento em horario livre.
+4. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
+5. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.
+6. Sincronizacao e primeiro agendamento consultam o documento remoto em transacao: se o lead ja existir, a sincronizacao nao sobrescreve os dados nem remove um horario escolhido durante a reconexao.
 
 ### 8.2 Estados exibidos
 

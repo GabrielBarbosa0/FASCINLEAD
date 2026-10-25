@@ -1303,6 +1303,12 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await expect(offlineLead).toContainText('Aguardando agendamento');
   await offlineLead.click();
   await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
+  const scheduleDate = new Date();
+  scheduleDate.setDate(scheduleDate.getDate() + 7);
+  await page.getByLabel('Data do pre-agendamento').fill(scheduleDate.toISOString().slice(0, 10));
+  await expect(page.getByLabel('Horario disponivel')).toBeVisible();
+  await expect(page.getByLabel('Horario disponivel')).toBeEnabled();
+  expect(await page.getByLabel('Horario disponivel').locator('option').count()).toBeGreaterThan(1);
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {

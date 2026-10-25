@@ -197,7 +197,12 @@ const state = {
   },
   leadDetailSchedule: {
     loading: false,
+    appointmentLoading: false,
+    leadId: '',
     storeId: '',
+    appointmentDate: '',
+    appointments: [],
+    error: '',
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
   offlineCapture: {
@@ -1248,6 +1253,50 @@ function findManagementLead(leadId) {
     || (state.management.activeLead?.id === leadId ? state.management.activeLead : null);
 }
 
+function leadDetailAppointmentTimeField(lead) {
+  const { settings, appointmentDate, appointments, appointmentLoading, error } = state.leadDetailSchedule;
+  const selectedTime = appointmentDate === lead.appointmentDate ? lead.appointmentTime : '';
+  if (!navigator.onLine) {
+    return '<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario disponivel</label><select id="edit-appointmentTime" name="appointmentTime" disabled><option>Conecte-se para consultar os horarios</option></select><small class="field-error"></small></div>';
+  }
+  if (settings.schedulingMode === 'free') {
+    return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(selectedTime)}" /><small class="field-error"></small></div>`;
+  }
+
+  const triage = ophthalmologyTriage(lead, settings);
+  const routeAllowed = triage.careRoute === 'ophthalmologist'
+    ? isOphthalmologyDateAllowed(settings, appointmentDate)
+    : isStoreDateAllowed(settings, appointmentDate);
+  const transportAllowed = !lead.needsTransport || isTransportDateAllowed(settings, appointmentDate);
+  const durationMinutes = Number(lead.appointmentDurationMinutes) || settings.appointmentDurationMinutes;
+  const serviceSchedule = {
+    ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(settings) : settings),
+    appointmentDurationMinutes: durationMinutes
+  };
+  const quota = appointmentQuotaStatus(settings, appointmentDate, appointments, state.profile, lead.id);
+  const available = appointmentDate && routeAllowed && transportAllowed && !appointmentLoading && !error
+    ? buildAppointmentSlots(serviceSchedule, appointments, lead.id, { appointmentDate, profile: state.profile })
+      .filter((slot) => slot.available && (!lead.needsTransport || isTransportAppointmentAllowed(
+        settings,
+        appointmentDate,
+        slot.time,
+        durationMinutes
+      )))
+    : [];
+  let placeholder = 'Escolha primeiro uma data';
+  if (appointmentLoading) placeholder = 'Consultando horarios...';
+  else if (error) placeholder = 'Horarios indisponiveis';
+  else if (appointmentDate && !routeAllowed) placeholder = triage.careRoute === 'ophthalmologist'
+    ? 'O oftalmologista nao atende neste dia'
+    : 'A loja nao funciona neste dia';
+  else if (appointmentDate && !transportAllowed) placeholder = 'Transporte indisponivel neste dia';
+  else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
+  else if (quota.reason === 'mei-quota' || quota.reason === 'daily-limit') placeholder = 'Limite de agendamentos atingido';
+  else if (appointmentDate && !available.length) placeholder = 'Dia sem horarios disponiveis';
+
+  return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario disponivel</label><select id="edit-appointmentTime" name="appointmentTime" ${available.length && !quota.blocked ? '' : 'disabled'}><option value="">${placeholder}</option>${available.map((slot) => `<option value="${slot.time}" ${slot.time === selectedTime ? 'selected' : ''}>${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+}
+
 function leadDetailView() {
   const managementMode = state.route === 'management-lead';
   if (managementMode && !canManage()) {
@@ -1284,7 +1333,7 @@ function leadDetailView() {
     </section>
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alteracoes e agendamento exigem internet.</span></div>' : ''}
-      <input name="schedulingMode" type="hidden" value="${escapeHtml(lead.appointmentSchedulingMode || state.leadDetailSchedule.settings.schedulingMode || 'controlled')}" />
+      <input name="schedulingMode" type="hidden" value="${escapeHtml(state.leadDetailSchedule.settings.schedulingMode || lead.appointmentSchedulingMode || 'controlled')}" />
       ${triageConfigFields(state.leadDetailSchedule.settings)}
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
       ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
@@ -1313,8 +1362,8 @@ function leadDetailView() {
       ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
       ${transportFields(lead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
-        <div class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(lead.appointmentTime)}" ${locked} /><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.leadDetailSchedule.appointmentDate || lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
+        ${leadDetailAppointmentTimeField(lead)}
       </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit" ${offlineEdit ? 'disabled' : ''}><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
@@ -2616,6 +2665,10 @@ function bindPageEvents() {
     bindExclusiveOptions(editLeadForm, 'pathologyIds');
     bindEyeTriage(editLeadForm, state.leadDetailSchedule.settings);
     bindTransportFields(editLeadForm, state.leadDetailSchedule.settings);
+    editLeadForm.elements.appointmentDate?.addEventListener('input', () => {
+      state.leadDetailSchedule.appointmentDate = editLeadForm.elements.appointmentDate.value;
+      startLeadDetailDayAppointmentsSubscription(existingLeadForDetail());
+    });
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!navigator.onLine) {
@@ -2674,8 +2727,10 @@ function bindPageEvents() {
       }
 
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
-        state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
-        render();
+        if (!values.appointmentDate || !values.appointmentTime) {
+          state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
+          render();
+        }
       }, existingLead);
       setFieldErrors(editLeadForm, result.errors || {});
       if (!result.isValid) {
@@ -4035,15 +4090,78 @@ function ensureManagementData() {
   }
 }
 
+function existingLeadForDetail() {
+  const leadId = currentRouteParam();
+  return state.route === 'management-lead'
+    ? findManagementLead(leadId)
+    : state.leads.find((item) => item.id === leadId);
+}
+
+function refreshLeadDetailAppointmentTime(lead) {
+  const container = document.querySelector('#edit-appointment-time-field');
+  if (container && lead) container.outerHTML = leadDetailAppointmentTimeField(lead);
+}
+
+function startLeadDetailDayAppointmentsSubscription(lead) {
+  state.unsubscribeDayAppointments?.();
+  state.unsubscribeDayAppointments = null;
+  state.leadDetailSchedule.appointments = [];
+  state.leadDetailSchedule.error = '';
+  const appointmentDate = state.leadDetailSchedule.appointmentDate;
+  if (!lead || !appointmentDate || state.leadDetailSchedule.settings.schedulingMode === 'free') {
+    state.leadDetailSchedule.appointmentLoading = false;
+    refreshLeadDetailAppointmentTime(lead);
+    return;
+  }
+
+  if (state.demoMode) {
+    state.leadDetailSchedule.appointments = state.leads.filter((item) => item.appointmentDate === appointmentDate);
+    state.leadDetailSchedule.appointmentLoading = false;
+    refreshLeadDetailAppointmentTime(lead);
+    return;
+  }
+
+  state.leadDetailSchedule.appointmentLoading = true;
+  refreshLeadDetailAppointmentTime(lead);
+  try {
+    state.unsubscribeDayAppointments = subscribeToDayAppointments(
+      { ...state.profile, storeId: lead.storeId },
+      appointmentDate,
+      (appointments) => {
+        if (state.leadDetailSchedule.appointmentDate !== appointmentDate) return;
+        state.leadDetailSchedule.appointments = appointments;
+        state.leadDetailSchedule.appointmentLoading = false;
+        state.leadDetailSchedule.error = '';
+        refreshLeadDetailAppointmentTime(existingLeadForDetail());
+      },
+      () => {
+        if (state.leadDetailSchedule.appointmentDate !== appointmentDate) return;
+        state.leadDetailSchedule.appointmentLoading = false;
+        state.leadDetailSchedule.error = 'Nao foi possivel consultar os horarios.';
+        refreshLeadDetailAppointmentTime(existingLeadForDetail());
+      },
+      lead.storeId
+    );
+  } catch {
+    state.leadDetailSchedule.appointmentLoading = false;
+    state.leadDetailSchedule.error = 'Nao foi possivel consultar os horarios.';
+    refreshLeadDetailAppointmentTime(lead);
+  }
+}
+
 async function ensureLeadDetailSchedule() {
   if (!['lead', 'management-lead'].includes(state.route) || !state.profile || state.leadDetailSchedule.loading) return;
   const leadId = currentRouteParam();
   const lead = state.route === 'management-lead'
     ? findManagementLead(leadId)
     : state.leads.find((item) => item.id === leadId);
-  if (!lead?.storeId || state.leadDetailSchedule.storeId === lead.storeId) return;
+  if (!lead?.storeId || (state.leadDetailSchedule.leadId === lead.id && state.leadDetailSchedule.storeId === lead.storeId)) return;
 
   state.leadDetailSchedule.loading = true;
+  state.leadDetailSchedule.leadId = lead.id;
+  state.leadDetailSchedule.appointmentDate = lead.appointmentDate || '';
+  state.leadDetailSchedule.appointments = [];
+  state.leadDetailSchedule.error = '';
   try {
     const settings = state.demoMode
       ? state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId }
@@ -4053,9 +4171,11 @@ async function ensureLeadDetailSchedule() {
   } catch {
     state.leadDetailSchedule.storeId = lead.storeId;
     state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+    state.leadDetailSchedule.error = 'Nao foi possivel carregar a agenda desta loja.';
   } finally {
     state.leadDetailSchedule.loading = false;
     render();
+    startLeadDetailDayAppointmentsSubscription(lead);
   }
 }
 
@@ -4622,7 +4742,12 @@ async function handleAction(action) {
     };
     state.leadDetailSchedule = {
       loading: false,
+      appointmentLoading: false,
+      leadId: '',
       storeId: '',
+      appointmentDate: '',
+      appointments: [],
+      error: '',
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };
     state.offlineCapture = { loaded: false, enabled: false };

@@ -5,6 +5,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   waitForPendingWrites,
@@ -70,7 +71,7 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
   const removingOfflineIds = new Set();
   const emit = () => {
     const merged = new Map(remoteLeads.map((lead) => [lead.id, lead]));
-    offlineLeads.forEach((lead) => merged.set(lead.id, lead));
+    offlineLeads.forEach((lead) => merged.set(lead.id, { ...merged.get(lead.id), ...lead }));
     onData([...merged.values()].sort((a, b) => (
       String(b.capturedAtClient).localeCompare(String(a.capturedAtClient))
     )));
@@ -218,6 +219,9 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
+  const localOnly = existingLead
+    && ['pending', 'error'].includes(existingLead.syncState)
+    && !existingLead.createdAtServer;
   const oldControlled = existingLead?.appointmentSchedulingMode === 'controlled'
     && existingLead.appointmentDate && existingLead.appointmentTime;
   const newControlled = result.data.appointmentSchedulingMode === 'controlled'
@@ -232,7 +236,29 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   const reservationChanged = oldBlocks.length !== newBlocks.length
     || oldBlocks.some((block) => !newIds.has(block.id));
   let writePromise;
-  if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
+  if (localOnly) {
+    const { id: ignoredId, syncState, fromCache, createdAtServer, ...localData } = existingLead;
+    const leadReference = doc(db, 'leads', id);
+    writePromise = runTransaction(db, async (transaction) => {
+      const remoteLead = await transaction.get(leadReference);
+      const completeLead = {
+        ...localData,
+        ...result.data,
+        ...(result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
+        ...(!remoteLead.exists() ? { createdAtServer: serverTimestamp() } : {}),
+        updatedAtServer: serverTimestamp()
+      };
+      transaction.set(leadReference, completeLead, { merge: true });
+      newBlocks.forEach((block) => setReservationBlock(transaction, block, {
+        storeId: existingLead.storeId,
+        appointmentDate: result.data.appointmentDate,
+        appointmentTime: result.data.appointmentTime,
+        durationMinutes: result.data.appointmentDurationMinutes,
+        leadId: id,
+        capturedByUid: existingLead.capturedByUid
+      }));
+    });
+  } else if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
     oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
@@ -294,12 +320,17 @@ async function synchronizeOfflineLeads(profile) {
   for (const lead of leads) {
     const { id, syncState, fromCache, ...data } = lead;
     try {
-      await setDoc(doc(db, 'leads', id), {
-        ...data,
-        appointmentDate: '',
-        appointmentTime: '',
-        createdAtServer: serverTimestamp(),
-        updatedAtServer: serverTimestamp()
+      const leadReference = doc(db, 'leads', id);
+      await runTransaction(db, async (transaction) => {
+        const remoteLead = await transaction.get(leadReference);
+        if (remoteLead.exists()) return;
+        transaction.set(leadReference, {
+          ...data,
+          appointmentDate: '',
+          appointmentTime: '',
+          createdAtServer: serverTimestamp(),
+          updatedAtServer: serverTimestamp()
+        });
       });
       synchronized += 1;
     } catch {
