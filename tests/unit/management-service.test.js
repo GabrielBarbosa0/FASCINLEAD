@@ -67,4 +67,23 @@ describe('deleteManagementLead', () => {
 
     expect(firestoreMocks.writeBatch).not.toHaveBeenCalled();
   });
+
+  it('lets a manager with deletion permission remove a lead from an allowed store', async () => {
+    await deleteManagementLead({
+      uid: 'manager-1',
+      role: 'manager',
+      storeId: 'loja-06',
+      permissions: ['leads.delete']
+    }, {
+      id: 'lead-1',
+      capturedByUid: 'captor-1',
+      storeId: 'loja-06'
+    });
+
+    expect(firestoreMocks.batch.delete).toHaveBeenCalledWith({
+      collectionName: 'leads',
+      documentId: 'lead-1'
+    });
+    expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce();
+  });
 });

@@ -57,6 +57,11 @@ describe('role profiles', () => {
     expect(result.data.permissions).toEqual(['leads.create']);
   });
 
+  it('allows deletion permission in own-data and store profiles', () => {
+    expect(normalizeRolePermissions('own', ['leads.delete'])).toEqual(['leads.delete']);
+    expect(normalizeRolePermissions('stores', ['leads.delete'])).toEqual(['leads.delete']);
+  });
+
   it('adds management access when a dependent team feature is enabled', () => {
     const result = validateRoleProfile({
       name: 'Analista regional',

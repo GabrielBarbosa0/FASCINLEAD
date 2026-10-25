@@ -31,7 +31,7 @@ export const PERMISSION_GROUPS = [
     label: 'Administracao',
     permissions: [
       { id: 'leads.edit_all', label: 'Editar qualquer lead permitido', scopes: ['admin'] },
-      { id: 'leads.delete', label: 'Excluir leads', scopes: ['admin'] },
+      { id: 'leads.delete', label: 'Excluir leads', scopes: ['own', 'stores', 'admin'] },
       { id: 'schedule.manage', label: 'Configurar agendas', scopes: ['admin'] },
       { id: 'access.manage', label: 'Gerenciar acessos', scopes: ['admin'] },
       { id: 'roles.manage', label: 'Gerenciar perfis e permissoes', scopes: ['admin'] }

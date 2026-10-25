@@ -356,6 +356,32 @@ describe('lead correction rules', () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     await assertFails(deleteDoc(doc(db, 'leads', 'lead-test')));
   });
+
+  it('lets a manager with deletion permission remove an allowed lead and its slot', async () => {
+    const slotId = 'slot-consultorio-surubim-2026-10-15-09:30';
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, 'users', 'manager-uid'), {
+        permissions: ['management.view', 'leads.delete']
+      });
+      await setDoc(doc(db, 'appointmentSlots', slotId), {
+        storeId: 'loja-06',
+        appointmentDate: '2026-10-15',
+        appointmentTime: '09:30',
+        blockTime: '09:30',
+        durationMinutes: 10,
+        leadId: 'lead-test',
+        capturedByUid: 'captor-uid',
+        createdAt: Timestamp.now()
+      });
+    });
+
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'appointmentSlots', slotId));
+    batch.delete(doc(db, 'leads', 'lead-test'));
+    await assertSucceeds(batch.commit());
+  });
 });
 
 describe('appointment calendar queries', () => {

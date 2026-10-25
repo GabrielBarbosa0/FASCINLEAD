@@ -592,7 +592,12 @@ service cloud.firestore {
           && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
         ));
 
-      allow delete: if isAdmin() && hasPermission('leads.delete');
+      allow delete: if isPrimaryAdmin()
+        || (activeUser()
+          && hasPermission('leads.delete')
+          && (isAdmin()
+            || resource.data.capturedByUid == request.auth.uid
+            || managerHasStore(resource.data.storeId)));
     }
 
     match /leadSales/{leadId} {
@@ -645,14 +650,18 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.appointmentTime == request.resource.data.appointmentTime
         && getAfter(/databases/$(database)/documents/leads/$(request.resource.data.leadId)).data.capturedByUid == request.resource.data.capturedByUid;
       allow delete: if isAdmin()
-        || (activeUser()
-          && resource.data.capturedByUid == request.auth.uid
-          && (
-            !existsAfter(/databases/$(database)/documents/leads/$(resource.data.leadId))
-            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDate != resource.data.appointmentDate
-            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentTime != resource.data.appointmentTime
-            || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDurationMinutes != resource.data.durationMinutes
-          ));
+        || (activeUser() && (
+          (hasPermission('leads.delete')
+            && (resource.data.capturedByUid == request.auth.uid || managerHasStore(resource.data.storeId))
+            && !existsAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)))
+          || (resource.data.capturedByUid == request.auth.uid
+            && (
+              !existsAfter(/databases/$(database)/documents/leads/$(resource.data.leadId))
+              || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDate != resource.data.appointmentDate
+              || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentTime != resource.data.appointmentTime
+              || getAfter(/databases/$(database)/documents/leads/$(resource.data.leadId)).data.appointmentDurationMinutes != resource.data.durationMinutes
+            ))
+        ));
     }
 
     match /goals/{goalId} {

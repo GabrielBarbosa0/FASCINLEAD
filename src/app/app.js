@@ -1367,10 +1367,10 @@ function leadDetailView() {
       </div>
       <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit" ${offlineEdit ? 'disabled' : ''}><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
-      ${managementMode && isAdmin() ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
+      ${hasAccess('leads.delete') ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>
-    ${managementMode && isAdmin() ? `<dialog id="delete-lead-dialog" class="confirmation-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
+    ${hasAccess('leads.delete') ? `<dialog id="delete-lead-dialog" class="confirmation-dialog" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
       <div class="confirmation-dialog-copy">
         <h2 id="delete-dialog-title">Excluir este lead?</h2>
@@ -5245,7 +5245,8 @@ export async function startApp() {
     }
     const deleteLeadButton = event.target.closest('[data-delete-lead]');
     if (deleteLeadButton && !deleteLeadButton.disabled) {
-      const lead = findManagementLead(deleteLeadButton.dataset.deleteLead);
+      const lead = findManagementLead(deleteLeadButton.dataset.deleteLead)
+        || state.leads.find((item) => item.id === deleteLeadButton.dataset.deleteLead);
       const dialog = document.querySelector('#delete-lead-dialog');
       if (lead && dialog) dialog.showModal();
     }
@@ -5255,15 +5256,18 @@ export async function startApp() {
     }
     const confirmDeleteButton = event.target.closest('[data-confirm-delete]');
     if (confirmDeleteButton && !confirmDeleteButton.disabled) {
-      const lead = findManagementLead(confirmDeleteButton.dataset.confirmDelete);
+      const lead = findManagementLead(confirmDeleteButton.dataset.confirmDelete)
+        || state.leads.find((item) => item.id === confirmDeleteButton.dataset.confirmDelete);
       if (!lead) return;
+      const returnRoute = state.route === 'management-lead' ? 'management' : 'leads';
       confirmDeleteButton.disabled = true;
       try {
         await deleteManagementLead(state.profile, lead);
+        state.leads = state.leads.filter((item) => item.id !== lead.id);
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
         state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
         state.management.activeLead = null;
-        navigate('management');
+        navigate(returnRoute);
         showToast('Lead excluido definitivamente.');
       } catch (error) {
         confirmDeleteButton.disabled = false;

@@ -632,6 +632,8 @@ Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem va
 
 Perfis do sistema usam IDs estaveis (`system-captor`, `system-mei`, `system-manager`, `system-receptionist` e `system-admin`). Perfis personalizados sao documentos do Firestore. O administrador sempre recebe todas as permissoes conhecidas independentemente do vetor salvo.
 
+A acao de excluir um lead e controlada pela permissao `leads.delete`, disponivel para perfis personalizados de dados proprios e de unidades, e nao pela rota usada para abrir o cadastro. Em qualquer tela de detalhes autorizada, o botao permanece logo abaixo de `Salvar alteracoes` e usa o mesmo modal de confirmacao. O alcance do perfil continua limitando quais leads podem ser visualizados e excluidos. A exclusao definitiva remove no mesmo lote o lead e os blocos reservados em `appointmentSlots`; cadastros ainda exclusivamente locais sao removidos da fila offline.
+
 ### 7.8 Colecao `leadSales` - fundacao experimental
 
 O repositorio possui servico e regras para associar, por lead, um CPF e uma venda consultada no SavWin. Essa fundacao ainda nao e importada pela interface principal e nao deve ser tratada como funcionalidade entregue.

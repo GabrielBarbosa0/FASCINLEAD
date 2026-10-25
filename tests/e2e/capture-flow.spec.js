@@ -203,6 +203,27 @@ test('blocks new offline registrations while the store feature is disabled', asy
   await page.context().setOffline(false);
 });
 
+test('shows lead deletion below save wherever an authorized user opens the details', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
+  await page.getByLabel('Nome *').fill('Lead com exclusao');
+  await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByLabel('Data de nascimento').fill('1985-04-12');
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+  await page.getByRole('button', { name: 'Ver cadastro de Lead com exclusao' }).click();
+
+  const saveButton = page.getByRole('button', { name: 'Salvar alteracoes' });
+  const deleteButton = page.getByRole('button', { name: 'Excluir lead', exact: true });
+  await expect(deleteButton).toBeVisible();
+  const positions = await Promise.all([
+    saveButton.evaluate((element) => element.getBoundingClientRect().top),
+    deleteButton.evaluate((element) => element.getBoundingClientRect().top)
+  ]);
+  expect(positions[1]).toBeGreaterThan(positions[0]);
+});
+
 test('routes cataract clients to configured ophthalmology days', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();

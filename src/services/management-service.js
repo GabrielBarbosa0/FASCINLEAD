@@ -13,7 +13,9 @@ import {
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { createLeadUpdate } from '../utils/lead.js';
 import { canAccessStore, profileStoreIds } from '../utils/permissions.js';
+import { hasPermission } from '../utils/role-profile.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
+import { removeOfflineLead } from './offline-lead-store.js';
 
 export const MANAGEMENT_QUERY_LIMIT = 300;
 
@@ -65,8 +67,11 @@ function assertCanUpdate(profile, lead) {
   }
 }
 
-function assertAdmin(profile) {
-  if (!isFirebaseConfigured || profile?.role !== 'admin') {
+function assertCanDelete(profile, lead) {
+  const canReachLead = profile?.role === 'admin'
+    || lead?.capturedByUid === profile?.uid
+    || canAccessStore(profile, lead?.storeId);
+  if (!isFirebaseConfigured || !hasPermission(profile, 'leads.delete') || !canReachLead) {
     const error = new Error('Perfil sem permissao para excluir leads.');
     error.code = 'permission-denied';
     throw error;
@@ -128,7 +133,11 @@ export async function updateManagementLead(profile, lead, input) {
 }
 
 export async function deleteManagementLead(profile, lead) {
-  assertAdmin(profile);
+  assertCanDelete(profile, lead);
+  if (['pending', 'error'].includes(lead.syncState) && !lead.createdAtServer) {
+    await removeOfflineLead(lead.id);
+    return;
+  }
   const batch = writeBatch(db);
   batch.delete(doc(db, 'leads', lead.id));
   if (lead.appointmentDate && lead.appointmentTime) {
@@ -136,4 +145,5 @@ export async function deleteManagementLead(profile, lead) {
       .forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
   }
   await batch.commit();
+  if (['pending', 'error'].includes(lead.syncState)) await removeOfflineLead(lead.id);
 }
