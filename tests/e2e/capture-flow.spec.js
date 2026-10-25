@@ -191,6 +191,27 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
 });
 
+test('keeps the mobile form filled and explains why a registration was not saved', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
+  await page.getByLabel('Nome *').fill('Cliente Mobile');
+  await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+
+  await expect(page.getByRole('status')).toContainText('Revise os campos destacados');
+  await expect(page.getByLabel('Nome *')).toHaveValue('Cliente Mobile');
+  await expect(page.getByLabel('Telefone ou WhatsApp *')).toHaveValue('(81) 99999-1234');
+  await expect(page.getByLabel('Data de nascimento *')).toBeFocused();
+
+  await page.getByLabel('Data de nascimento *').fill('1985-04-12');
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Cadastro salvo');
+  await expect(page.getByText('Cliente Mobile')).toBeVisible();
+});
+
 test('blocks new offline registrations while the store feature is disabled', async ({ page }) => {
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.context().setOffline(true);

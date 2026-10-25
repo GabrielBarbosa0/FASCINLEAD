@@ -617,6 +617,8 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
 
 Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem vazios. A escolha posterior de horario ocorre somente online e cria os documentos correspondentes em `appointmentSlots`.
 
+No envio do cadastro, a interface aguarda a confirmacao da gravacao online antes de limpar o formulario ou informar sucesso. Falhas de validacao preservam os valores digitados, exibem uma mensagem visivel e levam o foco ao primeiro campo invalido. Falhas do Firestore tambem preservam o formulario e mostram uma mensagem de permissao ou conexao; nenhum erro de gravacao deve terminar silenciosamente.
+
 ### 7.7 Colecao `roleProfiles`
 
 ```json

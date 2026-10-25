@@ -270,6 +270,7 @@ const state = {
     result: null
   }
 };
+let toastTimeoutId = null;
 
 function toLocalDateInput(date) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -2488,10 +2489,15 @@ function handleConnectivityChange() {
 
 function showToast(message, tone = 'success', icon = 'circle-check') {
   state.toast = { message, tone, icon };
-  render();
-  setTimeout(() => {
+  clearTimeout(toastTimeoutId);
+  const root = document.querySelector('#app');
+  root?.querySelector('.toast')?.remove();
+  root?.insertAdjacentHTML('beforeend', `<div class="toast toast-${tone}" role="status"><i data-lucide="${icon}"></i><span>${escapeHtml(message)}</span></div>`);
+  createIcons({ icons: appIcons });
+  toastTimeoutId = setTimeout(() => {
     state.toast = null;
-    render();
+    document.querySelector('#app .toast')?.remove();
+    toastTimeoutId = null;
   }, 3200);
 }
 
@@ -2499,12 +2505,23 @@ function setFieldErrors(form, errors) {
   form.querySelectorAll('.field').forEach((field) => field.classList.remove('has-error'));
   form.querySelectorAll('.field-error').forEach((element) => { element.textContent = ''; });
 
+  let firstInvalidField = null;
   for (const [name, message] of Object.entries(errors)) {
     const field = form.querySelector(`[data-field="${name}"]`);
     if (!field) continue;
+    firstInvalidField ||= field;
     field.classList.add('has-error');
-    field.querySelector('.field-error').textContent = message;
+    const errorElement = field.querySelector('.field-error');
+    if (errorElement) errorElement.textContent = message;
   }
+  return firstInvalidField;
+}
+
+function revealFirstFormError(field) {
+  if (!field) return;
+  field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const control = field.querySelector('input:not([type="hidden"]), select, textarea');
+  setTimeout(() => control?.focus({ preventScroll: true }), 250);
 }
 
 function bindPageEvents() {
@@ -2573,7 +2590,9 @@ function bindPageEvents() {
       const rawValues = leadFormValues(form);
       const storeId = rawValues.storeId;
       if (!captureStoreIds().includes(storeId)) {
-        setFieldErrors(form, { storeId: 'Selecione uma loja permitida.' });
+        const field = setFieldErrors(form, { storeId: 'Selecione uma loja permitida.' });
+        showToast('Selecione a loja de destino para continuar.', 'danger', 'circle-alert');
+        revealFirstFormError(field);
         return;
       }
       if (!navigator.onLine) {
@@ -2594,7 +2613,9 @@ function bindPageEvents() {
         })
           .find((slot) => slot.time === values.appointmentTime);
         if (!selectedSlot?.available) {
-          setFieldErrors(form, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
+          const field = setFieldErrors(form, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
+          showToast('O horario escolhido nao esta mais disponivel.', 'danger', 'circle-alert');
+          revealFirstFormError(field);
           startDayAppointmentsSubscription();
           return;
         }
@@ -2603,12 +2624,7 @@ function bindPageEvents() {
       submitButton.disabled = true;
       let result;
       try {
-        result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
-          if (!controlledAppointment) {
-            state.dataError = 'Um cadastro nao foi aceito pela nuvem. Verifique o acesso e tente novamente.';
-            render();
-          }
-        });
+        result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {});
       } catch {
         submitButton.disabled = false;
         showToast(
@@ -2618,9 +2634,11 @@ function bindPageEvents() {
         );
         return;
       }
-      setFieldErrors(form, result.errors || {});
+      const firstInvalidField = setFieldErrors(form, result.errors || {});
       if (!result.isValid) {
         submitButton.disabled = false;
+        showToast('Revise os campos destacados antes de salvar.', 'danger', 'circle-alert');
+        revealFirstFormError(firstInvalidField);
         return;
       }
       if (result.localSavePromise) {
@@ -2632,13 +2650,20 @@ function bindPageEvents() {
           return;
         }
       }
-      if (controlledAppointment && result.writePromise) {
+      if (result.writePromise) {
         try {
           await result.writePromise;
-        } catch {
+        } catch (error) {
           submitButton.disabled = false;
-          setFieldErrors(form, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
-          startDayAppointmentsSubscription();
+          if (controlledAppointment) {
+            const field = setFieldErrors(form, { appointmentTime: 'Nao foi possivel confirmar este horario. Atualize e escolha novamente.' });
+            revealFirstFormError(field);
+            startDayAppointmentsSubscription();
+          }
+          const message = error?.code === 'permission-denied'
+            ? 'O cadastro nao foi autorizado. Atualize o acesso e tente novamente.'
+            : 'Nao foi possivel salvar o cadastro. Verifique a conexao e tente novamente.';
+          showToast(message, 'danger', 'circle-alert');
           return;
         }
       }
