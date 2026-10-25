@@ -2661,7 +2661,7 @@ function bindPageEvents() {
             startDayAppointmentsSubscription();
           }
           const message = error?.code === 'permission-denied'
-            ? 'O cadastro nao foi autorizado. Atualize o acesso e tente novamente.'
+            ? 'O cadastro nao foi aceito pelo servidor. Seus dados foram mantidos; atualize a pagina e tente novamente.'
             : 'Nao foi possivel salvar o cadastro. Verifique a conexao e tente novamente.';
           showToast(message, 'danger', 'circle-alert');
           return;

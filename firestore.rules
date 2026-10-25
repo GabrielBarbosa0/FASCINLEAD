@@ -134,9 +134,7 @@ service cloud.firestore {
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid', 'notes',
-          'followUpContactedAt', 'followUpContactedByUid',
-          'followUpContactedByName', 'followUpContactedAppointmentKey',
+          'notes',
           'consentGiven', 'consentAtClient', 'source',
           'capturedAtClient', 'createdAtServer', 'updatedAtServer',
           'capturedByUid', 'capturedByName', 'storeId', 'installationId',
@@ -158,14 +156,6 @@ service cloud.firestore {
         && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
         && data.birthDate is string
         && data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
-        && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
-        && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
-        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'other'])
-        && (!('eyeSurgeryDetails' in data) || (data.eyeSurgeryDetails is string && data.eyeSurgeryDetails.size() <= 120))
-        && (!('careRoute' in data) || data.careRoute in ['optometrist', 'ophthalmologist'])
-        && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
-        && (!('careRouteReasons' in data) || (data.careRouteReasons is list
-          && data.careRouteReasons.hasOnly(['pathology', 'surgery', 'manual'])))
         && (!('needsTransport' in data) || data.needsTransport is bool)
         && (!('hasCompanion' in data) || data.hasCompanion is bool)
         && (!('transportSeats' in data) || (data.transportSeats is int
@@ -173,36 +163,8 @@ service cloud.firestore {
         && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
         && (!('needsTransport' in data) || !('transportSeats' in data)
           || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
-        && (!('street' in data) || (data.street is string && data.street.size() <= 120))
-        && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
         && data.notes is string
         && data.notes.size() <= 500
-        && (!('ametropiaIds' in data) || (
-          data.ametropiaIds is list
-          && data.ametropiaIds.size() <= 4
-          && data.ametropiaIds.hasOnly(['myopia', 'hyperopia', 'astigmatism', 'presbyopia', 'none', 'unknown'])
-          && (!data.ametropiaIds.hasAny(['none', 'unknown']) || data.ametropiaIds.size() == 1)
-        ))
-        && (!('ametropiaLabels' in data) || (
-          data.ametropiaLabels is list
-          && data.ametropiaLabels.size() <= 4
-          && data.ametropiaLabels.hasOnly(['Miopia', 'Hipermetropia', 'Astigmatismo', 'Presbiopia', 'Nao possui', 'Nao sabe informar'])
-        ))
-        && (('ametropiaIds' in data) == ('ametropiaLabels' in data))
-        && (!('ametropiaIds' in data) || data.ametropiaIds.size() == data.ametropiaLabels.size())
-        && (!('pathologyIds' in data) || (
-          data.pathologyIds is list
-          && data.pathologyIds.size() <= 10
-          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'macular-degeneration', 'retinal-detachment', 'other', 'none', 'unknown'])
-          && (!data.pathologyIds.hasAny(['none', 'unknown']) || data.pathologyIds.size() == 1)
-        ))
-        && (!('pathologyLabels' in data) || (
-          data.pathologyLabels is list
-          && data.pathologyLabels.size() <= 10
-          && data.pathologyLabels.hasOnly(['Catarata', 'Glaucoma', 'Diabetes', 'Pressao alta', 'Ceratocone', 'Retinopatia', 'Olho seco', 'Degeneracao macular', 'Descolamento de retina', 'Outra', 'Nao possui', 'Nao sabe informar'])
-        ))
-        && (('pathologyIds' in data) == ('pathologyLabels' in data))
-        && (!('pathologyIds' in data) || data.pathologyIds.size() == data.pathologyLabels.size())
         && (!('appointmentDate' in data) || (
           data.appointmentDate is string
           && (data.appointmentDate == '' || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
@@ -215,18 +177,6 @@ service cloud.firestore {
           || ((data.appointmentDate == '') == (data.appointmentTime == '')))
         && (!('appointmentAttendance' in data)
           || data.appointmentAttendance in ['pending', 'attended', 'missed'])
-        && (!('appointmentAttendanceUpdatedAt' in data)
-          || data.appointmentAttendanceUpdatedAt is timestamp)
-        && (!('appointmentAttendanceUpdatedByUid' in data)
-          || data.appointmentAttendanceUpdatedByUid is string)
-        && (!('followUpContactedAt' in data)
-          || data.followUpContactedAt is timestamp)
-        && (!('followUpContactedByUid' in data)
-          || (data.followUpContactedByUid is string && data.followUpContactedByUid.size() <= 128))
-        && (!('followUpContactedByName' in data)
-          || (data.followUpContactedByName is string && data.followUpContactedByName.size() <= 120))
-        && (!('followUpContactedAppointmentKey' in data)
-          || (data.followUpContactedAppointmentKey is string && data.followUpContactedAppointmentKey.size() <= 32))
         && (!('appointmentSchedulingMode' in data)
           || data.appointmentSchedulingMode in ['controlled', 'free'])
         && (!('appointmentDurationMinutes' in data)

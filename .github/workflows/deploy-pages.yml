@@ -33,6 +33,9 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: Run Firestore security rules tests
+        run: npm run test:rules
+
       - name: Validate Firebase configuration
         run: test -n "$VITE_FIREBASE_API_KEY"
         env:

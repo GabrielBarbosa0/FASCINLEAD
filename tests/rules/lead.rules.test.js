@@ -6,6 +6,7 @@ import {
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { createLeadDocument } from '../../src/utils/lead.js';
 
 const projectId = 'demo-fascinlead-leads';
 let testEnvironment;
@@ -164,6 +165,63 @@ describe('lead correction rules', () => {
 
     await assertSucceeds(setDoc(doc(db, 'leads', 'mei-permitted-store'), { ...lead, storeId: 'loja-05' }));
     await assertFails(setDoc(doc(db, 'leads', 'mei-blocked-store'), { ...lead, storeId: 'loja-06' }));
+  });
+
+  it('accepts the complete lead and appointment currently produced by the registration form', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const result = createLeadDocument({
+      fullName: 'Cliente do formulario',
+      phone: '(81) 99999-5678',
+      customerRg: '',
+      customerCpf: '',
+      birthDate: '1985-04-12',
+      sex: '',
+      preferredName: '',
+      street: '',
+      streetNumber: '',
+      neighborhood: '',
+      city: '',
+      state: 'PE',
+      interestId: '',
+      ametropiaIds: [],
+      pathologyIds: [],
+      eyeSurgeryStatus: '',
+      eyeSurgeryType: '',
+      eyeSurgeryDetails: '',
+      careRouteOverride: 'automatic',
+      careRouteReasons: [],
+      needsTransport: 'false',
+      hasCompanion: 'false',
+      appointmentDate: '2026-10-26',
+      appointmentTime: '08:00',
+      appointmentServiceId: 'eye-exam',
+      appointmentServiceName: 'Exame de vista',
+      appointmentDurationMinutes: 20,
+      schedulingMode: 'controlled',
+      notes: ''
+    }, {
+      uid: 'captor-uid',
+      displayName: 'Captador Teste',
+      storeId: 'loja-06'
+    }, 'installation-test', new Date('2026-10-25T12:00:00.000Z'));
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', 'form-generated-lead'), {
+      ...result.data,
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-26-08:00'), {
+      storeId: 'loja-06',
+      appointmentDate: '2026-10-26',
+      appointmentTime: '08:00',
+      blockTime: '08:00',
+      durationMinutes: 20,
+      leadId: 'form-generated-lead',
+      capturedByUid: 'captor-uid',
+      createdAt: Timestamp.now()
+    });
+    await assertSucceeds(batch.commit());
   });
 
   it('rejects a new lead without a birth date', async () => {

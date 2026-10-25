@@ -806,8 +806,8 @@ O backend inclui a Callable Function `updateTeamMemberPassword`, protegida pela 
 - Permissoes granulares complementam `role` e `roleProfileId`; nenhuma permissao de interface amplia o que as regras autorizam.
 - Blocos de agenda somente podem ser criados para um lead e uma unidade permitidos e nao podem substituir uma reserva existente.
 - Nenhum cliente pode elevar seu proprio perfil, trocar `storeId` ou alterar `role`.
-- Validar chaves permitidas, tipos, limites de texto e valores enumerados.
-- Permitir exclusao definitiva de `leads` somente para administradores.
+- Validar chaves permitidas e os campos de seguranca e consistencia no Firestore; validacoes de apresentacao e textos derivados permanecem no dominio para que uma criacao completa nao ultrapasse o limite de 1.000 expressoes das regras.
+- Permitir exclusao definitiva de `leads` somente para perfis com `leads.delete`, respeitando autoria ou unidades permitidas; o administrador possui essa permissao globalmente.
 - Correcoes administrativas de leads podem alterar somente os campos editaveis; `capturedByUid`, `storeId` e `createdAtServer` permanecem imutaveis. Essa rota evita revalidar integralmente documentos legados para nao ultrapassar o limite de 1.000 expressoes das regras do Firestore.
 - Captadores leem apenas suas metas; gestores leem e administram metas da propria loja; administradores administram todas.
 
@@ -909,6 +909,7 @@ Mensagens ao usuario devem ser simples e acionaveis. Detalhes tecnicos podem usa
 - gestor nao acessa outra loja;
 - usuario nao altera seu perfil ou papel;
 - lead invalido e rejeitado;
+- documento completo produzido pelo formulario, com reserva atomica, e aceito sem exceder o limite de expressoes das regras;
 - UUID repetido nao cria duplicata;
 - cadastro offline e rejeitado pela interface quando a capacidade da loja esta desativada;
 - lead offline habilitado e aceito sem data, horario ou reserva;
@@ -966,7 +967,7 @@ Um projeto de homologacao separado e desejavel quando o volume ou a equipe aumen
 
 ### 15.3 Deploy
 
-O deploy completo pode ser executado manualmente pelo Firebase CLI. O repositorio tambem possui GitHub Actions para publicar somente o frontend estatico no GitHub Pages quando houver `push` na `main` ou disparo manual. O workflow instala dependencias, executa os testes unitarios, valida a configuracao Firebase e gera o build com a base `/FASCINLEAD/`.
+O deploy completo pode ser executado manualmente pelo Firebase CLI. O repositorio tambem possui GitHub Actions para publicar somente o frontend estatico no GitHub Pages quando houver `push` na `main` ou disparo manual. O workflow instala dependencias, executa os testes unitarios e de regras do Firestore, valida a configuracao Firebase e gera o build com a base `/FASCINLEAD/`.
 
 Rules, indices e Callable Functions nao fazem parte desse workflow estatico. A promocao para producao deve executar os testes de regras, revisar o projeto Firebase selecionado e publicar esses componentes separadamente.
 
