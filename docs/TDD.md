@@ -4,9 +4,9 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.7 |
+| Versao | 2.8 |
 | Status | Em implementacao |
-| Data | 23/10/2026 |
+| Data | 26/10/2026 |
 | Responsavel | Oticas Fascinante |
 
 ### Manutencao deste documento
@@ -16,6 +16,7 @@
 - Decisoes ainda nao implementadas devem ser identificadas como proposta ou pendencia; nao podem ser descritas como comportamento atual.
 - A versao deve subir quando houver mudanca estrutural. A data deve refletir a ultima revisao funcional relevante.
 - Codigo, regras do Firestore e testes prevalecem como evidencia durante auditorias; divergencias encontradas devem ser reconciliadas no TDD antes de concluir a tarefa.
+- Riscos estruturais, prioridades e criterios de conclusao sao mantidos no [registro de dividas tecnicas](DIVIDAS-TECNICAS.md).
 
 ## 1. Visao geral
 
@@ -239,6 +240,7 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - O lead informa se precisa de transporte e se levara um acompanhante, limitado a um.
 - O consumo de capacidade e representado por `transportSeats`: um assento para o cliente e dois com acompanhante.
 - Cada loja configura os dias e horarios em que o transporte esta disponivel.
+- Quando o transporte estiver desativado para a loja, os campos de transporte e acompanhante nao aparecem nos fluxos de novo cadastro e novo agendamento.
 - Em acessos multi-loja, o formulario aguarda a configuracao da unidade de destino antes de liberar os campos, evitando usar a escala padrao ou a resposta atrasada de outra loja.
 - Um agendamento com transporte so pode usar data e intervalo integralmente compativeis com essa escala.
 - Loja 02 e Loja 06 compartilham o mesmo transporte de Surubim, incluindo escala e disponibilidade. Uma alteracao nessa configuracao e gravada para as duas lojas.

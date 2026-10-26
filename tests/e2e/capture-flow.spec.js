@@ -1282,6 +1282,16 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByLabel('Horario disponivel').locator('option[value="08:10"]')).toHaveCount(0);
 });
 
+test('hides transport fields from new registrations when transport is disabled', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: 'Novo', exact: true }).click();
+  await page.getByLabel('Loja de destino').selectOption('loja-06');
+
+  await expect(page.getByLabel('Transporte', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Tem acompanhante?')).toHaveCount(0);
+});
+
 test('uses the available width in schedule settings', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes('mobile'), 'Intermediate desktop layout only.');
   await page.setViewportSize({ width: 1024, height: 768 });

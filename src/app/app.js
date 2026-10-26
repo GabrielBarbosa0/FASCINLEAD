@@ -1110,7 +1110,9 @@ function newLeadView() {
         <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
       ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
-      ${transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')}
+      ${state.newLeadSchedule.settings.transportEnabled
+        ? transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')
+        : ''}
       <div class="field-row appointment-fields" data-online-appointment ${navigator.onLine ? '' : 'hidden'}>
         <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine && selectedStoreId ? '' : 'disabled'} /><small class="schedule-date-status">${!navigator.onLine ? 'Conecte-se para escolher uma data.' : !selectedStoreId ? 'Escolha primeiro a loja de destino.' : ''}</small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
@@ -1846,7 +1848,9 @@ function appointmentCreateDialog(allowedStores) {
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
         <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
         ${eyeTriageFields(draft, schedule, canOverrideCareRoute(), 'agenda-lead-eye')}
-        ${transportFields({ ...draft, appointmentDate: state.appointments.selectedDate }, schedule, 'agenda-lead-transport')}
+        ${schedule.transportEnabled
+          ? transportFields({ ...draft, appointmentDate: state.appointments.selectedDate }, schedule, 'agenda-lead-transport')
+          : ''}
         <div class="field-row appointment-fields">
           <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pre-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
           ${appointmentCreateTimeField()}
