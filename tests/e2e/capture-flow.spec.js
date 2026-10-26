@@ -39,7 +39,7 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await expect(page.getByText('Seu perfil não possui acesso aos dados gerenciais.')).toHaveCount(0);
 });
 
-test('requires a destination store for a multi-store MEI capture', async ({ page }) => {
+test('requires a destination store for a multi-store MEI capture', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'mei'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Nova abordagem/ }).click();
@@ -63,6 +63,15 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await expect(careRoute).toHaveValue('optometrist');
   const examPaymentType = page.getByLabel('Tipo do exame');
   const examPrice = page.locator('[data-exam-price]');
+  if (testInfo.project.name === 'desktop-chrome') {
+    const [routeBox, typeBox, priceBox] = await Promise.all([
+      careRoute.boundingBox(),
+      examPaymentType.boundingBox(),
+      page.locator('.exam-price-display').boundingBox()
+    ]);
+    expect(Math.abs(routeBox.y - typeBox.y)).toBeLessThan(2);
+    expect(Math.abs(routeBox.y - priceBox.y)).toBeLessThan(2);
+  }
   await expect(examPaymentType).toHaveValue('paid');
   await expect(examPrice).toHaveText('R$ 150,00');
   await careRoute.selectOption('ophthalmologist');

@@ -1015,22 +1015,33 @@ svg {
 }
 
 .exam-billing-fields {
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(145px, 0.55fr);
   align-items: stretch;
 }
 
 .exam-price-field {
+  min-width: 0;
+}
+
+.exam-price-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #44534f;
+  font-size: 0.83rem;
+  font-weight: 800;
+}
+
+.exam-price-display {
   display: grid;
   align-content: center;
-  gap: 2px;
-  min-height: 68px;
-  padding: 10px 12px;
+  gap: 1px;
+  height: 50px;
+  padding: 5px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-subtle);
 }
 
-.exam-price-field span,
 .exam-price-field small {
   color: var(--muted);
   font-size: 0.74rem;
