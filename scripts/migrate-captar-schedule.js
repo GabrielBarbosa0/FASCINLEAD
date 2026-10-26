@@ -53,7 +53,7 @@ function buildNotes(appointment, client, salesperson) {
     text(appointment.notes),
     text(client.notes),
     client.visual_need ? `Necessidade visual informada: ${text(client.visual_need, 120)}` : '',
-    `Importado do Captar. Captador original: ${text(salesperson?.name || 'Nao informado', 120)}.`
+    `Importado do Captar. Captador original: ${text(salesperson?.name || 'Não informado', 120)}.`
   ].filter(Boolean);
   return details.join('\n').slice(0, 500);
 }
@@ -94,7 +94,7 @@ async function loadCaptarData(email, password) {
     try {
       captured[match[1]] = await response.json();
     } catch {
-      // A pagina pode repetir requisicoes durante a hidratacao; a proxima resposta sera usada.
+      // A página pode repetir requisições durante a hidratação; a próxima resposta será usada.
     }
   });
 
@@ -112,7 +112,7 @@ async function loadCaptarData(email, password) {
   }
 
   for (const collection of ['appointments', 'clients', 'units', 'users']) {
-    if (!Array.isArray(captured[collection])) throw new Error(`O Captar nao retornou ${collection}.`);
+    if (!Array.isArray(captured[collection])) throw new Error(`O Captar não retornou ${collection}.`);
   }
   return captured;
 }

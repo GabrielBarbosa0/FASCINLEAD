@@ -20,7 +20,7 @@ describe('SavWin local proxy', () => {
 
     expect(response.statusCode).toBe(405);
     expect(response.headers.Allow).toBe('POST');
-    expect(response.body).toEqual({ ok: false, error: 'Metodo nao permitido.' });
+    expect(response.body).toEqual({ ok: false, error: 'Método não permitido.' });
   });
 
   it('builds the documented products by OS request body', () => {
@@ -46,7 +46,7 @@ describe('SavWin local proxy', () => {
       startDate: '2026-01-01',
       endDate: '2026-10-16',
       storeCodes: ['2']
-    })).toThrow('Consulte no maximo 93 dias por vez.');
+    })).toThrow('Consulte no máximo 93 dias por vez.');
   });
 
   it('normalizes common SavWin response envelopes', () => {
@@ -59,7 +59,7 @@ describe('SavWin local proxy', () => {
 
   it('normalizes a CPF request without sending punctuation', () => {
     expect(buildSalesByCpfBody('123.456.789-09')).toEqual({ CPF: '12345678909' });
-    expect(() => buildSalesByCpfBody('123')).toThrow('Informe um CPF valido.');
+    expect(() => buildSalesByCpfBody('123')).toThrow('Informe um CPF válido.');
   });
 
   it('filters fallback product rows by exact CPF', () => {

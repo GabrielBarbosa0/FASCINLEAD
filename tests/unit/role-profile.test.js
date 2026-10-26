@@ -26,7 +26,7 @@ describe('role profiles', () => {
     const receptionist = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-receptionist');
 
     expect(receptionist).toMatchObject({
-      name: 'Atendente de balcao',
+      name: 'Atendente de balcão',
       scope: 'stores',
       baseRole: 'manager',
       system: true

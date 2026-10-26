@@ -11,7 +11,7 @@ const FIRESTORE_ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 
 function requiredEnv(name) {
   const value = String(process.env[name] || '').trim();
-  if (!value) throw new Error(`Defina ${name} antes de executar a sincronizacao.`);
+  if (!value) throw new Error(`Defina ${name} antes de executar a sincronização.`);
   return value;
 }
 
@@ -31,7 +31,7 @@ function firebaseAccessToken() {
     stdio: ['ignore', 'pipe', 'ignore']
   });
   const login = JSON.parse(raw).result?.find((item) => item.tokens?.access_token);
-  if (!login) throw new Error('Execute firebase login antes da sincronizacao.');
+  if (!login) throw new Error('Execute firebase login antes da sincronização.');
   return login.tokens.access_token;
 }
 
@@ -87,7 +87,7 @@ async function loadCaptarTeam(email, password) {
       if (path.endsWith('/rest/v1/users') && response.status() === 200 && !users) users = await response.json();
       if (path === '/api/sales-management' && response.status() === 200 && !salesManagement) salesManagement = await response.json();
     } catch {
-      // As requisicoes sao repetidas durante a navegacao; a proxima resposta valida sera usada.
+      // As requisições são repetidas durante a navegação; a próxima resposta válida será usada.
     }
   });
 
@@ -107,7 +107,7 @@ async function loadCaptarTeam(email, password) {
   }
 
   if (!Array.isArray(users) || !Array.isArray(salesManagement?.sellerCodes)) {
-    throw new Error('O Captar nao retornou os dados completos da equipe.');
+    throw new Error('O Captar não retornou os dados completos da equipe.');
   }
   return { users, sellerCodes: salesManagement.sellerCodes };
 }
@@ -177,9 +177,9 @@ async function main() {
       records: matches.map(({ displayName, email, phone, savwinCode }) => ({
         displayName,
         email,
-        phone: phone || 'nao informado',
-        savwinCode: savwinCode || 'nao informado',
-        password: SET_PASSWORD ? 'sera redefinida' : 'nao alterada'
+        phone: phone || 'não informado',
+        savwinCode: savwinCode || 'não informado',
+        password: SET_PASSWORD ? 'será redefinida' : 'não alterada'
       }))
     }, null, 2));
 
@@ -209,6 +209,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`Falha na sincronizacao da equipe: ${error.message}`);
+  console.error(`Falha na sincronização da equipe: ${error.message}`);
   process.exitCode = 1;
 });

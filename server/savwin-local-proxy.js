@@ -32,8 +32,8 @@ export function buildProductsByOsBody({ startDate, endDate, storeCodes }) {
   const start = parseIsoDate(startDate);
   const end = parseIsoDate(endDate);
   const stores = normalizeStoreCodes(storeCodes);
-  if (!start || !end || start > end) throw new Error('Informe um periodo valido.');
-  if ((end - start) / 86_400_000 > 92) throw new Error('Consulte no maximo 93 dias por vez.');
+  if (!start || !end || start > end) throw new Error('Informe um período válido.');
+  if ((end - start) / 86_400_000 > 92) throw new Error('Consulte no máximo 93 dias por vez.');
   if (!stores.length) throw new Error('Informe ao menos uma loja permitida.');
   return {
     DATAINICIAL: formatSavwinDate(startDate),
@@ -52,7 +52,7 @@ export function normalizeSavwinRecords(payload) {
 
 export function buildSalesByCpfBody(cpf) {
   const digits = String(cpf || '').replace(/\D/g, '');
-  if (digits.length !== 11) throw new Error('Informe um CPF valido.');
+  if (digits.length !== 11) throw new Error('Informe um CPF válido.');
   return { CPF: digits };
 }
 
@@ -76,7 +76,7 @@ function readJson(request) {
       try {
         resolve(raw ? JSON.parse(raw) : {});
       } catch {
-        reject(new Error('Corpo JSON invalido.'));
+        reject(new Error('Corpo JSON inválido.'));
       }
     });
     request.on('error', reject);
@@ -100,10 +100,10 @@ export function createSavwinLocalProxy(env, fetchImpl = globalThis.fetch) {
         if (![LOCAL_ROUTE, SALES_BY_CPF_ROUTE].includes(pathname)) return next();
         if (request.method !== 'POST') {
           response.setHeader('Allow', 'POST');
-          return sendJson(response, 405, { ok: false, error: 'Metodo nao permitido.' });
+          return sendJson(response, 405, { ok: false, error: 'Método não permitido.' });
         }
         if (!config.baseUrl || !config.identificador || !config.authorization) {
-          return sendJson(response, 503, { ok: false, error: 'Credenciais locais do SavWin nao configuradas.' });
+          return sendJson(response, 503, { ok: false, error: 'Credenciais locais do SavWin não configuradas.' });
         }
 
         try {
@@ -173,7 +173,7 @@ export function createSavwinLocalProxy(env, fetchImpl = globalThis.fetch) {
           const validationError = error.message?.startsWith('Informe') || error.message?.startsWith('Consulte');
           return sendJson(response, validationError ? 400 : 502, {
             ok: false,
-            error: validationError ? error.message : 'Nao foi possivel consultar o SavWin localmente.'
+            error: validationError ? error.message : 'Não foi possível consultar o SavWin localmente.'
           });
         }
       });

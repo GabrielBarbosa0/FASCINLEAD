@@ -33,7 +33,7 @@ exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, asyn
   const password = String(request.data?.password || '');
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
-    throw new HttpsError('invalid-argument', 'Informe um e-mail valido.');
+    throw new HttpsError('invalid-argument', 'Informe um e-mail válido.');
   }
   if (password.length < 6 || password.length > 72) {
     throw new HttpsError('invalid-argument', 'A senha deve ter entre 6 e 72 caracteres.');
@@ -41,7 +41,7 @@ exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, asyn
 
   const targetAccess = await getFirestore().doc(`allowedEmails/${targetEmail}`).get();
   if (!targetAccess.exists) {
-    throw new HttpsError('not-found', 'O acesso informado nao existe.');
+    throw new HttpsError('not-found', 'O acesso informado não existe.');
   }
 
   let user;
@@ -49,7 +49,7 @@ exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, asyn
     user = await getAuth().getUserByEmail(targetEmail);
   } catch (error) {
     if (error?.code === 'auth/user-not-found') {
-      throw new HttpsError('not-found', 'A conta de login nao foi encontrada.');
+      throw new HttpsError('not-found', 'A conta de login não foi encontrada.');
     }
     throw error;
   }

@@ -6,7 +6,7 @@ import { normalizeCpf } from '../utils/savwin-matching.js';
 function assertAuthorized(profile, lead) {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)
     || (profile.role === 'manager' && !canAccessStore(profile, lead?.storeId))) {
-    const error = new Error('Registro de venda nao autorizado.');
+    const error = new Error('Registro de venda não autorizado.');
     error.code = 'permission-denied';
     throw error;
   }

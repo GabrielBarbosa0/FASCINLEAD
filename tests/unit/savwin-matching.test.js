@@ -12,12 +12,12 @@ describe('SavWin sale matching', () => {
 
   it('groups product rows from the same OS without summing the sale twice', () => {
     const sales = groupSavwinSales([
-      { LOJA: '0006 - OTICAS FASCINANTE', OS: 123, CPF: '52998224725', DATAVENDA: '16/10/2026', VLRLIQUIDOVENDA: '1.200,00', PRODUTO: 'Armacao' },
-      { LOJA: '0006 - OTICAS FASCINANTE', OS: 123, CPF: '52998224725', DATAVENDA: '16/10/2026', VLRLIQUIDOVENDA: '1.200,00', PRODUTO: 'Lente' }
+      { LOJA: '0006 - ÓTICAS FASCINANTE', OS: 123, CPF: '52998224725', DATAVENDA: '16/10/2026', VLRLIQUIDOVENDA: '1.200,00', PRODUTO: 'Armação' },
+      { LOJA: '0006 - ÓTICAS FASCINANTE', OS: 123, CPF: '52998224725', DATAVENDA: '16/10/2026', VLRLIQUIDOVENDA: '1.200,00', PRODUTO: 'Lente' }
     ]);
     expect(sales).toHaveLength(1);
     expect(sales[0]).toMatchObject({ storeCode: '6', osNumber: '123', saleValue: 1200, rowCount: 2 });
-    expect(sales[0].products).toEqual(['Armacao', 'Lente']);
+    expect(sales[0].products).toEqual(['Armação', 'Lente']);
   });
 
   it('separates recent candidates from sales before lead capture', () => {

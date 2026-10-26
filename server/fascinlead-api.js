@@ -46,7 +46,7 @@ export function createFirestoreLeadRepository(env) {
     const projectId = String(env.FASCINLEAD_API_FIREBASE_PROJECT_ID || env.VITE_FIREBASE_PROJECT_ID || '');
     const emulatorHost = String(env.FASCINLEAD_API_FIRESTORE_EMULATOR_HOST || '');
     const serviceAccount = serviceAccountFromEnv(String(env.FASCINLEAD_API_SERVICE_ACCOUNT_JSON || ''));
-    if (!projectId) throw new Error('Projeto Firebase da API nao configurado.');
+    if (!projectId) throw new Error('Projeto Firebase da API não configurado.');
     if (emulatorHost) process.env.FIRESTORE_EMULATOR_HOST = emulatorHost;
 
     const appName = `fascinlead-api-${projectId}`;
@@ -104,26 +104,26 @@ export function createFascinLeadApi(env, dependencies = {}) {
         if (requestUrl.pathname === `${API_PREFIX}/health`) {
           if (request.method !== 'GET') {
             response.setHeader('Allow', 'GET');
-            return apiError(response, 405, 'method_not_allowed', 'Metodo nao permitido.', requestId);
+            return apiError(response, 405, 'method_not_allowed', 'Método não permitido.', requestId);
           }
           return sendJson(response, 200, { ok: true, service: 'fascinlead-api', version: 'v1' }, requestId);
         }
         if (token.length < 32) {
-          return apiError(response, 503, 'api_not_configured', 'API de integracao nao configurada.', requestId);
+          return apiError(response, 503, 'api_not_configured', 'API de integração não configurada.', requestId);
         }
         if (!secureTokenMatches(bearerToken(request), token)) {
-          return apiError(response, 401, 'unauthorized', 'Token de integracao invalido.', requestId);
+          return apiError(response, 401, 'unauthorized', 'Token de integração inválido.', requestId);
         }
         if (request.method !== 'GET') {
           response.setHeader('Allow', 'GET');
-          return apiError(response, 405, 'method_not_allowed', 'Metodo nao permitido.', requestId);
+          return apiError(response, 405, 'method_not_allowed', 'Método não permitido.', requestId);
         }
 
         try {
           if (requestUrl.pathname === `${API_PREFIX}/leads`) {
             const options = parseLeadListQuery(requestUrl.searchParams, { sensitiveFieldsEnabled });
             if (options.storeIds.some((storeId) => !allowedStores.has(storeId))) {
-              return apiError(response, 403, 'store_forbidden', 'Integracao sem acesso a uma das lojas solicitadas.', requestId);
+              return apiError(response, 403, 'store_forbidden', 'Integração sem acesso a uma das lojas solicitadas.', requestId);
             }
             const scopedOptions = {
               ...options,
@@ -144,20 +144,20 @@ export function createFascinLeadApi(env, dependencies = {}) {
           if (match) {
             const record = await repository.get(match[1]);
             if (!record || !allowedStores.has(record.data.storeId)) {
-              return apiError(response, 404, 'lead_not_found', 'Lead nao encontrado.', requestId);
+              return apiError(response, 404, 'lead_not_found', 'Lead não encontrado.', requestId);
             }
             const includeSensitive = sensitiveFieldsEnabled && requestUrl.searchParams.get('include_sensitive') === 'true';
             return sendJson(response, 200, { data: publicLead(record.id, record.data, { includeSensitive }) }, requestId);
           }
 
-          return apiError(response, 404, 'route_not_found', 'Endpoint nao encontrado.', requestId);
+          return apiError(response, 404, 'route_not_found', 'Endpoint não encontrado.', requestId);
         } catch (error) {
           const validationError = /limite|updated_since|lojas|Cursor/.test(error.message || '');
           return apiError(
             response,
             validationError ? 400 : 500,
             validationError ? 'invalid_request' : 'internal_error',
-            validationError ? error.message : 'Nao foi possivel consultar os leads.',
+            validationError ? error.message : 'Não foi possível consultar os leads.',
             requestId
           );
         }

@@ -78,7 +78,7 @@ export function parseLeadListQuery(searchParams, { sensitiveFieldsEnabled = fals
     .map((value) => value.trim())
     .filter(Boolean))];
   if (storeIds.some((storeId) => !ALLOWED_STORE_IDS.has(storeId))) {
-    throw new Error('Uma das lojas informadas nao e permitida.');
+    throw new Error('Uma das lojas informadas não é permitida.');
   }
 
   const requestedSensitive = searchParams.get('include_sensitive') === 'true';
@@ -105,7 +105,7 @@ export function decodeCursor(value) {
     if (!parsed.id || !Number.isInteger(parsed.seconds) || !Number.isInteger(parsed.nanoseconds)) throw new Error();
     return parsed;
   } catch {
-    throw new Error('Cursor de paginacao invalido.');
+    throw new Error('Cursor de paginação inválido.');
   }
 }
 

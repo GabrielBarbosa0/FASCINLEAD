@@ -13,7 +13,7 @@ function permissionError(message) {
 
 export function subscribeToTeamFollowUps(profile, onData, onError) {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role) || (profile.role === 'manager' && !profile.storeId)) {
-    throw permissionError('Retornos da equipe indisponiveis.');
+    throw permissionError('Retornos da equipe indisponíveis.');
   }
   const today = new Date();
   const localToday = new Date(today.getTime() - (today.getTimezoneOffset() * 60_000)).toISOString().slice(0, 10);
@@ -35,7 +35,7 @@ export async function markFollowUpContactStarted(profile, lead) {
   const captorOwnsLead = profile?.role === 'captor' && lead?.capturedByUid === profile.uid;
   const managerCanAccess = ['manager', 'admin'].includes(profile?.role) && canAccessStore(profile, lead?.storeId);
   if (!isFirebaseConfigured || (!captorOwnsLead && !managerCanAccess)) {
-    throw permissionError('Retorno nao autorizado.');
+    throw permissionError('Retorno não autorizado.');
   }
   await setDoc(doc(db, 'leads', lead.id), {
     followUpContactedAt: serverTimestamp(),

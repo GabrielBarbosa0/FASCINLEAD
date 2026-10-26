@@ -54,7 +54,7 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
-    errors.email = 'Informe um e-mail valido.';
+    errors.email = 'Informe um e-mail válido.';
   }
 
   if ((options.requirePassword || requestedPassword) && (password.length < 6 || password.length > 72)) {
@@ -68,16 +68,16 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
   }
 
   if (savwinCode.length > 30) {
-    errors.savwinCode = 'Use no maximo 30 caracteres.';
+    errors.savwinCode = 'Use no máximo 30 caracteres.';
   }
 
   if (!VALID_ROLES.has(role) || (roleProfileId && !selectedProfile)) {
-    errors.role = 'Escolha um perfil valido.';
+    errors.role = 'Escolha um perfil válido.';
   }
 
   if (!STORE_IDS.has(storeId)) {
     if (isMei) errors.storeIds = 'Escolha ao menos uma unidade permitida.';
-    else errors.storeId = 'Escolha uma loja valida.';
+    else errors.storeId = 'Escolha uma loja válida.';
   }
 
   const storeIds = role === 'admin'
@@ -86,7 +86,7 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
       ? [...new Set([storeId, ...normalizedRequestedStoreIds].filter(Boolean))]
       : [storeId];
   if (isMei && !storeIds.length) errors.storeIds = 'Escolha ao menos uma unidade permitida.';
-  if (storeIds.some((item) => !STORE_IDS.has(item))) errors.storeIds = 'Escolha apenas unidades validas.';
+  if (storeIds.some((item) => !STORE_IDS.has(item))) errors.storeIds = 'Escolha apenas unidades válidas.';
 
   return {
     isValid: Object.keys(errors).length === 0,

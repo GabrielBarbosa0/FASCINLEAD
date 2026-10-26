@@ -35,7 +35,7 @@ function scheduleWithSharedTransport(storeId, schedulesByStore) {
 }
 
 export function subscribeToStoreSchedule(profile, onData, onError, storeId = profile?.storeId) {
-  if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId)) throw permissionError('Configuracao de agenda indisponivel.');
+  if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId)) throw permissionError('Configuração de agenda indisponível.');
   const resourceStoreIds = transportResourceStoreIds(storeId);
   const storesQuery = query(
     collection(db, 'stores'),
@@ -53,7 +53,7 @@ export function subscribeToStoreSchedule(profile, onData, onError, storeId = pro
 
 export function subscribeToDayAppointments(profile, appointmentDate, onData, onError, storeId = profile?.storeId) {
   if (!isFirebaseConfigured || !storeId || !profileStoreIds(profile).includes(storeId) || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate || '')) {
-    throw permissionError('Data de agendamento indisponivel.');
+    throw permissionError('Data de agendamento indisponível.');
   }
   const resourceStoreIds = appointmentResourceStoreIds(storeId);
   const dayQuery = query(
@@ -67,7 +67,7 @@ export function subscribeToDayAppointments(profile, appointmentDate, onData, onE
 }
 
 export async function loadStoreSchedules(profile) {
-  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)) throw permissionError('Agendas indisponiveis.');
+  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)) throw permissionError('Agendas indisponíveis.');
   const snapshot = await getDocs(collection(db, 'stores'));
   const byId = new Map(snapshot.docs.map((item) => [item.id, item.data()]));
   const allowedStoreIds = profileStoreIds(profile);
@@ -79,7 +79,7 @@ export async function loadStoreSchedules(profile) {
 
 export async function loadStoreSchedule(profile, storeId) {
   if (!isFirebaseConfigured || !profile?.uid || !profileStoreIds(profile).includes(storeId)) {
-    throw permissionError('Configuracao de agenda indisponivel.');
+    throw permissionError('Configuração de agenda indisponível.');
   }
   const resourceStoreIds = transportResourceStoreIds(storeId);
   const snapshots = await Promise.all(resourceStoreIds.map((id) => getDoc(doc(db, 'stores', id))));

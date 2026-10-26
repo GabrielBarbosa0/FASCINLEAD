@@ -78,10 +78,16 @@ describe('missed appointment follow-ups', () => {
   });
 
   it('builds a prepared WhatsApp message using the customer phone and preferred name', () => {
-    const url = new URL(buildWhatsAppFollowUpUrl(lead));
+    const url = new URL(buildWhatsAppFollowUpUrl(lead, 'reschedule', 'Gabriel'));
     expect(url.pathname).toBe('/5581999991234');
-    expect(url.searchParams.get('text')).toContain('Ola, Clara!');
-    expect(url.searchParams.get('text')).toContain('reagendar');
+    expect(url.searchParams.get('text')).toBe(
+      'Olá, Clara! Tudo bem? Sou Gabriel, da Óticas Fascinante. Vi que você não conseguiu comparecer ao seu atendimento. Gostaria de reagendar? Posso ajudar a encontrar um novo horário que fique melhor para você.'
+    );
+  });
+
+  it('uses the team introduction when the attendant name is unavailable', () => {
+    const message = new URL(buildWhatsAppFollowUpUrl(lead)).searchParams.get('text');
+    expect(message).toContain('Somos da equipe das Óticas Fascinante.');
   });
 
   it('changes the return stage and message after the rescheduling threshold', () => {
@@ -90,7 +96,7 @@ describe('missed appointment follow-ups', () => {
     expect(followUpStage(lead, settings, new Date('2026-10-15T09:30:00'))).toBe('reschedule');
 
     const lateMessage = new URL(buildWhatsAppFollowUpUrl(lead, 'late')).searchParams.get('text');
-    expect(lateMessage).toContain('Voce esta a caminho?');
+    expect(lateMessage).toContain('Você está a caminho?');
     expect(lateMessage).not.toContain('reagendar');
   });
 });

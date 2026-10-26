@@ -7,7 +7,7 @@ const FIELD_ALIASES = Object.freeze({
   customerName: ['CLIENTE', 'NOMECLIENTE', 'NOME_CLIENTE'],
   date: ['DATAVENDA', 'DATA_VENDA', 'DATAOS', 'DATA_OS', 'DATA'],
   value: ['VLRLIQUIDOVENDA', 'VALORVENDA', 'VALOR_VENDA', 'VALORTOTAL', 'TOTAL'],
-  product: ['PRODUTO', 'DESCRICAOPRODUTO', 'DESCRICAO_PRODUTO', 'DESCRICAO']
+  product: ['PRODUTO', 'DESCRICAOPRODUTO', 'DESCRICAO_PRODUTO', 'DESCRIÇÃO']
 });
 
 function firstValue(record, aliases) {

@@ -3,9 +3,9 @@ import { isValidCpf, normalizeCpf } from './savwin-matching.js';
 import { isTransportAppointmentAllowed } from './schedule.js';
 
 export const INTERESTS = [
-  { id: '', label: 'Nao informado' },
+  { id: '', label: 'Não informado' },
   { id: 'complete-glasses', label: 'Oculos completo' },
-  { id: 'frames', label: 'Armacao' },
+  { id: 'frames', label: 'Armação' },
   { id: 'lenses', label: 'Lentes' },
   { id: 'eye-exam', label: 'Exame de vista' },
   { id: 'other', label: 'Outro' }
@@ -16,8 +16,8 @@ export const AMETROPIAS = [
   { id: 'hyperopia', label: 'Hipermetropia' },
   { id: 'astigmatism', label: 'Astigmatismo' },
   { id: 'presbyopia', label: 'Presbiopia' },
-  { id: 'none', label: 'Nao possui' },
-  { id: 'unknown', label: 'Nao sabe informar' }
+  { id: 'none', label: 'Não possui' },
+  { id: 'unknown', label: 'Não sabe informar' }
 ];
 
 export const PATHOLOGIES = [
@@ -28,12 +28,12 @@ export const PATHOLOGIES = [
   { id: 'keratoconus', label: 'Ceratocone' },
   { id: 'retinopathy', label: 'Retinopatia' },
   { id: 'other', label: 'Outra' },
-  { id: 'none', label: 'Nao possui' },
-  { id: 'unknown', label: 'Nao sabe informar' }
+  { id: 'none', label: 'Não possui' },
+  { id: 'unknown', label: 'Não sabe informar' }
 ];
 
 export const SEX_OPTIONS = [
-  { id: '', label: 'Nao informado' },
+  { id: '', label: 'Não informado' },
   { id: 'female', label: 'Feminino' },
   { id: 'male', label: 'Masculino' }
 ];
@@ -41,8 +41,8 @@ export const SEX_OPTIONS = [
 export const EYE_SURGERY_STATUS_OPTIONS = [
   { id: '', label: 'Selecione' },
   { id: 'yes', label: 'Sim' },
-  { id: 'no', label: 'Nao' },
-  { id: 'unknown', label: 'Nao sabe informar' }
+  { id: 'no', label: 'Não' },
+  { id: 'unknown', label: 'Não sabe informar' }
 ];
 
 export const EYE_SURGERIES = [
@@ -185,19 +185,19 @@ export function validateLeadInput(input, options = {}) {
   const hasCompanion = needsTransport && booleanValue(input.hasCompanion);
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
-  if (fullName.length > 120) errors.fullName = 'Use no maximo 120 caracteres.';
+  if (fullName.length > 120) errors.fullName = 'Use no máximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
-  if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF valido.';
-  if (customerRg.length > 20) errors.customerRg = 'Use no maximo 20 caracteres.';
+  if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF válido.';
+  if (customerRg.length > 20) errors.customerRg = 'Use no máximo 20 caracteres.';
   if (!birthDate) {
     if (options.requireBirthDate !== false) errors.birthDate = 'Informe a data de nascimento.';
   } else if (calculateAge(birthDate) === null) {
-    errors.birthDate = 'Informe uma data de nascimento valida.';
+    errors.birthDate = 'Informe uma data de nascimento válida.';
   }
-  if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opcao valida.';
-  if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no maximo 120 caracteres.';
-  if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no maximo 12 caracteres.';
-  if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no maximo 500 caracteres.';
+  if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opção válida.';
+  if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no máximo 120 caracteres.';
+  if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no máximo 12 caracteres.';
+  if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no máximo 500 caracteres.';
 
   const triage = ophthalmologyTriage(input, {
     ophthalmologyRoutingEnabled: input.ophthalmologyRoutingEnabled,
@@ -206,7 +206,7 @@ export function validateLeadInput(input, options = {}) {
     ophthalmologySurgeryIds: input.ophthalmologySurgeryIds
   });
   if (triage.surgeryQuestionRequired && !triage.eyeSurgeryStatus) {
-    errors.eyeSurgeryStatus = 'Informe se o cliente ja realizou cirurgia nos olhos.';
+    errors.eyeSurgeryStatus = 'Informe se o cliente já realizou cirurgia nos olhos.';
   }
   if (triage.eyeSurgeryStatus === 'yes' && !triage.eyeSurgeryType) {
     errors.eyeSurgeryType = 'Informe qual cirurgia foi realizada.';
@@ -218,33 +218,33 @@ export function validateLeadInput(input, options = {}) {
   const appointmentDate = input.appointmentDate?.trim() || '';
   const appointmentTime = input.appointmentTime?.trim() || '';
   if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
-    errors.appointmentDate = 'Informe a data e o horario do pre-agendamento.';
-    errors.appointmentTime = 'Informe a data e o horario do pre-agendamento.';
+    errors.appointmentDate = 'Informe a data e o horário do pré-agendamento.';
+    errors.appointmentTime = 'Informe a data e o horário do pré-agendamento.';
   }
   if (appointmentDate && !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
-    errors.appointmentDate = 'Informe uma data valida.';
+    errors.appointmentDate = 'Informe uma data válida.';
   }
   if (appointmentTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(appointmentTime)) {
-    errors.appointmentTime = 'Informe um horario valido.';
+    errors.appointmentTime = 'Informe um horário válido.';
   }
   if (input.appointmentServiceId && String(input.appointmentServiceId).length > 120) {
-    errors.appointmentServiceId = 'Selecione um servico valido.';
+    errors.appointmentServiceId = 'Selecione um serviço válido.';
   }
   const transportAllowedWeekdays = Array.isArray(input.transportAllowedWeekdays)
     ? input.transportAllowedWeekdays.map(Number)
     : [];
   if (needsTransport && !booleanValue(input.transportEnabled)) {
-    errors.needsTransport = 'O transporte ainda nao esta configurado para esta loja.';
+    errors.needsTransport = 'O transporte ainda não está configurado para esta loja.';
   }
   if (needsTransport && appointmentDate && !transportAllowedWeekdays.includes(weekdayFromDate(appointmentDate))) {
-    errors.appointmentDate = 'Escolha um dia com transporte disponivel.';
+    errors.appointmentDate = 'Escolha um dia com transporte disponível.';
   }
   if (needsTransport && appointmentDate && appointmentTime && Array.isArray(input.transportHoursRules)
     && !isTransportAppointmentAllowed({
       transportEnabled: booleanValue(input.transportEnabled),
       transportHoursRules: input.transportHoursRules
     }, appointmentDate, appointmentTime, Number(input.appointmentDurationMinutes) || 20)) {
-    errors.appointmentTime = 'Escolha um horario dentro da disponibilidade do transporte.';
+    errors.appointmentTime = 'Escolha um horário dentro da disponibilidade do transporte.';
   }
   const allowedWeekdays = Array.isArray(input.ophthalmologyAllowedWeekdays)
     ? input.ophthalmologyAllowedWeekdays.map(Number)

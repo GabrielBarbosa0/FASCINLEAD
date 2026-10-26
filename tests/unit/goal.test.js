@@ -4,7 +4,7 @@ import { calculateGoalProgress, duplicateGoalDraft, validateGoal } from '../../s
 describe('goal validation', () => {
   it('accepts an individual goal assigned to multiple captors', () => {
     const result = validateGoal({
-      title: 'Captacoes de outubro',
+      title: 'Captações de outubro',
       targetCount: 25,
       startDate: '2026-10-01',
       endDate: '2026-10-31',
@@ -84,7 +84,7 @@ describe('goal duplication', () => {
     });
 
     expect(draft).toEqual({
-      title: 'Meta de Natal - copia',
+      title: 'Meta de Natal - cópia',
       targetCount: 20,
       startDate: '2026-12-01',
       endDate: '2026-12-24',
@@ -101,6 +101,6 @@ describe('goal duplication', () => {
     });
 
     expect(draft.title).toHaveLength(80);
-    expect(draft.title.endsWith(' - copia')).toBe(true);
+    expect(draft.title.endsWith(' - cópia')).toBe(true);
   });
 });

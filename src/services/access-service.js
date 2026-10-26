@@ -69,7 +69,7 @@ export async function saveAccess(profile, values, roleProfiles = [], options = {
   const selectedRoleProfile = roleProfiles.find((item) => item.id === roleProfileId) || { role };
   const permissions = permissionsForProfile({ role, permissions: selectedRoleProfile.permissions });
   if (email === normalizeAccessEmail(profile.email) && role !== 'admin') {
-    return { ...validation, isValid: false, errors: { role: 'Voce nao pode remover seu proprio perfil de administrador.' } };
+    return { ...validation, isValid: false, errors: { role: 'Você não pode remover seu próprio perfil de administrador.' } };
   }
 
   const permissionRef = doc(db, 'allowedEmails', email);
@@ -110,7 +110,7 @@ export async function deleteAccess(profile, access) {
   assertAdmin(profile);
   const email = normalizeAccessEmail(access.email);
   if (email === normalizeAccessEmail(profile.email)) {
-    throw new Error('Voce nao pode excluir seu proprio acesso.');
+    throw new Error('Você não pode excluir seu próprio acesso.');
   }
 
   const usersSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
@@ -128,7 +128,7 @@ export async function setAccessActive(profile, access, active) {
   assertAdmin(profile);
   const email = normalizeAccessEmail(access.email);
   if (email === normalizeAccessEmail(profile.email) && !active) {
-    throw new Error('Voce nao pode bloquear seu proprio acesso.');
+    throw new Error('Você não pode bloquear seu próprio acesso.');
   }
 
   const usersSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', email)));

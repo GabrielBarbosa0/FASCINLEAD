@@ -31,7 +31,7 @@ function localDayAfter(date) {
 
 export async function loadManagementLeads(profile, startDate, endDate) {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile.role)) {
-    throw new Error('Acesso gerencial indisponivel.');
+    throw new Error('Acesso gerencial indisponível.');
   }
 
   const constraints = [
@@ -72,7 +72,7 @@ function assertCanDelete(profile, lead) {
     || lead?.capturedByUid === profile?.uid
     || canAccessStore(profile, lead?.storeId);
   if (!isFirebaseConfigured || !hasPermission(profile, 'leads.delete') || !canReachLead) {
-    const error = new Error('Perfil sem permissao para excluir leads.');
+    const error = new Error('Perfil sem permissão para excluir leads.');
     error.code = 'permission-denied';
     throw error;
   }

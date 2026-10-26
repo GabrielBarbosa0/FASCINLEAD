@@ -28,7 +28,7 @@ function normalizeEmail(email) {
 }
 
 function assertEmailPassword(email, password) {
-  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Informe um e-mail valido.');
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Informe um e-mail válido.');
   if (String(password || '').length < 6) throw new Error('A senha deve ter pelo menos 6 caracteres.');
 }
 
@@ -39,7 +39,7 @@ export async function completeRedirectSignIn() {
 
 export async function signInWithGoogle() {
   if (!isFirebaseConfigured) {
-    throw new Error('Firebase ainda nao foi configurado.');
+    throw new Error('Firebase ainda não foi configurado.');
   }
 
   await authPersistenceReady;
@@ -61,7 +61,7 @@ export async function signInWithGoogle() {
     }
 
     if (error?.code === 'auth/cancelled-popup-request') {
-      throw new Error('Ja existe uma tentativa de login aberta. Aguarde alguns segundos e tente novamente.');
+      throw new Error('Já existe uma tentativa de login aberta. Aguarde alguns segundos e tente novamente.');
     }
 
     throw error;
@@ -69,7 +69,7 @@ export async function signInWithGoogle() {
 }
 
 export async function signInWithEmail(emailInput, password) {
-  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);
   assertEmailPassword(email, password);
   await authPersistenceReady;
@@ -82,7 +82,7 @@ export async function signInWithEmail(emailInput, password) {
 }
 
 export async function createEmailPasswordAccess(emailInput, password) {
-  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);
   assertEmailPassword(email, password);
   await authPersistenceReady;
@@ -96,7 +96,7 @@ export async function createEmailPasswordAccess(emailInput, password) {
 }
 
 export async function createTeamPasswordAccount(emailInput, password) {
-  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);
   assertEmailPassword(email, password);
 
@@ -118,7 +118,7 @@ export async function createTeamPasswordAccount(emailInput, password) {
 }
 
 export async function updateTeamMemberPassword(emailInput, password) {
-  if (!isFirebaseConfigured || !functions) throw new Error('Firebase ainda nao foi configurado.');
+  if (!isFirebaseConfigured || !functions) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);
   assertEmailPassword(email, password);
   const updatePassword = httpsCallable(functions, 'updateTeamMemberPassword');
@@ -126,7 +126,7 @@ export async function updateTeamMemberPassword(emailInput, password) {
 }
 
 export async function requestPasswordReset(emailInput) {
-  if (!isFirebaseConfigured) throw new Error('Firebase ainda nao foi configurado.');
+  if (!isFirebaseConfigured) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Informe o e-mail para recuperar a senha.');
   await sendPasswordResetEmail(auth, email);
@@ -151,7 +151,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
   const permissionSnapshot = await getDoc(permissionRef);
 
   if (!permissionSnapshot.exists() || permissionSnapshot.data().active !== true) {
-    throw new Error('Esta conta ainda nao foi autorizada no FascinLead.');
+    throw new Error('Esta conta ainda não foi autorizada no FascinLead.');
   }
 
   const permission = permissionSnapshot.data();
@@ -196,18 +196,18 @@ export async function loadAuthorizedProfile(firebaseUser) {
       };
 
   if (profile.active !== true) {
-    throw new Error('Este acesso esta inativo. Procure o administrador.');
+    throw new Error('Este acesso está inativo. Procure o administrador.');
   }
 
   let roleProfile = systemRoleProfileForId(profile.roleProfileId)
     || systemRoleProfileForRole(profile.role);
   if (profile.roleProfileId?.startsWith('system-') && !systemRoleProfileForId(profile.roleProfileId)) {
-    throw new Error('O perfil de acesso desta conta nao esta disponivel. Procure o administrador.');
+    throw new Error('O perfil de acesso desta conta não está disponível. Procure o administrador.');
   }
   if (profile.roleProfileId && !profile.roleProfileId.startsWith('system-')) {
     const roleSnapshot = await getDoc(doc(db, 'roleProfiles', profile.roleProfileId));
     if (!roleSnapshot.exists() || roleSnapshot.data().active === false) {
-      throw new Error('O perfil de acesso desta conta nao esta disponivel. Procure o administrador.');
+      throw new Error('O perfil de acesso desta conta não está disponível. Procure o administrador.');
     }
     roleProfile = { id: roleSnapshot.id, ...roleSnapshot.data() };
   }

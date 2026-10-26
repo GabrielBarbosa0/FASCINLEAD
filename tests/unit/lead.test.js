@@ -146,7 +146,7 @@ describe('lead validation', () => {
       transportAllowedWeekdays: [3]
     });
 
-    expect(result.errors.appointmentDate).toBe('Escolha um dia com transporte disponivel.');
+    expect(result.errors.appointmentDate).toBe('Escolha um dia com transporte disponível.');
   });
 
   it('blocks appointments outside the configured transport hours', () => {
@@ -159,7 +159,7 @@ describe('lead validation', () => {
       transportHoursRules: [{ weekday: 5, openingTime: '08:00', closingTime: '14:00' }]
     });
 
-    expect(result.errors.appointmentTime).toBe('Escolha um horario dentro da disponibilidade do transporte.');
+    expect(result.errors.appointmentTime).toBe('Escolha um horário dentro da disponibilidade do transporte.');
   });
 
   it('creates an update with editable fields only', () => {
@@ -192,7 +192,7 @@ describe('lead validation', () => {
     });
 
     expect(result.data.ametropiaIds).toEqual(['none']);
-    expect(result.data.ametropiaLabels).toEqual(['Nao possui']);
+    expect(result.data.ametropiaLabels).toEqual(['Não possui']);
   });
 
   it('keeps exclusive pathology answers consistent', () => {
@@ -202,7 +202,7 @@ describe('lead validation', () => {
     });
 
     expect(result.data.pathologyIds).toEqual(['none']);
-    expect(result.data.pathologyLabels).toEqual(['Nao possui']);
+    expect(result.data.pathologyLabels).toEqual(['Não possui']);
   });
 
   it('ignores pathology options removed from the registration form', () => {

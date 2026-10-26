@@ -10,8 +10,8 @@ function permissionError(message) {
 }
 
 export async function loadAppointmentServices(profile, { includeInactive = false } = {}) {
-  if (!isFirebaseConfigured || !profile) throw permissionError('Servicos indisponiveis.');
-  if (includeInactive && profile.role !== 'admin') throw permissionError('Servicos inativos indisponiveis.');
+  if (!isFirebaseConfigured || !profile) throw permissionError('Serviços indisponíveis.');
+  if (includeInactive && profile.role !== 'admin') throw permissionError('Serviços inativos indisponíveis.');
 
   const constraints = [];
   const storeIds = profileStoreIds(profile);
@@ -27,7 +27,7 @@ export async function loadAppointmentServices(profile, { includeInactive = false
 }
 
 export async function saveAppointmentService(profile, values, serviceId = '') {
-  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem gerenciar servicos.');
+  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem gerenciar serviços.');
   const validation = validateAppointmentService(values);
   if (!validation.isValid) return validation;
 
@@ -48,7 +48,7 @@ export async function setAppointmentServiceActive(profile, service, active) {
       services.filter((item) => item.id !== service.id), storeId
     ).length);
     if (uncoveredStoreIds.length) {
-      const error = new Error('Mantenha pelo menos um servico ativo em cada unidade atendida.');
+      const error = new Error('Mantenha pelo menos um serviço ativo em cada unidade atendida.');
       error.code = 'last-active-service';
       throw error;
     }
@@ -57,8 +57,8 @@ export async function setAppointmentServiceActive(profile, service, active) {
 }
 
 export async function deleteAppointmentService(profile, service) {
-  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem excluir servicos.');
-  if (!service?.id) throw new Error('Servico invalido.');
+  if (!isFirebaseConfigured || profile?.role !== 'admin') throw permissionError('Apenas administradores podem excluir serviços.');
+  if (!service?.id) throw new Error('Serviço inválido.');
 
   if (service.active) {
     const services = await loadAppointmentServices(profile, { includeInactive: true });
@@ -66,7 +66,7 @@ export async function deleteAppointmentService(profile, service) {
       services.filter((item) => item.id !== service.id), storeId
     ).length);
     if (uncoveredStoreIds.length) {
-      const error = new Error('Mantenha pelo menos um servico ativo em cada unidade atendida.');
+      const error = new Error('Mantenha pelo menos um serviço ativo em cada unidade atendida.');
       error.code = 'last-active-service';
       throw error;
     }

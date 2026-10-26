@@ -170,7 +170,7 @@ describe('lead correction rules', () => {
   it('accepts the complete lead and appointment currently produced by the registration form', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const result = createLeadDocument({
-      fullName: 'Cliente do formulario',
+      fullName: 'Cliente do formulário',
       phone: '(81) 99999-5678',
       customerRg: '',
       customerCpf: '',
@@ -211,7 +211,7 @@ describe('lead correction rules', () => {
       createdAtServer: Timestamp.now(),
       updatedAtServer: Timestamp.now()
     });
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-26-08:00'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-26-08:00'), {
       storeId: 'loja-06',
       appointmentDate: '2026-10-26',
       appointmentTime: '08:00',
@@ -264,7 +264,7 @@ describe('lead correction rules', () => {
       createdAtServer: Timestamp.now(),
       updatedAtServer: Timestamp.now()
     });
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-10:00'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-10:00'), {
       storeId: 'loja-02',
       appointmentDate: '2026-10-20',
       appointmentTime: '10:00',
@@ -327,7 +327,7 @@ describe('lead correction rules', () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
       ametropiaIds: ['myopia', 'none'],
-      ametropiaLabels: ['Miopia', 'Nao possui'],
+      ametropiaLabels: ['Miopia', 'Não possui'],
       updatedAtServer: Timestamp.now()
     }));
   });
@@ -336,7 +336,7 @@ describe('lead correction rules', () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
       pathologyIds: ['glaucoma', 'none'],
-      pathologyLabels: ['Glaucoma', 'Nao possui'],
+      pathologyLabels: ['Glaucoma', 'Não possui'],
       updatedAtServer: Timestamp.now()
     }));
   });
@@ -416,7 +416,7 @@ describe('lead correction rules', () => {
   });
 
   it('lets a manager with deletion permission remove an allowed lead and its slot', async () => {
-    const slotId = 'slot-consultorio-surubim-2026-10-15-09:30';
+    const slotId = 'slot-consultório-surubim-2026-10-15-09:30';
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       await updateDoc(doc(db, 'users', 'manager-uid'), {
@@ -587,7 +587,7 @@ describe('appointment calendar queries', () => {
         ]
       });
       await setDoc(doc(db, 'leads', 'receptionist-lead'), {
-        fullName: 'Cliente do Balcao',
+        fullName: 'Cliente do Balcão',
         phone: '+5581999995678',
         phoneSearch: '81999995678',
         notes: '',
@@ -779,7 +779,7 @@ describe('appointment service catalog', () => {
 
 describe('appointment slot reservations', () => {
   const lead = {
-    fullName: 'Cliente com horario',
+    fullName: 'Cliente com horário',
     phone: '+5581999991234',
     phoneSearch: '81999991234',
     birthDate: '1985-04-12',
@@ -813,7 +813,7 @@ describe('appointment slot reservations', () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'lead-slot'), lead);
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot);
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), slot);
     await assertSucceeds(batch.commit());
     await assertSucceeds(getDocs(query(
       collection(db, 'appointmentSlots'),
@@ -826,11 +826,11 @@ describe('appointment slot reservations', () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await Promise.all([
         setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
-        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), slot)
       ]);
     });
     const db = authenticatedDb('captor-uid', 'captor@example.com');
-    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), {
       ...slot,
       leadId: 'second-lead',
       createdAt: Timestamp.now()
@@ -841,7 +841,7 @@ describe('appointment slot reservations', () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await Promise.all([
         setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
-        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), slot)
       ]);
     });
     const db = authenticatedDb('captor-uid', 'captor@example.com');
@@ -853,7 +853,7 @@ describe('appointment slot reservations', () => {
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'overlapping-lead'), overlappingLead);
     ['07:50', '08:00'].forEach((blockTime) => {
-      batch.set(doc(db, 'appointmentSlots', `slot-consultorio-surubim-2026-10-20-${blockTime}`), {
+      batch.set(doc(db, 'appointmentSlots', `slot-consultório-surubim-2026-10-20-${blockTime}`), {
         ...slot,
         appointmentTime: '07:50',
         blockTime,
@@ -865,12 +865,12 @@ describe('appointment slot reservations', () => {
 
   it('rejects an orphan slot without a matching lead', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
-    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot));
+    await assertFails(setDoc(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), slot));
   });
 
   it('lets an administrator backfill a slot for an existing lead', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
-    await assertSucceeds(setDoc(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-15-09:30'), {
+    await assertSucceeds(setDoc(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-15-09:30'), {
       storeId: 'loja-06',
       appointmentDate: '2026-10-15',
       appointmentTime: '09:30',
@@ -911,7 +911,7 @@ describe('appointment slot reservations', () => {
       appointmentDurationMinutes: 20,
       updatedAtServer: Timestamp.now()
     });
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), {
       ...slot,
       leadId: 'offline-lead'
     });
@@ -929,7 +929,7 @@ describe('appointment slot reservations', () => {
     };
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'local-only-lead'), localLead, { merge: true });
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-21-08:20'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-21-08:20'), {
       ...slot,
       appointmentDate: '2026-10-21',
       appointmentTime: '08:20',
@@ -958,7 +958,7 @@ describe('appointment slot reservations', () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await Promise.all([
         setDoc(doc(context.firestore(), 'leads', 'lead-slot'), lead),
-        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), slot)
+        setDoc(doc(context.firestore(), 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), slot)
       ]);
     });
     const db = authenticatedDb('manager-uid', 'manager@example.com');
@@ -970,7 +970,7 @@ describe('appointment slot reservations', () => {
     };
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', 'lead-loja-02'), loja02Lead);
-    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultório-surubim-2026-10-20-08:00'), {
       ...slot,
       storeId: 'loja-02',
       leadId: 'lead-loja-02',

@@ -133,14 +133,14 @@ export async function saveRoleProfile(profile, values, existingId = '') {
 
 export async function deleteRoleProfile(profile, roleProfile) {
   assertAdmin(profile);
-  if (!roleProfile || roleProfile.system) throw new Error('Perfis padrao nao podem ser excluidos.');
+  if (!roleProfile || roleProfile.system) throw new Error('Perfis padrão não podem ser excluídos.');
   const assigned = await getDocs(query(
     collection(db, 'allowedEmails'),
     where('roleProfileId', '==', roleProfile.id),
     limit(1)
   ));
   if (!assigned.empty) {
-    const error = new Error('Este perfil esta atribuido a um ou mais acessos. Troque esses acessos antes de excluir.');
+    const error = new Error('Este perfil está atribuído a um ou mais acessos. Troque esses acessos antes de excluir.');
     error.code = 'role-in-use';
     throw error;
   }

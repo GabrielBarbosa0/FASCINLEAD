@@ -8,7 +8,7 @@ const STORE_CODES = Object.freeze({
 export const isLocalSavwinEnabled = import.meta.env.DEV;
 
 export async function consultLocalSavwinSales({ startDate, endDate, storeIds }) {
-  if (!isLocalSavwinEnabled) throw new Error('A consulta local ao SavWin nao esta disponivel nesta versao.');
+  if (!isLocalSavwinEnabled) throw new Error('A consulta local ao SavWin não está disponível nesta versão.');
   const storeCodes = [...new Set((storeIds || []).map((storeId) => STORE_CODES[storeId]).filter(Boolean))];
   const response = await fetch('/api/savwin/products-by-os', {
     method: 'POST',
@@ -16,12 +16,12 @@ export async function consultLocalSavwinSales({ startDate, endDate, storeIds }) 
     body: JSON.stringify({ startDate, endDate, storeCodes })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nao foi possivel consultar o SavWin.');
+  if (!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível consultar o SavWin.');
   return payload;
 }
 
 export async function consultLocalSavwinSalesByCpf(cpf, { startDate, endDate, storeIds, periods = [] } = {}) {
-  if (!isLocalSavwinEnabled) throw new Error('A consulta local ao SavWin nao esta disponivel nesta versao.');
+  if (!isLocalSavwinEnabled) throw new Error('A consulta local ao SavWin não está disponível nesta versão.');
   const storeCodes = [...new Set((storeIds || []).map((storeId) => STORE_CODES[storeId]).filter(Boolean))];
   const normalizedPeriods = periods.map((period) => ({
     startDate: period.startDate,
@@ -34,6 +34,6 @@ export async function consultLocalSavwinSalesByCpf(cpf, { startDate, endDate, st
     body: JSON.stringify({ cpf, startDate, endDate, storeCodes, periods: normalizedPeriods })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nao foi possivel consultar as vendas do cliente.');
+  if (!response.ok || !payload.ok) throw new Error(payload.error || 'Não foi possível consultar as vendas do cliente.');
   return payload;
 }

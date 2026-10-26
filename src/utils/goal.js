@@ -1,7 +1,7 @@
 export const GOAL_METRIC = 'leads_captured';
 
 export function duplicateGoalDraft(group) {
-  const suffix = ' - copia';
+  const suffix = ' - cópia';
   const title = String(group?.title || '').slice(0, 80 - suffix.length).trimEnd();
   return {
     title: `${title}${suffix}`,
@@ -25,7 +25,7 @@ export function validateGoal(values) {
   const errors = {};
 
   if (title.length < 3 || title.length > 80) {
-    errors.title = 'Informe um titulo entre 3 e 80 caracteres.';
+    errors.title = 'Informe um título entre 3 e 80 caracteres.';
   }
 
   if (!Number.isInteger(targetCount) || targetCount < 1 || targetCount > 10_000) {

@@ -119,7 +119,7 @@ describe('access administration rules', () => {
 
   it('keeps the primary administrator able to recover access administration', async () => {
     const db = authenticatedDb('new-primary-uid', 'oticasfascinantes.financeiro@gmail.com');
-    const email = 'recuperacao@example.com';
+    const email = 'recuperação@example.com';
     const batch = writeBatch(db);
     batch.set(doc(db, 'allowedEmails', email), {
       email,

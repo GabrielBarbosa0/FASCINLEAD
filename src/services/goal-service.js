@@ -80,7 +80,7 @@ async function loadProgressLeads(profile, goals) {
 }
 
 export async function loadGoalsDashboard(profile) {
-  if (!isFirebaseConfigured || !profile?.uid) throw new Error('Metas indisponiveis.');
+  if (!isFirebaseConfigured || !profile?.uid) throw new Error('Metas indisponíveis.');
   const [goals, members] = await Promise.all([loadGoals(profile), loadMembers(profile)]);
   const { leads, truncated } = await loadProgressLeads(profile, goals);
   const progress = goals
@@ -92,7 +92,7 @@ export async function loadGoalsDashboard(profile) {
 
 function validateGoalMembers(profile, values, members) {
   if (!isFirebaseConfigured || !canManageGoals(profile)) {
-    const error = new Error('Seu perfil nao pode gerenciar metas.');
+    const error = new Error('Seu perfil não pode gerenciar metas.');
     error.code = 'permission-denied';
     throw error;
   }
@@ -104,7 +104,7 @@ function validateGoalMembers(profile, values, members) {
     .filter(Boolean);
   if (selectedMembers.length !== validation.data.assigneeUids.length) {
     return {
-      validation: { ...validation, isValid: false, errors: { assigneeUids: 'Um dos colaboradores selecionados nao esta disponivel.' } },
+      validation: { ...validation, isValid: false, errors: { assigneeUids: 'Um dos colaboradores selecionados não está disponível.' } },
       selectedMembers: []
     };
   }
@@ -112,7 +112,7 @@ function validateGoalMembers(profile, values, members) {
     !canAccessStore(profile, validation.data.storeId)
     || selectedMembers.some((member) => member.storeId !== validation.data.storeId)
   )) {
-    const error = new Error('O gestor so pode criar metas para sua propria equipe.');
+    const error = new Error('O gestor só pode criar metas para sua propria equipe.');
     error.code = 'permission-denied';
     throw error;
   }
@@ -150,11 +150,11 @@ export async function createGoals(profile, values, members) {
 
 export async function updateGoalGroup(profile, goals, values, members) {
   const currentGoals = Array.isArray(goals) ? goals : [];
-  if (!currentGoals.length) throw new Error('Meta nao encontrada.');
+  if (!currentGoals.length) throw new Error('Meta não encontrada.');
   const { validation, selectedMembers } = validateGoalMembers(profile, values, members);
   if (!validation.isValid) return validation;
   if (profile.role === 'manager' && currentGoals.some((goal) => !canAccessStore(profile, goal.storeId))) {
-    const error = new Error('Seu perfil nao pode editar esta meta.');
+    const error = new Error('Seu perfil não pode editar esta meta.');
     error.code = 'permission-denied';
     throw error;
   }
@@ -209,7 +209,7 @@ export async function deleteGoalGroup(profile, goals) {
   if (!isFirebaseConfigured || !canManageGoals(profile)
     || !currentGoals.length
     || (profile.role === 'manager' && currentGoals.some((goal) => !canAccessStore(profile, goal.storeId)))) {
-    const error = new Error('Seu perfil nao pode excluir esta meta.');
+    const error = new Error('Seu perfil não pode excluir esta meta.');
     error.code = 'permission-denied';
     throw error;
   }

@@ -29,15 +29,15 @@ function storeName(storeId) {
 }
 
 function sourceName(source) {
-  return source === 'street' ? 'Captacao em campo' : source || '';
+  return source === 'street' ? 'Captação em campo' : source || '';
 }
 
 function attendanceLabel(attendance) {
-  return { attended: 'Sim', missed: 'Nao', pending: 'Aguardando' }[attendance] || 'Aguardando';
+  return { attended: 'Sim', missed: 'Não', pending: 'Aguardando' }[attendance] || 'Aguardando';
 }
 
 function sexLabel(sex) {
-  return { female: 'Feminino', male: 'Masculino' }[sex] || 'Nao informado';
+  return { female: 'Feminino', male: 'Masculino' }[sex] || 'Não informado';
 }
 
 const CSV_COLUMNS = [
@@ -49,27 +49,27 @@ const CSV_COLUMNS = [
   ['Data de nascimento', (lead) => inputDatePart(lead.birthDate)],
   ['Idade atual', (lead) => calculateAge(lead.birthDate) ?? ''],
   ['Sexo', (lead) => sexLabel(lead.sex)],
-  ['Captador responsavel', (lead) => lead.capturedByName],
+  ['Captador responsável', (lead) => lead.capturedByName],
   ['ID do captador', (lead) => lead.capturedByUid],
   ['Unidade / loja', (lead) => storeName(lead.storeId)],
-  ['Data da captacao', (lead) => datePart(lead.capturedAtClient)],
-  ['Horario da captacao', (lead) => timePart(lead.capturedAtClient)],
-  ['Data do pre-agendamento', (lead) => inputDatePart(lead.appointmentDate)],
-  ['Horario do pre-agendamento', (lead) => lead.appointmentTime],
+  ['Data da captação', (lead) => datePart(lead.capturedAtClient)],
+  ['Horário da captação', (lead) => timePart(lead.capturedAtClient)],
+  ['Data do pré-agendamento', (lead) => inputDatePart(lead.appointmentDate)],
+  ['Horário do pré-agendamento', (lead) => lead.appointmentTime],
   ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
-  ['Precisa de transporte?', (lead) => lead.needsTransport ? 'Sim' : 'Nao'],
-  ['Levara acompanhante?', (lead) => lead.needsTransport && lead.hasCompanion ? 'Sim' : 'Nao'],
+  ['Precisa de transporte?', (lead) => lead.needsTransport ? 'Sim' : 'Não'],
+  ['Levara acompanhante?', (lead) => lead.needsTransport && lead.hasCompanion ? 'Sim' : 'Não'],
   ['Assentos do transporte', (lead) => Number(lead.transportSeats) || 0],
   ['Interesse principal', (lead) => lead.interestLabel],
   ['Ametropias', (lead) => Array.isArray(lead.ametropiaLabels) ? lead.ametropiaLabels.join(', ') : ''],
-  ['Patologias e condicoes de saude', (lead) => Array.isArray(lead.pathologyLabels) ? lead.pathologyLabels.join(', ') : ''],
+  ['Patologias e condições de saúde', (lead) => Array.isArray(lead.pathologyLabels) ? lead.pathologyLabels.join(', ') : ''],
   ['Rua', (lead) => lead.street],
-  ['Numero', (lead) => lead.streetNumber],
+  ['Número', (lead) => lead.streetNumber],
   ['Bairro', (lead) => lead.neighborhood],
   ['Cidade', (lead) => lead.city],
   ['UF', (lead) => lead.state],
   ['Origem do lead', (lead) => sourceName(lead.source)],
-  ['Observacoes', (lead) => lead.notes]
+  ['Observações', (lead) => lead.notes]
 ];
 
 function protectSpreadsheetFormula(value) {

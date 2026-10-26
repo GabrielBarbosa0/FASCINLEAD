@@ -13,7 +13,7 @@ describe('createLeadsCsv', () => {
       phone: '+5581999991234',
       phoneSearch: '81999991234',
       customerRg: '12.345.678-X',
-      interestLabel: 'Armacao',
+      interestLabel: 'Armação',
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyLabels: ['Glaucoma', 'Pressao alta'],
       street: 'Rua das Flores',
@@ -28,7 +28,7 @@ describe('createLeadsCsv', () => {
       appointmentTime: '14:30',
       appointmentAttendance: 'attended',
       source: 'street',
-      notes: 'Contato pela manha'
+      notes: 'Contato pela manhã'
     }]);
 
     expect(csv.startsWith('\uFEFF')).toBe(true);
@@ -44,14 +44,14 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"02/10/2026";"14:30"');
     expect(csv).toContain('"Compareceu?"');
     expect(csv).toContain('"14:30";"Sim"');
-    expect(csv).toContain('"Captacao em campo"');
+    expect(csv).toContain('"Captação em campo"');
     expect(csv).toContain('"Ametropias"');
     expect(csv).toContain('"Miopia, Astigmatismo"');
-    expect(csv).toContain('"Patologias e condicoes de saude"');
+    expect(csv).toContain('"Patologias e condições de saúde"');
     expect(csv).toContain('"Glaucoma, Pressao alta"');
     expect(csv).toContain('"Rua"');
     expect(csv).toContain('"Rua das Flores"');
-    expect(csv).toContain('"Numero"');
+    expect(csv).toContain('"Número"');
     expect(csv).toContain('"S/N"');
     expect(csv).not.toContain('Consentimento');
   });

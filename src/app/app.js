@@ -297,7 +297,7 @@ function createDefaultGoalDraft(storeId = '') {
   const today = new Date();
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   return {
-    title: 'Meta de captacoes',
+    title: 'Meta de captações',
     targetCount: 20,
     startDate: toLocalDateInput(today),
     endDate: toLocalDateInput(monthEnd),
@@ -444,7 +444,7 @@ function storeLabel(storeId = '') {
 
 function formatCapturedAt(value) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Data indisponivel';
+  if (Number.isNaN(date.getTime())) return 'Data indisponível';
   return new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short'
@@ -452,12 +452,12 @@ function formatCapturedAt(value) {
 }
 
 function formatGoalDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponivel';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponível';
   return new Intl.DateTimeFormat('pt-BR').format(new Date(`${value}T12:00:00`));
 }
 
 function formatAppointmentDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponivel';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponível';
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
     .format(new Date(`${value}T12:00:00`));
 }
@@ -511,23 +511,23 @@ function syncLabel(lead) {
 }
 
 function offlineSyncDetail(lead) {
-  if (lead.syncState === 'pending') return 'Salvo neste aparelho. Sincronizacao automatica pendente.';
-  if (lead.syncState === 'error') return 'Nao foi possivel sincronizar. O cadastro continua salvo neste aparelho.';
+  if (lead.syncState === 'pending') return 'Salvo neste aparelho. Sincronização automática pendente.';
+  if (lead.syncState === 'error') return 'Não foi possível sincronizar. O cadastro continua salvo neste aparelho.';
   return '';
 }
 
 function loginView() {
   const configNotice = isFirebaseConfigured
     ? ''
-    : '<div class="notice notice-warning"><i data-lucide="wrench"></i><div><strong>Firebase ainda nao configurado</strong><span>Use o modo de desenvolvimento sem dados reais.</span></div></div>';
+    : '<div class="notice notice-warning"><i data-lucide="wrench"></i><div><strong>Firebase ainda não configurado</strong><span>Use o modo de desenvolvimento sem dados reais.</span></div></div>';
 
   return `
     <main class="login-page">
       <section class="login-panel" aria-labelledby="login-title">
         <div class="brand-mark" aria-hidden="true">F</div>
-        <p class="eyebrow">OTICAS FASCINANTE</p>
+        <p class="eyebrow">ÓTICAS FASCINANTE</p>
         <h1 id="login-title">FascinLead</h1>
-        <p class="login-copy">Cadastro rapido para quem encontra clientes onde eles estao.</p>
+        <p class="login-copy">Cadastro rápido para quem encontra clientes onde eles estão.</p>
         ${configNotice}
         ${state.authError ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.authError)}</span></div>` : ''}
         ${state.authMessage ? `<div class="notice notice-success" role="status"><i data-lucide="circle-check"></i><span>${escapeHtml(state.authMessage)}</span></div>` : ''}
@@ -553,21 +553,21 @@ function loginView() {
 
 function currentPageTitle() {
   const titles = {
-    home: 'Inicio',
+    home: 'Início',
     new: 'Cadastro',
     leads: 'Meus cadastros',
     lead: 'Detalhes do cadastro',
     management: 'Painel de leads',
     'management-lead': 'Detalhes do lead',
     dashboard: 'Dashboard',
-    reports: 'Relatorios',
+    reports: 'Relatórios',
     appointments: 'Agenda de exames',
     access: 'Acessos da equipe',
     goals: 'Metas',
-    settings: 'Configuracoes'
+    settings: 'Configurações'
   };
   if (state.route === 'follow-ups') return canManage() ? 'Retornos da equipe' : 'Retornos pendentes';
-  return titles[state.route] || 'Inicio';
+  return titles[state.route] || 'Início';
 }
 
 function headerView() {
@@ -619,8 +619,8 @@ function homeView() {
 
   return `
     ${profileCard()}
-    ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Nao utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}
-    <section class="action-grid" aria-label="Acoes principais">
+    ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Não utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}
+    <section class="action-grid" aria-label="Ações principais">
       ${hasAccess('leads.create') ? `<button class="action-card action-card-primary" type="button" data-route="new">
         <span class="action-icon"><i data-lucide="user-plus"></i></span>
         <span><strong>Nova abordagem</strong><small>Cadastrar novo contato</small></span>
@@ -634,16 +634,16 @@ function homeView() {
       ${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups">
         <span class="action-icon"><i data-lucide="bell-ring"></i></span>
         <span><strong>${hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
-        ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendencia(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
+        ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendência(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
       </button>` : ''}
       ${canManage() ? `<button class="action-card" type="button" data-route="management">
         <span class="action-icon"><i data-lucide="bar-chart-3"></i></span>
-        <span><strong>Painel de gestao</strong><small>Consultar e exportar captacoes</small></span>
+        <span><strong>Painel de gestão</strong><small>Consultar e exportar captações</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="appointments">
         <span class="action-icon"><i data-lucide="calendar-days"></i></span>
-        <span><strong>Agenda de exames</strong><small>Visualizar os pre-agendamentos</small></span>
+        <span><strong>Agenda de exames</strong><small>Visualizar os pré-agendamentos</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       ${hasAccess('goals.view_own') || canManageGoals() ? `<button class="action-card" type="button" data-route="goals">
@@ -658,7 +658,7 @@ function homeView() {
       </button>` : ''}
       ${isAdmin() ? `<button class="action-card" type="button" data-route="settings">
         <span class="action-icon"><i data-lucide="settings"></i></span>
-        <span><strong>Configuracoes</strong><small>Agenda e preferencias do sistema</small></span>
+        <span><strong>Configurações</strong><small>Agenda e preferências do sistema</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
     </section>`;
@@ -681,19 +681,19 @@ function appointmentTimeField() {
     : settings;
   const serviceSchedule = { ...baseSchedule, appointmentDurationMinutes: service.durationMinutes };
   if (!navigator.onLine) {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Conecte-se para consultar os horarios</option></select><small class="field-error"></small><small class="schedule-availability">Agendamentos exigem conexao com a agenda atualizada.</small></div>`;
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Conecte-se para consultar os horários</option></select><small class="field-error"></small><small class="schedule-availability">Agendamentos exigem conexão com a agenda atualizada.</small></div>`;
   }
   if (ophthalmologyDateBlocked) {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmologico.</small></div>`;
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmológico.</small></div>`;
   }
   if (storeDateBlocked) {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">A loja nao funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado no horario de funcionamento da loja.</small></div>`;
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">A loja não funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado no horário de funcionamento da loja.</small></div>`;
   }
   if (transportDateBlocked) {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario disponivel</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Transporte indisponivel neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado para transporte.</small></div>`;
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Transporte indisponível neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado para transporte.</small></div>`;
   }
   if (settings.schedulingMode === 'free') {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horario</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário</label><input id="appointmentTime" name="appointmentTime" type="time" /><small class="field-error"></small></div>`;
   }
 
   const quota = appointmentQuotaStatus(settings, appointmentDate, appointments, state.profile);
@@ -707,26 +707,26 @@ function appointmentTimeField() {
     service.durationMinutes
   )));
   let placeholder = 'Escolha primeiro uma data';
-  if (loading) placeholder = 'Consultando horarios...';
-  else if (error) placeholder = 'Horarios indisponiveis';
+  if (loading) placeholder = 'Consultando horários...';
+  else if (error) placeholder = 'Horários indisponíveis';
   else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
   else if (quota.reason === 'mei-quota') placeholder = 'Sua cota de agendamentos foi atingida';
   else if (quota.reason === 'daily-limit') placeholder = 'Limite de vagas do dia atingido';
   else if (appointmentDate && !availableSlots.length) placeholder = triage.careRoute === 'ophthalmologist'
-    ? 'Sem horarios do oftalmologista neste dia'
-    : 'Dia sem horarios disponiveis';
-  else if (appointmentDate) placeholder = 'Selecione um horario';
+    ? 'Sem horários do oftalmologista neste dia'
+    : 'Dia sem horários disponíveis';
+  else if (appointmentDate) placeholder = 'Selecione um horário';
 
   const options = availableSlots
     .map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`)
     .join('');
   return `<div class="field" data-field="appointmentTime">
-    <label for="appointmentTime">Horario disponivel</label>
+    <label for="appointmentTime">Horário disponível</label>
     <select id="appointmentTime" name="appointmentTime" ${!appointmentDate || loading || error || !availableSlots.length ? 'disabled' : ''}>
       <option value="">${placeholder}</option>${options}
     </select>
     <small class="field-error"></small>
-    ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${quota.isMei && quota.meiLimited ? `Cota MEI: ${quota.meiMorningRemaining} pela manha e ${quota.meiAfternoonRemaining} a tarde${quota.limited ? `; ${quota.dailyRemaining} vaga(s) no dia` : ''}` : quota.limited ? `${quota.dailyRemaining} vaga(s) restante(s) no dia` : `${availableSlots.length} de ${slots.length} horario(s) disponivel(is)`}</small>` : ''}
+    ${appointmentDate && !loading && !error ? `<small class="schedule-availability">${quota.isMei && quota.meiLimited ? `Cota MEI: ${quota.meiMorningRemaining} pela manhã e ${quota.meiAfternoonRemaining} à tarde${quota.limited ? `; ${quota.dailyRemaining} vaga(s) no dia` : ''}` : quota.limited ? `${quota.dailyRemaining} vaga(s) restante(s) no dia` : `${availableSlots.length} de ${slots.length} horário(s) disponível(is)`}</small>` : ''}
   </div>`;
 }
 
@@ -804,17 +804,17 @@ function transportFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefi
   const status = !needsTransport
     ? ''
     : !settings.transportEnabled
-      ? 'O transporte ainda nao esta configurado para esta loja.'
+      ? 'O transporte ainda não está configurado para esta loja.'
       : !appointmentDate
         ? 'Escolha a data para consultar a disponibilidade do transporte.'
         : hours
-          ? `Transporte disponivel das ${hours.openingTime} as ${hours.closingTime}.`
-          : 'Nao ha transporte disponivel nesta data.';
+          ? `Transporte disponível das ${hours.openingTime} às ${hours.closingTime}.`
+          : 'Não há transporte disponível nesta data.';
   return `<section class="transport-section" data-transport-section>
     ${locked ? `<input type="hidden" name="needsTransport" value="${needsTransport}" /><input type="hidden" name="hasCompanion" value="${hasCompanion}" />` : ''}
     <div class="field-row transport-fields">
       <div class="field" data-field="needsTransport"><label for="${idPrefix}-needed">Transporte</label><select id="${idPrefix}-needed" name="needsTransport" ${locked ? 'disabled' : ''}><option value="false" ${needsTransport ? '' : 'selected'}>Sem transporte</option><option value="true" ${needsTransport ? 'selected' : ''}>Com transporte</option></select><small class="field-error"></small></div>
-      <div class="field ${needsTransport ? '' : 'is-disabled'}" data-transport-companion data-field="hasCompanion"><label for="${idPrefix}-companion">Tem acompanhante?</label><select id="${idPrefix}-companion" name="hasCompanion" ${locked || !needsTransport ? 'disabled' : ''}><option value="false" ${hasCompanion ? '' : 'selected'}>Nao</option><option value="true" ${hasCompanion ? 'selected' : ''}>Sim</option></select><small class="field-help">Limite de 1 acompanhante por cliente.</small><small class="field-error"></small></div>
+      <div class="field ${needsTransport ? '' : 'is-disabled'}" data-transport-companion data-field="hasCompanion"><label for="${idPrefix}-companion">Tem acompanhante?</label><select id="${idPrefix}-companion" name="hasCompanion" ${locked || !needsTransport ? 'disabled' : ''}><option value="false" ${hasCompanion ? '' : 'selected'}>Não</option><option value="true" ${hasCompanion ? 'selected' : ''}>Sim</option></select><small class="field-help">Limite de 1 acompanhante por cliente.</small><small class="field-error"></small></div>
     </div>
     <div class="transport-status" data-transport-status ${status ? '' : 'hidden'}><i data-lucide="bus-front"></i><span>${escapeHtml(status)}</span></div>
   </section>`;
@@ -837,12 +837,12 @@ function bindTransportFields(form, settings, onChange = () => {}) {
     const message = !needsTransport
       ? ''
       : !settings.transportEnabled
-        ? 'O transporte ainda nao esta configurado para esta loja.'
+        ? 'O transporte ainda não está configurado para esta loja.'
         : !appointmentDate
           ? 'Escolha a data para consultar a disponibilidade do transporte.'
           : hours
-            ? `Transporte disponivel das ${hours.openingTime} as ${hours.closingTime}.`
-            : 'Nao ha transporte disponivel nesta data.';
+            ? `Transporte disponível das ${hours.openingTime} às ${hours.closingTime}.`
+            : 'Não há transporte disponível nesta data.';
     status.hidden = !message;
     status.querySelector('span').textContent = message;
     onChange(leadFormValues(form));
@@ -860,7 +860,7 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOv
   return `<section class="eye-triage-section" data-eye-triage>
     <div class="field-row eye-surgery-fields" data-eye-surgery-question ${showSurgeryQuestion ? '' : 'hidden'}>
       <div class="field" data-field="eyeSurgeryStatus">
-        <label for="${idPrefix}-surgery-status">Ja realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
+        <label for="${idPrefix}-surgery-status">Já realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
         <select id="${idPrefix}-surgery-status" name="eyeSurgeryStatus">${eyeSurgeryStatusOptions(values.eyeSurgeryStatus || '')}</select>
         <small class="field-help">Pergunta obrigatoria a partir de ${settings.ophthalmologyMinimumAge} anos.</small>
         <small class="field-error"></small>
@@ -876,7 +876,7 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOv
         <small class="field-error"></small>
       </div>
     </div>
-    ${allowOverride ? `<div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automatico</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>` : '<input name="careRouteOverride" type="hidden" value="automatic" />'}
+    ${allowOverride ? `<div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automático</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>` : '<input name="careRouteOverride" type="hidden" value="automatic" />'}
     <div class="eye-route-status ${triage.careRoute === 'ophthalmologist' ? 'is-ophthalmology' : ''}" data-eye-route-status ${triage.careRoute === 'ophthalmologist' ? '' : 'hidden'}><i data-lucide="stethoscope"></i><span>Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.</span></div>
   </section>`;
 }
@@ -991,7 +991,7 @@ function bindCpfInput(form) {
 
 function birthAgeText(value) {
   const age = calculateAge(value);
-  return age === null ? 'A idade sera calculada automaticamente.' : `${age} ano${age === 1 ? '' : 's'}`;
+  return age === null ? 'A idade será calculada automaticamente.' : `${age} ano${age === 1 ? '' : 's'}`;
 }
 
 function bindBirthDateInput(form) {
@@ -1009,7 +1009,7 @@ function newLeadView() {
       <section class="page-toolbar">
         <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
       </section>
-      <div class="empty-state"><i data-lucide="wifi-off"></i><strong>Cadastro offline desativado</strong><p>Conecte-se a internet para iniciar um novo cadastro. Esta protecao evita registros incompletos enquanto o modo offline esta em refinamento.</p></div>`;
+      <div class="empty-state"><i data-lucide="wifi-off"></i><strong>Cadastro offline desativado</strong><p>Conecte-se à internet para iniciar um novo cadastro. Esta proteção evita registros incompletos enquanto o modo offline está em refinamento.</p></div>`;
   }
   const interests = INTERESTS.map((item) => `<option value="${item.id}">${item.label}</option>`).join('');
   const selectedStoreId = selectedNewLeadStoreId();
@@ -1028,16 +1028,16 @@ function newLeadView() {
       <button class="back-button" type="button" data-route="home" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
     </section>
     <form id="lead-form" class="form-panel" novalidate>
-      <div class="notice notice-warning" data-offline-capture-notice ${navigator.onLine ? 'hidden' : ''}><i data-lucide="wifi-off"></i><span>Cadastro offline ativo. Os dados do lead serao preservados, mas data e horario so poderao ser escolhidos com internet.</span></div>
+      <div class="notice notice-warning" data-offline-capture-notice ${navigator.onLine ? 'hidden' : ''}><i data-lucide="wifi-off"></i><span>Cadastro offline ativo. Os dados do lead serão preservados, mas data e horário só poderão ser escolhidos com internet.</span></div>
       <div class="field" data-field="storeId">
         <label for="capture-store">Loja de destino <span aria-hidden="true">*</span></label>
         <select id="capture-store" name="storeId" required ${storeChoice ? '' : 'aria-disabled="true" tabindex="-1"'}>
           ${storeChoice ? '<option value="">Selecione a loja</option>' : ''}${storeOptions}
         </select>
-        <small>${storeChoice ? 'Os servicos, horarios e limites serao carregados para esta unidade.' : 'Unidade definida no acesso deste colaborador.'}</small>
+        <small>${storeChoice ? 'Os serviços, horários e limites serão carregados para esta unidade.' : 'Unidade definida no acesso deste colaborador.'}</small>
         <small class="field-error"></small>
       </div>
-      ${selectedStoreId && !state.newLeadSchedule.loaded ? '<div class="notice notice-info" data-schedule-loading><i data-lucide="refresh-cw"></i><span>Carregando agenda, transporte e horarios desta loja...</span></div>' : ''}
+      ${selectedStoreId && !state.newLeadSchedule.loaded ? '<div class="notice notice-info" data-schedule-loading><i data-lucide="refresh-cw"></i><span>Carregando agenda, transporte e horários desta loja...</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.newLeadSchedule.settings.schedulingMode)}" />
       ${triageConfigFields(state.newLeadSchedule.settings)}
       <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
@@ -1068,7 +1068,7 @@ function newLeadView() {
         <div class="field" data-field="birthDate">
           <label for="birthDate">Data de nascimento <span aria-hidden="true">*</span></label>
           <input id="birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" required />
-          <small class="birth-age-hint" data-birth-age>A idade sera calculada automaticamente.</small>
+          <small class="birth-age-hint" data-birth-age>A idade será calculada automaticamente.</small>
           <small class="field-error"></small>
         </div>
         <div class="field" data-field="sex">
@@ -1083,7 +1083,7 @@ function newLeadView() {
       </div>
       <div class="field-row address-fields">
         <div class="field address-street" data-field="street"><label for="street">Rua</label><input id="street" name="street" maxlength="120" autocomplete="address-line1" /><small class="field-error"></small></div>
-        <div class="field address-number" data-field="streetNumber"><label for="streetNumber">Numero</label><input id="streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div>
+        <div class="field address-number" data-field="streetNumber"><label for="streetNumber">Número</label><input id="streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" /><small class="field-error"></small></div>
         <div class="field address-neighborhood"><label for="neighborhood">Bairro</label><input id="neighborhood" name="neighborhood" maxlength="80" /></div>
         <div class="field address-city"><label for="city">Cidade</label><input id="city" name="city" maxlength="80" /></div>
         <div class="field field-state"><label for="state">UF</label><input id="state" name="state" maxlength="2" value="PE" /></div>
@@ -1094,8 +1094,8 @@ function newLeadView() {
           <select id="interestId" name="interestId">${interests}</select>
         </div>
         <div class="field" data-field="appointmentServiceId">
-          <label for="appointmentServiceId">Servico do agendamento</label>
-          <select id="appointmentServiceId" name="appointmentServiceId" ${selectedStoreId ? '' : 'disabled'}><option value="">${selectedStoreId ? 'Selecione o servico' : 'Escolha primeiro a loja'}</option>${serviceOptions}</select>
+          <label for="appointmentServiceId">Serviço do agendamento</label>
+          <select id="appointmentServiceId" name="appointmentServiceId" ${selectedStoreId ? '' : 'disabled'}><option value="">${selectedStoreId ? 'Selecione o serviço' : 'Escolha primeiro a loja'}</option>${serviceOptions}</select>
           <small class="field-error"></small>
         </div>
       </div>
@@ -1105,7 +1105,7 @@ function newLeadView() {
         <div class="ametropia-options">${ametropiaOptions()}</div>
       </fieldset>` : ''}
       <fieldset id="new-lead-pathologies" class="field ametropia-field">
-        <legend>Patologias e condicoes de saude</legend>
+        <legend>Patologias e condições de saúde</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
@@ -1114,17 +1114,17 @@ function newLeadView() {
         ? transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')
         : ''}
       <div class="field-row appointment-fields" data-online-appointment ${navigator.onLine ? '' : 'hidden'}>
-        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pre-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine && selectedStoreId ? '' : 'disabled'} /><small class="schedule-date-status">${!navigator.onLine ? 'Conecte-se para escolher uma data.' : !selectedStoreId ? 'Escolha primeiro a loja de destino.' : ''}</small><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="appointmentDate">Data do pré-agendamento</label><input id="appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${navigator.onLine ? escapeHtml(state.newLeadSchedule.appointmentDate) : ''}" ${navigator.onLine && selectedStoreId ? '' : 'disabled'} /><small class="schedule-date-status">${!navigator.onLine ? 'Conecte-se para escolher uma data.' : !selectedStoreId ? 'Escolha primeiro a loja de destino.' : ''}</small><small class="field-error"></small></div>
         <div id="appointment-time-field">${appointmentTimeField()}</div>
       </div>
       <div class="field" data-field="notes">
-        <label for="notes">Observacao rapida</label>
-        <textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha"></textarea>
+        <label for="notes">Observação rápida</label>
+        <textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manhã"></textarea>
         <small class="field-hint"><span id="notes-count">0</span>/500</small>
         <small class="field-error"></small>
       </div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar cadastro</span></button>
-      <p class="form-footnote"><i data-lucide="shield-check"></i> ${state.offlineCapture.enabled ? 'Quando offline, somente os dados do lead serao salvos; o agendamento sera feito depois.' : 'O cadastro exige conexao com a internet nesta loja.'}</p>
+      <p class="form-footnote"><i data-lucide="shield-check"></i> ${state.offlineCapture.enabled ? 'Quando offline, somente os dados do lead serão salvos; o agendamento será feito depois.' : 'O cadastro exige conexão com a internet nesta loja.'}</p>
     </form>`;
 }
 
@@ -1141,7 +1141,7 @@ function leadsView() {
         const [label, tone] = syncLabel(lead);
         return `<button class="lead-item" type="button" data-open-lead-id="${escapeHtml(lead.id)}" aria-label="Ver cadastro de ${escapeHtml(lead.fullName)}">
           <div class="lead-avatar">${escapeHtml(lead.fullName[0]?.toUpperCase() || '?')}</div>
-          <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(offlineSyncDetail(lead) || lead.interestLabel || 'Interesse nao informado')}</small></div>
+          <div class="lead-content"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(offlineSyncDetail(lead) || lead.interestLabel || 'Interesse não informado')}</small></div>
           <span class="status-badge status-${tone}">${label}</span>
           <i class="lead-chevron" data-lucide="chevron-right"></i>
         </button>`;
@@ -1156,7 +1156,7 @@ function leadsView() {
 
 function followUpsView() {
   if (!hasAccess('followups.own') && !hasAccess('followups.team')) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta area e exclusiva para captadores e gestores.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Esta área e exclusiva para captadores e gestores.</span></div>`;
   }
 
   const allRecords = pendingFollowUps();
@@ -1172,7 +1172,7 @@ function followUpsView() {
       const followUpSettings = state.followUps.settingsByStore[lead.storeId] || state.followUps.settings;
       const stage = followUpStage(lead, followUpSettings);
       const rescheduleRecommended = stage === 'reschedule';
-      const whatsAppUrl = buildWhatsAppFollowUpUrl(lead, stage);
+      const whatsAppUrl = buildWhatsAppFollowUpUrl(lead, stage, state.profile.displayName);
       const manuallyMissed = lead.appointmentAttendance === 'missed';
       const contacted = isFollowUpContacted(lead);
       return `<article class="follow-up-item">
@@ -1184,10 +1184,10 @@ function followUpsView() {
         <dl class="follow-up-details">
           <div><dt>Agendamento</dt><dd>${escapeHtml(formatAppointmentDate(lead.appointmentDate))}, ${escapeHtml(lead.appointmentTime)}</dd></div>
           <div><dt>Retorno liberado</dt><dd>${escapeHtml(formatFollowUpAvailableAt(lead))}</dd></div>
-          <div><dt>Acao sugerida</dt><dd>${rescheduleRecommended ? 'Oferecer uma nova data' : 'Confirmar se esta a caminho'}</dd></div>
-          ${managerView ? `<div><dt>Situacao</dt><dd>${manuallyMissed ? 'Nao compareceu' : 'Sem confirmacao'}</dd></div>
-          <div><dt>Ultimo contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda nao iniciado'}</dd></div>
-          ${contacted ? `<div><dt>Contato por</dt><dd>${escapeHtml(lead.followUpContactedByName || 'Nao informado')}</dd></div>` : ''}
+          <div><dt>Ação sugerida</dt><dd>${rescheduleRecommended ? 'Oferecer uma nova data' : 'Confirmar se está a caminho'}</dd></div>
+          ${managerView ? `<div><dt>Situação</dt><dd>${manuallyMissed ? 'Não compareceu' : 'Sem confirmação'}</dd></div>
+          <div><dt>Último contato</dt><dd>${contacted ? escapeHtml(formatDateTimeValue(lead.followUpContactedAt)) : 'Ainda não iniciado'}</dd></div>
+          ${contacted ? `<div><dt>Contato por</dt><dd>${escapeHtml(lead.followUpContactedByName || 'Não informado')}</dd></div>` : ''}
           ${adminView ? `<div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>` : ''}` : ''}
         </dl>
         <div class="follow-up-actions">
@@ -1199,13 +1199,13 @@ function followUpsView() {
   const contactedCount = allRecords.filter(isFollowUpContacted).length;
   const captorGroups = [...allRecords.reduce((groups, lead) => {
     const key = lead.capturedByUid || lead.capturedByName || 'captor';
-    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador nao informado', records: [] });
+    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador não informado', records: [] });
     groups.get(key).records.push(lead);
     return groups;
   }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   const visibleCaptorGroups = [...records.reduce((groups, lead) => {
     const key = lead.capturedByUid || lead.capturedByName || 'captor';
-    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador nao informado', records: [] });
+    if (!groups.has(key)) groups.set(key, { id: key, name: lead.capturedByName || 'Captador não informado', records: [] });
     groups.get(key).records.push(lead);
     return groups;
   }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -1223,7 +1223,7 @@ function followUpsView() {
       <div class="follow-up-captor-dialog-content follow-up-list">
         ${selectedCaptorPending.length
           ? selectedCaptorPending.map(renderItem).join('')
-          : '<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum contato aguardando</strong><p>Todos os retornos deste captador ja tiveram o contato iniciado.</p></div>'}
+          : '<div class="empty-state"><i data-lucide="circle-check"></i><strong>Nenhum contato aguardando</strong><p>Todos os retornos deste captador já tiveram o contato iniciado.</p></div>'}
       </div>
       <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-follow-up-captor-close>Fechar</button></div>
     </dialog>` : '';
@@ -1260,10 +1260,10 @@ function leadDetailAppointmentTimeField(lead) {
   const { settings, appointmentDate, appointments, appointmentLoading, error } = state.leadDetailSchedule;
   const selectedTime = appointmentDate === lead.appointmentDate ? lead.appointmentTime : '';
   if (!navigator.onLine) {
-    return '<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario disponivel</label><select id="edit-appointmentTime" name="appointmentTime" disabled><option>Conecte-se para consultar os horarios</option></select><small class="field-error"></small></div>';
+    return '<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horário disponível</label><select id="edit-appointmentTime" name="appointmentTime" disabled><option>Conecte-se para consultar os horários</option></select><small class="field-error"></small></div>';
   }
   if (settings.schedulingMode === 'free') {
-    return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(selectedTime)}" /><small class="field-error"></small></div>`;
+    return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horário</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(selectedTime)}" /><small class="field-error"></small></div>`;
   }
 
   const triage = ophthalmologyTriage(lead, settings);
@@ -1287,23 +1287,23 @@ function leadDetailAppointmentTimeField(lead) {
       )))
     : [];
   let placeholder = 'Escolha primeiro uma data';
-  if (appointmentLoading) placeholder = 'Consultando horarios...';
-  else if (error) placeholder = 'Horarios indisponiveis';
+  if (appointmentLoading) placeholder = 'Consultando horários...';
+  else if (error) placeholder = 'Horários indisponíveis';
   else if (appointmentDate && !routeAllowed) placeholder = triage.careRoute === 'ophthalmologist'
-    ? 'O oftalmologista nao atende neste dia'
-    : 'A loja nao funciona neste dia';
-  else if (appointmentDate && !transportAllowed) placeholder = 'Transporte indisponivel neste dia';
+    ? 'O oftalmologista não atende neste dia'
+    : 'A loja não funciona neste dia';
+  else if (appointmentDate && !transportAllowed) placeholder = 'Transporte indisponível neste dia';
   else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
   else if (quota.reason === 'mei-quota' || quota.reason === 'daily-limit') placeholder = 'Limite de agendamentos atingido';
-  else if (appointmentDate && !available.length) placeholder = 'Dia sem horarios disponiveis';
+  else if (appointmentDate && !available.length) placeholder = 'Dia sem horários disponíveis';
 
-  return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horario disponivel</label><select id="edit-appointmentTime" name="appointmentTime" ${available.length && !quota.blocked ? '' : 'disabled'}><option value="">${placeholder}</option>${available.map((slot) => `<option value="${slot.time}" ${slot.time === selectedTime ? 'selected' : ''}>${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+  return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horário disponível</label><select id="edit-appointmentTime" name="appointmentTime" ${available.length && !quota.blocked ? '' : 'disabled'}><option value="">${placeholder}</option>${available.map((slot) => `<option value="${slot.time}" ${slot.time === selectedTime ? 'selected' : ''}>${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
 }
 
 function leadDetailView() {
   const managementMode = state.route === 'management-lead';
   if (managementMode && !canManage()) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao pode alterar leads da equipe.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não pode alterar leads da equipe.</span></div>`;
   }
 
   const leadId = currentRouteParam();
@@ -1314,7 +1314,7 @@ function leadDetailView() {
   if (!lead) {
     return `<section class="page-toolbar">
       <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
-    </section><div class="notice notice-warning"><i data-lucide="info"></i><span>Cadastro nao encontrado. Volte para a lista e tente novamente.</span></div>`;
+    </section><div class="notice notice-warning"><i data-lucide="info"></i><span>Cadastro não encontrado. Volte para a lista e tente novamente.</span></div>`;
   }
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
@@ -1329,13 +1329,13 @@ function leadDetailView() {
       <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
       <h2>${escapeHtml(lead.fullName)}</h2>
     </section>
-    <section class="lead-detail-summary" aria-label="Informacoes do cadastro">
+    <section class="lead-detail-summary" aria-label="Informações do cadastro">
       <div><span>Status</span><strong class="status-badge status-${syncTone}">${syncStatus}</strong></div>
       <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
-      ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alteracoes e agendamento exigem internet.</span></div>' : ''}
+      ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alterações e agendamento exigem internet.</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.leadDetailSchedule.settings.schedulingMode || lead.appointmentSchedulingMode || 'controlled')}" />
       ${triageConfigFields(state.leadDetailSchedule.settings)}
       <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
@@ -1346,7 +1346,7 @@ function leadDetailView() {
       <div class="field"><label for="edit-preferredName">Como prefere ser chamado</label><input id="edit-preferredName" name="preferredName" maxlength="60" value="${escapeHtml(lead.preferredName)}" ${locked} /></div>
       <div class="field-row address-fields">
         <div class="field address-street" data-field="street"><label for="edit-street">Rua</label><input id="edit-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(lead.street)}" ${locked} /><small class="field-error"></small></div>
-        <div class="field address-number" data-field="streetNumber"><label for="edit-streetNumber">Numero</label><input id="edit-streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" value="${escapeHtml(lead.streetNumber)}" placeholder="S/N" ${locked} /><small class="field-error"></small></div>
+        <div class="field address-number" data-field="streetNumber"><label for="edit-streetNumber">Número</label><input id="edit-streetNumber" name="streetNumber" maxlength="12" autocomplete="address-line2" value="${escapeHtml(lead.streetNumber)}" placeholder="S/N" ${locked} /><small class="field-error"></small></div>
         <div class="field address-neighborhood"><label for="edit-neighborhood">Bairro</label><input id="edit-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(lead.neighborhood)}" ${locked} /></div>
         <div class="field address-city"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
@@ -1358,18 +1358,18 @@ function leadDetailView() {
         <div class="ametropia-options">${ametropiaOptions(lead.ametropiaIds || [])}</div>
       </fieldset>` : ''}
       <fieldset class="field ametropia-field" ${locked}>
-        <legend>Patologias e condicoes de saude</legend>
+        <legend>Patologias e condições de saúde</legend>
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
       </fieldset>
       ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
       ${transportFields(lead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
       <div class="field-row appointment-fields">
-        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pre-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.leadDetailSchedule.appointmentDate || lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
+        <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pré-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.leadDetailSchedule.appointmentDate || lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
         ${leadDetailAppointmentTimeField(lead)}
       </div>
-      <div class="field" data-field="notes"><label for="edit-notes">Observacao rapida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
-      <button class="button button-primary button-block" type="submit" ${offlineEdit ? 'disabled' : ''}><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alteracoes'}</span></button>
+      <div class="field" data-field="notes"><label for="edit-notes">Observação rápida</label><textarea id="edit-notes" name="notes" maxlength="500" rows="3" ${locked}>${escapeHtml(lead.notes)}</textarea><small class="field-hint"><span id="edit-notes-count">${String(lead.notes || '').length}</span>/500</small><small class="field-error"></small></div>
+      <button class="button button-primary button-block" type="submit" ${offlineEdit ? 'disabled' : ''}><i data-lucide="save"></i><span>${managerReschedule ? 'Salvar reagendamento' : 'Salvar alterações'}</span></button>
       ${hasAccess('leads.delete') ? `<button class="button button-danger button-block" type="button" data-delete-lead="${escapeHtml(lead.id)}"><i data-lucide="trash-2"></i><span>Excluir lead</span></button>` : ''}
       <p class="form-footnote"><i data-lucide="shield-check"></i> Autor, loja e data original permanecem preservados.</p>
     </form>
@@ -1377,7 +1377,7 @@ function leadDetailView() {
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
       <div class="confirmation-dialog-copy">
         <h2 id="delete-dialog-title">Excluir este lead?</h2>
-        <p id="delete-dialog-description">O cadastro de <strong>${escapeHtml(lead.fullName)}</strong> sera excluido definitivamente. Essa acao nao pode ser desfeita.</p>
+        <p id="delete-dialog-description">O cadastro de <strong>${escapeHtml(lead.fullName)}</strong> será excluído definitivamente. Essa ação não pode ser desfeita.</p>
       </div>
       <div class="confirmation-dialog-actions">
         <button class="button button-secondary" type="button" data-close-delete-dialog>Cancelar</button>
@@ -1388,7 +1388,7 @@ function leadDetailView() {
 
 function managementView() {
   if (!canManage()) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos dados gerenciais.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso aos dados gerenciais.</span></div>`;
   }
 
   const { filters, loaded, loading, error, records, truncated, pageSize } = state.management;
@@ -1408,16 +1408,16 @@ function managementView() {
 
   const tableRows = pageRecords.map((lead) => `<tr>
     <td>${isAdmin() ? `<button class="management-lead-link" type="button" data-management-lead-id="${escapeHtml(lead.id)}"><strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small></button>` : `<strong>${escapeHtml(lead.fullName)}</strong><small>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</small>`}</td>
-    <td>${escapeHtml(lead.capturedByName || 'Nao informado')}</td>
+    <td>${escapeHtml(lead.capturedByName || 'Não informado')}</td>
     <td>${escapeHtml(storeLabel(lead.storeId))}</td>
-    <td>${escapeHtml(lead.interestLabel || 'Nao informado')}</td>
+    <td>${escapeHtml(lead.interestLabel || 'Não informado')}</td>
     <td>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</td>
   </tr>`).join('');
 
   const mobileRows = pageRecords.map((lead) => `<article class="management-card">
     <div>${isAdmin() ? `<button class="management-lead-link" type="button" data-management-lead-id="${escapeHtml(lead.id)}"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span></button>` : `<strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span>`}</div>
     <dl>
-      <div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Nao informado')}</dd></div>
+      <div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Não informado')}</dd></div>
       <div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div>
       <div><dt>Captado em</dt><dd>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</dd></div>
     </dl>
@@ -1435,22 +1435,22 @@ function managementView() {
         <strong>${currentPage} de ${totalPages}</strong>
         <button class="button button-secondary" type="button" data-management-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>Proxima</button></div>
       </div>`
-    : `<div class="empty-state management-empty"><i data-lucide="bar-chart-3"></i><strong>${loaded ? 'Nenhum cadastro no periodo' : 'Consulte as captacoes'}</strong><p>${loaded ? 'Ajuste os filtros para ampliar a busca.' : 'Escolha o periodo e carregue os resultados.'}</p></div>`;
+    : `<div class="empty-state management-empty"><i data-lucide="bar-chart-3"></i><strong>${loaded ? 'Nenhum cadastro no período' : 'Consulte as captações'}</strong><p>${loaded ? 'Ajuste os filtros para ampliar a busca.' : 'Escolha o período e carregue os resultados.'}</p></div>`;
 
   return `
     <section class="management-heading management-dashboard-heading management-toolbar">
       <div class="management-heading-actions">
         ${hasAccess('appointments.view') ? '<button class="button button-secondary" type="button" data-route="appointments"><i data-lucide="calendar-days"></i><span>Agenda de exames</span></button>' : ''}
         ${hasAccess('followups.team') ? '<button class="button button-secondary" type="button" data-route="follow-ups"><i data-lucide="bell-ring"></i><span>Retornos da equipe</span></button>' : ''}
-        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="settings"></i><span>Configuracoes</span></button>' : ''}
+        ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="settings"></i><span>Configurações</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         ${hasAccess('dashboard.view') ? '<button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>' : ''}
-        ${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatorios</span></button>' : ''}
+        ${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatórios</span></button>' : ''}
         ${hasAccess('leads.export') ? `<button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>` : ''}
       </div>
     </section>
     <form id="management-filters" class="management-filters">
-      <div class="filter-title"><i data-lucide="filter"></i><div><strong>Filtros</strong><span>Periodo maximo recomendado: 90 dias.</span></div></div>
+      <div class="filter-title"><i data-lucide="filter"></i><div><strong>Filtros</strong><span>Período máximo recomendado: 90 dias.</span></div></div>
       <div class="management-filter-grid">
         <div class="field"><label for="management-start">Data inicial</label><input id="management-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
         <div class="field"><label for="management-end">Data final</label><input id="management-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
@@ -1461,8 +1461,8 @@ function managementView() {
       </div>
     </form>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A consulta atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter a lista completa.</span></div>` : ''}
-    <section class="management-metrics" aria-label="Resumo do periodo">
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A consulta atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o período para obter a lista completa.</span></div>` : ''}
+    <section class="management-metrics" aria-label="Resumo do período">
       <div><i data-lucide="clipboard-list"></i><span>Leads encontrados</span><strong>${filtered.length}</strong></div>
       <div><i data-lucide="users"></i><span>Captadores</span><strong>${new Set(filtered.map((lead) => lead.capturedByUid)).size}</strong></div>
       <div><i data-lucide="building-2"></i><span>Lojas</span><strong>${new Set(filtered.map((lead) => lead.storeId)).size}</strong></div>
@@ -1504,7 +1504,7 @@ function reportAppointmentDistribution(records) {
   }));
   const periods = [
     { label: 'Madrugada', start: 0, end: 6 },
-    { label: 'Manha', start: 6, end: 12 },
+    { label: 'Manhã', start: 6, end: 12 },
     { label: 'Tarde', start: 12, end: 18 },
     { label: 'Noite', start: 18, end: 24 }
   ].map((period) => ({
@@ -1546,7 +1546,7 @@ function reportDistributionPanel(title, description, icon, items, total, highlig
 
 function reportsView() {
   if (!hasAccess('reports.view')) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso aos relatorios.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso aos relatórios.</span></div>`;
   }
   const records = filteredReportRecords();
   const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
@@ -1555,27 +1555,27 @@ function reportsView() {
   const decided = attended + missed;
   const attendanceRate = decided ? Math.round((attended / decided) * 100) : 0;
   const storeRows = reportGroupRows(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId));
-  const captorRows = reportGroupRows(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Nao informado');
+  const captorRows = reportGroupRows(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Não informado');
   const appointmentDistribution = reportAppointmentDistribution(records);
   const periodSummary = appointmentDistribution.predominantPeriod
     ? `Predominio: ${appointmentDistribution.predominantPeriod}`
-    : (scheduled ? 'Sem predominio no periodo' : 'Nenhum agendamento no periodo');
-  const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${scheduled} agendamento(s) distribuidos por dia`, 'calendar-days', appointmentDistribution.weekdays, scheduled)}
-    ${reportDistributionPanel('Agendamentos por horario', periodSummary, 'clock-3', appointmentDistribution.periods, scheduled, appointmentDistribution.predominantPeriod)}`;
+    : (scheduled ? 'Sem predominio no período' : 'Nenhum agendamento no período');
+  const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${scheduled} agendamento(s) distribuídos por dia`, 'calendar-days', appointmentDistribution.weekdays, scheduled)}
+    ${reportDistributionPanel('Agendamentos por horário', periodSummary, 'clock-3', appointmentDistribution.periods, scheduled, appointmentDistribution.predominantPeriod)}`;
   const { filters, loading, error, truncated } = state.management;
-  const table = (title, icon, rows) => `<section class="report-panel"><div class="report-panel-heading"><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${records.length} cadastro(s) no periodo</span></div></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  const table = (title, icon, rows) => `<section class="report-panel"><div class="report-panel-heading"><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${records.length} cadastro(s) no período</span></div></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 
-  return `<section class="reports-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></section>
+  return `<section class="reports-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></section>
     <form id="reports-period" class="dashboard-period-filter">
-      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>Defina o intervalo do relatorio</strong></div></div>
+      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Período analisado</span><strong>Defina o intervalo do relatório</strong></div></div>
       <div class="field"><label for="reports-start">Data inicial</label><input id="reports-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
       <div class="field"><label for="reports-end">Data final</label><input id="reports-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
-      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar periodo'}</span></button>
+      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar período'}</span></button>
     </form>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatorio atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
-    <section class="report-metrics" aria-label="Indicadores do periodo"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
-    ${records.length ? `<section class="report-analysis-grid">${appointmentAnalysis}</section><section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no periodo</strong><p>Ajuste o periodo analisado para ampliar a busca.</p></div>`}`;
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatório atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o período para obter o resultado completo.</span></div>` : ''}
+    <section class="report-metrics" aria-label="Indicadores do período"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
+    ${records.length ? `<section class="report-analysis-grid">${appointmentAnalysis}</section><section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no período</strong><p>Ajuste o período analisado para ampliar a busca.</p></div>`}`;
 }
 
 function dashboardGroupStats(records, keyFor, labelFor) {
@@ -1601,7 +1601,7 @@ function dashboardGroupStats(records, keyFor, labelFor) {
 
 function dashboardView() {
   if (!hasAccess('dashboard.view')) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso ao dashboard.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso ao dashboard.</span></div>`;
   }
 
   const records = filteredReportRecords();
@@ -1630,37 +1630,37 @@ function dashboardView() {
   const storeMax = Math.max(1, ...stores.map((store) => store.total));
   const storeRows = stores.map((store) => `<div class="dashboard-performance-row"><div><strong>${escapeHtml(store.label)}</strong><span>${store.total} cadastro(s)</span></div><div class="dashboard-progress"><i style="width:${Math.round((store.total / storeMax) * 100)}%"></i></div><strong>${store.attendanceRate}% presença</strong></div>`).join('');
 
-  const captors = dashboardGroupStats(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Nao informado')
+  const captors = dashboardGroupStats(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Não informado')
     .sort((a, b) => b.total - a.total || b.attendanceRate - a.attendanceRate || a.label.localeCompare(b.label, 'pt-BR'));
   const captorRows = captors.map((captor, index) => `<div class="dashboard-ranking-row"><span>${index + 1}</span><div><strong>${escapeHtml(captor.label)}</strong><small>${captor.scheduled} agendado(s) · ${captor.attended} comparecimento(s)</small></div><strong>${captor.total}</strong></div>`).join('');
 
   const attendanceItems = [
     ['Compareceram', attended, 'success'],
-    ['Nao compareceram', missed, 'danger'],
-    ['Aguardando definicao', pending, 'neutral']
+    ['Não compareceram', missed, 'danger'],
+    ['Aguardando definição', pending, 'neutral']
   ].map(([label, count, tone]) => {
     const percentage = scheduled ? Math.round((count / scheduled) * 100) : 0;
     return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos agendamentos</small></div>`;
   }).join('');
 
-  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatorios</span></button>' : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
+  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatórios</span></button>' : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
     <form id="dashboard-period" class="dashboard-period-filter">
-      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Periodo analisado</span><strong>Defina o intervalo do dashboard</strong></div></div>
+      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Período analisado</span><strong>Defina o intervalo do dashboard</strong></div></div>
       <div class="field"><label for="dashboard-start">Data inicial</label><input id="dashboard-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
       <div class="field"><label for="dashboard-end">Data final</label><input id="dashboard-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
-      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar periodo'}</span></button>
+      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar período'}</span></button>
     </form>
     ${state.savwin.error ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><div><strong>Consulta SavWin</strong><span>${escapeHtml(state.savwin.error)}</span></div></div>` : ''}
-    ${state.savwin.result ? `<div class="notice notice-success" role="status"><i data-lucide="cloud-check"></i><div><strong>SavWin conectado localmente</strong><span>${state.savwin.result.count} item(ns) encontrados em ${state.savwin.result.osCount} OS no periodo.</span></div></div>` : ''}
+    ${state.savwin.result ? `<div class="notice notice-success" role="status"><i data-lucide="cloud-check"></i><div><strong>SavWin conectado localmente</strong><span>${state.savwin.result.count} item(ns) encontrados em ${state.savwin.result.osCount} OS no período.</span></div></div>` : ''}
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O dashboard atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o periodo para obter o resultado completo.</span></div>` : ''}
-    <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${records.length}</strong><small>no periodo</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>${appointmentRate}% dos cadastros</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presenca</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
-    ${records.length ? `<section class="dashboard-grid"><article class="dashboard-panel dashboard-trend-panel"><header><div><span>Evolucao</span><h2>Cadastros por dia</h2></div><strong>Ultimos ${dailyData.length} dia(s) com registros</strong></header><div class="dashboard-chart" aria-label="Grafico de cadastros por dia">${dailyBars}</div></article><article class="dashboard-panel"><header><div><span>Agenda</span><h2>Situacao dos agendamentos</h2></div><strong>${scheduled} total</strong></header><div class="dashboard-status-list">${attendanceItems}</div></article><article class="dashboard-panel"><header><div><span>Unidades</span><h2>Desempenho por loja</h2></div><strong>${stores.length} analisada(s)</strong></header><div class="dashboard-performance-list">${storeRows}</div></article><article class="dashboard-panel"><header><div><span>Equipe</span><h2>Ranking de captadores</h2></div><strong>Por cadastros</strong></header><div class="dashboard-ranking-list">${captorRows}</div></article></section>` : `<div class="empty-state dashboard-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado para exibir</strong><p>Volte para a gestao e ajuste os filtros do periodo.</p></div>`}`;
+    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O dashboard atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o período para obter o resultado completo.</span></div>` : ''}
+    <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${records.length}</strong><small>no período</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>${appointmentRate}% dos cadastros</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presença</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
+    ${records.length ? `<section class="dashboard-grid"><article class="dashboard-panel dashboard-trend-panel"><header><div><span>Evolução</span><h2>Cadastros por dia</h2></div><strong>Últimos ${dailyData.length} dia(s) com registros</strong></header><div class="dashboard-chart" aria-label="Gráfico de cadastros por dia">${dailyBars}</div></article><article class="dashboard-panel"><header><div><span>Agenda</span><h2>Situação dos agendamentos</h2></div><strong>${scheduled} total</strong></header><div class="dashboard-status-list">${attendanceItems}</div></article><article class="dashboard-panel"><header><div><span>Unidades</span><h2>Desempenho por loja</h2></div><strong>${stores.length} analisada(s)</strong></header><div class="dashboard-performance-list">${storeRows}</div></article><article class="dashboard-panel"><header><div><span>Equipe</span><h2>Ranking de captadores</h2></div><strong>Por cadastros</strong></header><div class="dashboard-ranking-list">${captorRows}</div></article></section>` : `<div class="empty-state dashboard-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado para exibir</strong><p>Volte para a gestão e ajuste os filtros do período.</p></div>`}`;
 }
 
 function appointmentsView() {
   if (!hasAccess('appointments.view')) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil nao possui acesso a agenda gerencial.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso a agenda gerencial.</span></div>`;
   }
 
   const { loading, error, truncated, month, storeId, selectedDate, updatingId } = state.appointments;
@@ -1699,15 +1699,15 @@ function appointmentsView() {
       const updating = updatingId === lead.id;
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
-        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador nao informado')}</small>${lead.needsTransport ? `<small class="appointment-transport"><i data-lucide="bus-front"></i> Transporte · ${lead.hasCompanion ? 'com acompanhante' : 'sem acompanhante'}</small>` : ''}</div>
+        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador não informado')}</small>${lead.needsTransport ? `<small class="appointment-transport"><i data-lucide="bus-front"></i> Transporte · ${lead.hasCompanion ? 'com acompanhante' : 'sem acompanhante'}</small>` : ''}</div>
         ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
-          <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Nao compareceu</span></button>
+          <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Não compareceu</span></button>
         </div>` : ''}
         ${isAdmin() ? `<button class="icon-button appointment-open" type="button" data-appointment-lead-id="${escapeHtml(lead.id)}" title="Abrir cadastro" aria-label="Abrir cadastro de ${escapeHtml(lead.fullName)}"><i data-lucide="chevron-right"></i></button>` : ''}
       </article>`;
     }).join('')
-    : `<div class="agenda-empty"><i data-lucide="calendar-days"></i><strong>Nenhum exame neste dia</strong><p>Selecione uma data destacada no calendario.</p></div>`;
+    : `<div class="agenda-empty"><i data-lucide="calendar-days"></i><strong>Nenhum exame neste dia</strong><p>Selecione uma data destacada no calendário.</p></div>`;
 
   const storeTotals = allowedStores
     .map((store) => ({ ...store, count: records.filter((lead) => lead.storeId === store.id).length }))
@@ -1717,8 +1717,8 @@ function appointmentsView() {
   const createDialog = appointmentCreateDialog(allowedStores);
 
   return `<section class="management-heading page-actions-only agenda-heading">
-      <button class="button button-secondary" type="button" data-route="${backRoute}"><i data-lucide="arrow-left"></i><span>${backRoute === 'management' ? 'Voltar para gestao' : 'Voltar ao inicio'}</span></button>
-      ${hasAccess('leads.create') ? `<button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Nao e possivel agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>` : ''}
+      <button class="button button-secondary" type="button" data-route="${backRoute}"><i data-lucide="arrow-left"></i><span>${backRoute === 'management' ? 'Voltar para gestão' : 'Voltar ao início'}</span></button>
+      ${hasAccess('leads.create') ? `<button class="button button-primary" type="button" data-create-appointment ${selectedDateCanBeScheduled ? '' : 'disabled title="Não é possível agendar em uma data passada"'}><i data-lucide="user-plus"></i><span>Novo agendamento</span></button>` : ''}
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A agenda atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} exames neste mes.</span></div>` : ''}
@@ -1728,7 +1728,7 @@ function appointmentsView() {
           <div class="calendar-navigation">
             <button class="icon-button" type="button" data-appointment-month="-1" aria-label="Mes anterior"><i data-lucide="chevron-left"></i></button>
             <h2>${escapeHtml(formatMonthLabel(month))}</h2>
-            <button class="icon-button" type="button" data-appointment-month="1" aria-label="Proximo mes"><i data-lucide="chevron-right"></i></button>
+            <button class="icon-button" type="button" data-appointment-month="1" aria-label="Próximo mes"><i data-lucide="chevron-right"></i></button>
           </div>
           <div class="calendar-toolbar-actions">
             ${allowedStores.length > 1 ? `<label class="calendar-store-filter"><span>Unidade</span><select id="appointments-store"><option value="">Todas as lojas permitidas</option>${storeOptions}</select></label>` : ''}
@@ -1775,19 +1775,19 @@ function appointmentCreateTimeField() {
     && !isStoreDateAllowed(schedule, state.appointments.selectedDate);
   const transportDateBlocked = needsTransport && !isTransportDateAllowed(schedule, state.appointments.selectedDate);
   if (state.appointmentCreate.loading) {
-    return '<div id="appointment-create-time-field" class="field"><label>Horario</label><div class="readonly-field">Carregando horarios...</div></div>';
+    return '<div id="appointment-create-time-field" class="field"><label>Horário</label><div class="readonly-field">Carregando horários...</div></div>';
   }
   if (ophthalmologyDateBlocked) {
-    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>O oftalmologista nao atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>O oftalmologista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (storeDateBlocked) {
-    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>A loja nao funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>A loja não funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (transportDateBlocked) {
-    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horario disponivel</label><select name="appointmentTime" disabled><option>Transporte indisponivel neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>Transporte indisponível neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (schedule.schedulingMode === 'free') {
-    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horário</label><input id="agenda-lead-time" name="appointmentTime" type="time" required /><small class="field-error"></small></div>';
   }
   const records = (state.demoMode ? state.leads : state.appointments.records)
     .filter((lead) => lead.storeId === state.appointmentCreate.storeId
@@ -1804,7 +1804,7 @@ function appointmentCreateTimeField() {
       slot.time,
       service.durationMinutes
     )));
-  return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horario disponivel</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horario' : triage.careRoute === 'ophthalmologist' ? 'Sem horarios do oftalmologista neste dia' : 'Dia sem horarios disponiveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
+  return `<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label for="agenda-lead-time">Horário disponível</label><select id="agenda-lead-time" name="appointmentTime" required ${available.length ? '' : 'disabled'}><option value="">${available.length ? 'Selecione um horário' : triage.careRoute === 'ophthalmologist' ? 'Sem horários do oftalmologista neste dia' : 'Dia sem horários disponíveis'}</option>${available.map((slot) => `<option value="${slot.time}">${slot.time} - ${slot.endTime}</option>`).join('')}</select><small class="field-error"></small></div>`;
 }
 
 function appointmentCreateDialog(allowedStores) {
@@ -1839,23 +1839,23 @@ function appointmentCreateDialog(allowedStores) {
           <div class="field" data-field="sex"><label for="agenda-lead-sex">Sexo</label><select id="agenda-lead-sex" name="sex">${sexOptions(draft.sex || '')}</select><small class="field-error"></small></div>
         </div>
         <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" value="${escapeHtml(draft.preferredName || '')}" /></div>
-        <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(draft.street || '')}" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Numero</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" value="${escapeHtml(draft.streetNumber || '')}" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(draft.neighborhood || '')}" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" value="${escapeHtml(draft.city || '')}" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="${escapeHtml(draft.state || 'PE')}" /></div></div>
+        <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(draft.street || '')}" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Número</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" value="${escapeHtml(draft.streetNumber || '')}" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(draft.neighborhood || '')}" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" value="${escapeHtml(draft.city || '')}" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="${escapeHtml(draft.state || 'PE')}" /></div></div>
         <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
         <div class="field-row interest-service-fields">
           <div class="field"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>
-          <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Servico do agendamento</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
+          <div class="field" data-field="appointmentServiceId"><label for="agenda-lead-service">Serviço do agendamento</label><select id="agenda-lead-service" name="appointmentServiceId" ${loading ? 'disabled' : ''}>${serviceOptions}</select><small class="field-error"></small></div>
         </div>
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
-        <fieldset class="field ametropia-field"><legend>Patologias e condicoes de saude</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
+        <fieldset class="field ametropia-field"><legend>Patologias e condições de saúde</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
         ${eyeTriageFields(draft, schedule, canOverrideCareRoute(), 'agenda-lead-eye')}
         ${schedule.transportEnabled
           ? transportFields({ ...draft, appointmentDate: state.appointments.selectedDate }, schedule, 'agenda-lead-transport')
           : ''}
         <div class="field-row appointment-fields">
-          <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pre-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
+          <div class="field" data-field="appointmentDate"><label for="agenda-lead-date">Data do pré-agendamento</label><input id="agenda-lead-date" type="date" value="${escapeHtml(state.appointments.selectedDate)}" disabled /><input name="appointmentDate" type="hidden" value="${escapeHtml(state.appointments.selectedDate)}" /><small class="field-error"></small></div>
           ${appointmentCreateTimeField()}
         </div>
-        <div class="field" data-field="notes"><label for="agenda-lead-notes">Observacao rapida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manha">${escapeHtml(draft.notes || '')}</textarea><small class="field-hint"><span id="agenda-notes-count">${String(draft.notes || '').length}</span>/500</small><small class="field-error"></small></div>
+        <div class="field" data-field="notes"><label for="agenda-lead-notes">Observação rápida</label><textarea id="agenda-lead-notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manhã">${escapeHtml(draft.notes || '')}</textarea><small class="field-hint"><span id="agenda-notes-count">${String(draft.notes || '').length}</span>/500</small><small class="field-error"></small></div>
       </div>
       </div>
       <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-close-appointment-create>Cancelar</button><button class="button button-primary" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar cadastro'}</span></button></div>
@@ -1865,7 +1865,7 @@ function appointmentCreateDialog(allowedStores) {
 
 function settingsView() {
   if (!isAdmin()) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configuracoes das lojas.</span></div>`;
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Somente administradores podem alterar as configurações das lojas.</span></div>`;
   }
 
   const { records, selectedStoreId, loading, saving, error, section } = state.settings;
@@ -1876,12 +1876,12 @@ function settingsView() {
       : scheduleSettingsView();
 
   return `<section class="page-toolbar settings-toolbar">
-      <div class="settings-tabs" role="tablist" aria-label="Categorias de configuracao">
+      <div class="settings-tabs" role="tablist" aria-label="Categorias de configuração">
         <button class="settings-tab ${section === 'schedule' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'schedule'}" data-settings-section="schedule"><i data-lucide="calendar-days"></i><span>Agenda</span></button>
-        <button class="settings-tab ${section === 'services' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'services'}" data-settings-section="services"><i data-lucide="stethoscope"></i><span>Servicos</span></button>
-        <button class="settings-tab ${section === 'roles' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'roles'}" data-settings-section="roles"><i data-lucide="shield-check"></i><span>Perfis e permissoes</span></button>
+        <button class="settings-tab ${section === 'services' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'services'}" data-settings-section="services"><i data-lucide="stethoscope"></i><span>Serviços</span></button>
+        <button class="settings-tab ${section === 'roles' ? 'is-active' : ''}" type="button" role="tab" aria-selected="${section === 'roles'}" data-settings-section="roles"><i data-lucide="shield-check"></i><span>Perfis e permissões</span></button>
       </div>
-      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button>
     </section>
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     <div aria-busy="${loading || saving}">${content}</div>`;
@@ -1893,12 +1893,12 @@ function serviceCatalogSettingsView() {
   const rows = services.map((service) => `<article class="service-catalog-row ${service.active ? '' : 'is-inactive'}">
     <span class="service-catalog-icon"><i data-lucide="${service.name.toLocaleLowerCase('pt-BR').includes('limpeza') ? 'brush-cleaning' : 'stethoscope'}"></i></span>
     <div class="service-catalog-name"><strong>${escapeHtml(service.name)}</strong><span>${escapeHtml(service.storeIds.map(storeLabel).join(' · '))}</span></div>
-    <div class="service-catalog-duration"><span>Duracao</span><strong>${service.durationMinutes} min</strong></div>
+    <div class="service-catalog-duration"><span>Duração</span><strong>${service.durationMinutes} min</strong></div>
     <span class="status-badge status-${service.active ? 'success' : 'neutral'}">${service.active ? 'Ativo' : 'Inativo'}</span>
     <div class="service-catalog-actions">
-      <button class="icon-button" type="button" data-service-edit="${escapeHtml(service.id)}" title="Editar servico" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
+      <button class="icon-button" type="button" data-service-edit="${escapeHtml(service.id)}" title="Editar serviço" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
       <button class="button button-secondary" type="button" data-service-toggle="${escapeHtml(service.id)}" ${saving ? 'disabled' : ''}><i data-lucide="${service.active ? 'circle-x' : 'circle-check'}"></i><span>${service.active ? 'Desativar' : 'Ativar'}</span></button>
-      <button class="icon-button role-delete-button" type="button" data-service-delete="${escapeHtml(service.id)}" title="Excluir servico" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>
+      <button class="icon-button role-delete-button" type="button" data-service-delete="${escapeHtml(service.id)}" title="Excluir serviço" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>
     </div>
   </article>`).join('');
   const deleting = services.find((service) => service.id === pendingDeleteServiceId) || null;
@@ -1909,22 +1909,22 @@ function serviceCatalogSettingsView() {
   </label>`).join('');
 
   return `<section class="service-catalog-panel">
-    <div class="service-catalog-heading"><div><span class="eyebrow">AGENDA</span><h2>Servicos cadastrados</h2><p>Defina a duracao dos atendimentos oferecidos em cada unidade.</p></div><button class="button button-primary" type="button" data-service-new><i data-lucide="circle-plus"></i><span>Novo servico</span></button></div>
-    ${rows ? `<div class="service-catalog-list">${rows}</div>` : '<div class="empty-state"><i data-lucide="stethoscope"></i><strong>Nenhum servico cadastrado</strong><p>Crie o primeiro servico da agenda.</p></div>'}
+    <div class="service-catalog-heading"><div><span class="eyebrow">AGENDA</span><h2>Serviços cadastrados</h2><p>Defina a duração dos atendimentos oferecidos em cada unidade.</p></div><button class="button button-primary" type="button" data-service-new><i data-lucide="circle-plus"></i><span>Novo serviço</span></button></div>
+    ${rows ? `<div class="service-catalog-list">${rows}</div>` : '<div class="empty-state"><i data-lucide="stethoscope"></i><strong>Nenhum serviço cadastrado</strong><p>Crie o primeiro serviço da agenda.</p></div>'}
   </section>
   ${serviceEditorOpen ? `<dialog id="service-editor-dialog" class="access-editor-dialog service-editor-dialog" aria-labelledby="service-editor-title">
     <form id="service-form" class="access-form" novalidate>
-      <header><div><span class="eyebrow">SERVICO DA AGENDA</span><h2 id="service-editor-title">${editing ? 'Editar servico' : 'Novo servico'}</h2><p>A duracao sera usada para calcular os horarios disponiveis.</p></div><button class="icon-button" type="button" data-service-editor-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <header><div><span class="eyebrow">SERVIÇO DA AGENDA</span><h2 id="service-editor-title">${editing ? 'Editar serviço' : 'Novo serviço'}</h2><p>A duração será usada para calcular os horários disponíveis.</p></div><button class="icon-button" type="button" data-service-editor-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
       <div class="access-form-body">
-        <div class="field service-name-field" data-field="name"><label for="service-name">Nome do servico</label><input id="service-name" name="name" maxlength="80" value="${escapeHtml(editing?.name || '')}" placeholder="Ex.: Exame de vista" required /><small class="field-error"></small></div>
-        <div class="field service-duration-field" data-field="durationMinutes"><label for="service-duration">Duracao</label><div class="number-with-unit"><input id="service-duration" name="durationMinutes" type="number" min="10" max="180" step="10" value="${editing?.durationMinutes || 30}" required /><span>min</span></div><small class="field-error"></small></div>
-        <fieldset class="field access-field-wide service-store-field" data-field="storeIds"><legend>Lojas atendidas</legend><small>Marque todas as unidades que oferecem este servico.</small><div class="service-store-options">${storeOptions}</div><small class="field-error"></small></fieldset>
+        <div class="field service-name-field" data-field="name"><label for="service-name">Nome do serviço</label><input id="service-name" name="name" maxlength="80" value="${escapeHtml(editing?.name || '')}" placeholder="Ex.: Exame de vista" required /><small class="field-error"></small></div>
+        <div class="field service-duration-field" data-field="durationMinutes"><label for="service-duration">Duração</label><div class="number-with-unit"><input id="service-duration" name="durationMinutes" type="number" min="10" max="180" step="10" value="${editing?.durationMinutes || 30}" required /><span>min</span></div><small class="field-error"></small></div>
+        <fieldset class="field access-field-wide service-store-field" data-field="storeIds"><legend>Lojas atendidas</legend><small>Marque todas as unidades que oferecem este serviço.</small><div class="service-store-options">${storeOptions}</div><small class="field-error"></small></fieldset>
         <input name="active" type="hidden" value="${editing?.active === false ? 'false' : 'true'}" />
       </div>
-      <footer><button class="button button-secondary" type="button" data-service-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar servico'}</span></button></footer>
+      <footer><button class="button button-secondary" type="button" data-service-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar serviço'}</span></button></footer>
     </form>
   </dialog>` : ''}
-  ${deleting ? `<dialog id="delete-service-dialog" class="confirmation-dialog" aria-labelledby="delete-service-title" aria-describedby="delete-service-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-service-title">Excluir servico?</h2><p id="delete-service-description">O servico <strong>${escapeHtml(deleting.name)}</strong> sera removido do catalogo e nao aparecera em novos agendamentos. Os agendamentos ja cadastrados serao preservados.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-service-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-service-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir servico</span></button></div></dialog>` : ''}`;
+  ${deleting ? `<dialog id="delete-service-dialog" class="confirmation-dialog" aria-labelledby="delete-service-title" aria-describedby="delete-service-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-service-title">Excluir serviço?</h2><p id="delete-service-description">O serviço <strong>${escapeHtml(deleting.name)}</strong> será removido do catalogo e não aparecera em novos agendamentos. Os agendamentos já cadastrados serão preservados.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-service-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-service-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir serviço</span></button></div></dialog>` : ''}`;
 }
 
 function scheduleSettingsView() {
@@ -1945,7 +1945,7 @@ function scheduleSettingsView() {
     const afternoon = rule?.afternoonQuota ?? selected.meiAfternoonQuota;
     return `<div class="schedule-rule-row schedule-mei-rule-row ${rule ? 'is-active' : ''}" data-mei-day-row="${day.id}">
       <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="meiQuotaWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
-      <div class="number-with-unit"><input aria-label="Cota da manha de ${day.label}" name="meiMorningQuota-${day.id}" type="number" min="0" max="100" step="1" value="${morning}" ${rule ? '' : 'disabled'} /><span>manha</span></div>
+      <div class="number-with-unit"><input aria-label="Cota da manhã de ${day.label}" name="meiMorningQuota-${day.id}" type="number" min="0" max="100" step="1" value="${morning}" ${rule ? '' : 'disabled'} /><span>manhã</span></div>
       <div class="number-with-unit"><input aria-label="Cota da tarde de ${day.label}" name="meiAfternoonQuota-${day.id}" type="number" min="0" max="100" step="1" value="${afternoon}" ${rule ? '' : 'disabled'} /><span>tarde</span></div>
       <strong class="schedule-rule-total" data-mei-day-total>${morning + afternoon} total</strong>
     </div>`;
@@ -1954,7 +1954,7 @@ function scheduleSettingsView() {
     const rule = selected.storeHoursRules.find((item) => item.weekday === day.id);
     return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-store-hours-row="${day.id}">
       <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="storeHoursWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
-      <input aria-label="Inicio de ${day.label}" name="storeOpeningTime-${day.id}" type="time" value="${rule?.openingTime || selected.openingTime}" ${rule ? '' : 'disabled'} />
+      <input aria-label="Início de ${day.label}" name="storeOpeningTime-${day.id}" type="time" value="${rule?.openingTime || selected.openingTime}" ${rule ? '' : 'disabled'} />
       <input aria-label="Fim de ${day.label}" name="storeClosingTime-${day.id}" type="time" value="${rule?.closingTime || selected.closingTime}" ${rule ? '' : 'disabled'} />
     </div>`;
   }).join('');
@@ -1962,7 +1962,7 @@ function scheduleSettingsView() {
     const rule = selected.ophthalmologyHoursRules.find((item) => item.weekday === day.id);
     return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-ophthalmology-hours-row="${day.id}">
       <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="ophthalmologyWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
-      <input aria-label="Inicio do oftalmologista em ${day.label}" name="ophthalmologyOpeningTime-${day.id}" type="time" value="${rule?.openingTime || selected.ophthalmologyOpeningTime}" ${rule ? '' : 'disabled'} />
+      <input aria-label="Início do oftalmologista em ${day.label}" name="ophthalmologyOpeningTime-${day.id}" type="time" value="${rule?.openingTime || selected.ophthalmologyOpeningTime}" ${rule ? '' : 'disabled'} />
       <input aria-label="Fim do oftalmologista em ${day.label}" name="ophthalmologyClosingTime-${day.id}" type="time" value="${rule?.closingTime || selected.ophthalmologyClosingTime}" ${rule ? '' : 'disabled'} />
     </div>`;
   }).join('');
@@ -1970,19 +1970,19 @@ function scheduleSettingsView() {
     const rule = selected.transportHoursRules.find((item) => item.weekday === day.id);
     return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-transport-hours-row="${day.id}">
       <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="transportWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
-      <input aria-label="Inicio do transporte em ${day.label}" name="transportOpeningTime-${day.id}" type="time" value="${rule?.openingTime || '08:00'}" ${rule ? '' : 'disabled'} />
+      <input aria-label="Início do transporte em ${day.label}" name="transportOpeningTime-${day.id}" type="time" value="${rule?.openingTime || '08:00'}" ${rule ? '' : 'disabled'} />
       <input aria-label="Fim do transporte em ${day.label}" name="transportClosingTime-${day.id}" type="time" value="${rule?.closingTime || '18:00'}" ${rule ? '' : 'disabled'} />
     </div>`;
   }).join('');
 
   return `<section class="settings-layout">
       <form id="schedule-settings-form" class="settings-form" novalidate>
-        <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configuracoes da agenda</strong><span>As alteracoes valem para novos pre-agendamentos.</span></div></div>
+        <div class="filter-title"><i data-lucide="calendar-days"></i><div><strong>Configurações da agenda</strong><span>As alterações valem para novos pré-agendamentos.</span></div></div>
         <div class="field"><label for="settings-store">Loja</label><select id="settings-store" name="storeId">${storeOptions}</select></div>
         <div class="schedule-config-grid">
           <div class="schedule-config-launch">
             <span class="schedule-config-launch-icon"><i data-lucide="calendar-days"></i></span>
-            <span><strong>Configuracoes gerais</strong><small data-general-schedule-summary>${selected.schedulingMode === 'free' ? 'Cadastro livre' : `${selected.storeHoursRules.length} ${selected.storeHoursRules.length === 1 ? 'dia aberto' : 'dias abertos'}`}</small></span>
+            <span><strong>Configurações gerais</strong><small data-general-schedule-summary>${selected.schedulingMode === 'free' ? 'Cadastro livre' : `${selected.storeHoursRules.length} ${selected.storeHoursRules.length === 1 ? 'dia aberto' : 'dias abertos'}`}</small></span>
             <button class="button button-secondary" type="button" data-general-schedule-open><i data-lucide="wrench"></i><span>Configurar agenda</span></button>
           </div>
           <div class="schedule-config-launch">
@@ -1997,7 +1997,7 @@ function scheduleSettingsView() {
           </div>
           <div class="schedule-config-launch">
             <span class="schedule-config-launch-icon"><i data-lucide="stethoscope"></i></span>
-            <span><strong>Atendimento oftalmologico</strong><small data-ophthalmology-summary>${selected.ophthalmologyRoutingEnabled ? `${selected.ophthalmologyWeekdays.length} ${selected.ophthalmologyWeekdays.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
+            <span><strong>Atendimento oftalmológico</strong><small data-ophthalmology-summary>${selected.ophthalmologyRoutingEnabled ? `${selected.ophthalmologyWeekdays.length} ${selected.ophthalmologyWeekdays.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
             <button class="button button-secondary" type="button" data-ophthalmology-open><i data-lucide="wrench"></i><span>Configurar triagem</span></button>
           </div>
           <div class="schedule-config-launch">
@@ -2012,33 +2012,33 @@ function scheduleSettingsView() {
           </div>
         </div>
         <dialog id="general-schedule-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="general-schedule-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="general-schedule-title">Configuracoes gerais</h2><p>Defina a disponibilidade e as regras gerais da agenda.</p></div><button class="icon-button" type="button" data-general-schedule-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="general-schedule-title">Configurações gerais</h2><p>Defina a disponibilidade e as regras gerais da agenda.</p></div><button class="icon-button" type="button" data-general-schedule-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body general-schedule-dialog-body">
-            <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horarios</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
+            <div class="field" data-field="schedulingMode"><label for="settings-mode">Disponibilidade</label><select id="settings-mode" name="schedulingMode"><option value="controlled" ${selected.schedulingMode === 'controlled' ? 'selected' : ''}>Controlada por horários</option><option value="free" ${selected.schedulingMode === 'free' ? 'selected' : ''}>Cadastro livre</option></select><small class="field-error"></small></div>
             <div class="schedule-settings-fields ${selected.schedulingMode === 'free' ? 'is-disabled' : ''}">
               <input name="openingTime" type="hidden" value="${selected.openingTime}" />
               <input name="closingTime" type="hidden" value="${selected.closingTime}" />
               <input name="storeHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.storeHoursRules))}" />
-              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="storeHoursRules"><legend>Funcionamento da loja</legend><small>Ative os dias de funcionamento e defina o expediente de cada um.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Inicio</span><span>Fim</span></div><div class="schedule-rule-list">${storeHoursRuleRows}</div><small class="field-error"></small></fieldset>
+              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="storeHoursRules"><legend>Funcionamento da loja</legend><small>Ative os dias de funcionamento e defina o expediente de cada um.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${storeHoursRuleRows}</div><small class="field-error"></small></fieldset>
             </div>
             <div class="schedule-follow-up-times">
-              <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Alertar atraso apos</label><small id="settings-no-show-help" class="field-help">Libera o retorno para perguntar se o cliente esta a caminho.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
-              <div class="field schedule-grace-field" data-field="rescheduleAfterMinutes"><label for="settings-reschedule-after">Sugerir reagendamento apos</label><small id="settings-reschedule-help" class="field-help">Muda o retorno e a mensagem para oferecer uma nova data.</small><div class="number-with-unit"><input id="settings-reschedule-after" name="rescheduleAfterMinutes" type="number" min="1" max="1440" step="5" value="${selected.rescheduleAfterMinutes}" aria-describedby="settings-reschedule-help" /><span>min</span></div><small class="field-error"></small></div>
+              <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Alertar atraso após</label><small id="settings-no-show-help" class="field-help">Libera o retorno para perguntar se o cliente está a caminho.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
+              <div class="field schedule-grace-field" data-field="rescheduleAfterMinutes"><label for="settings-reschedule-after">Sugerir reagendamento após</label><small id="settings-reschedule-help" class="field-help">Muda o retorno e a mensagem para oferecer uma nova data.</small><div class="number-with-unit"><input id="settings-reschedule-after" name="rescheduleAfterMinutes" type="number" min="1" max="1440" step="5" value="${selected.rescheduleAfterMinutes}" aria-describedby="settings-reschedule-help" /><span>min</span></div><small class="field-error"></small></div>
             </div>
             <input name="automaticPendingFollowUp" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-automatic-follow-up">
-              <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmacao depois do alerta de atraso.</small></span>
+              <span><strong>Gerar retorno automaticamente</strong><small>Inclui agendamentos sem confirmação depois do alerta de atraso.</small></span>
               <input id="settings-automatic-follow-up" name="automaticPendingFollowUp" type="checkbox" value="true" ${selected.automaticPendingFollowUp ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
             <input name="showAmetropiaFields" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-show-ametropias">
-              <span><strong>Exibir ametropias no cadastro</strong><small>Mostra estas opcoes nos novos cadastros e agendamentos.</small></span>
+              <span><strong>Exibir ametropias no cadastro</strong><small>Mostra estas opções nos novos cadastros e agendamentos.</small></span>
               <input id="settings-show-ametropias" name="showAmetropiaFields" type="checkbox" value="true" ${selected.showAmetropiaFields ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
           </div>
-          <footer><span>As alteracoes serao salvas com a configuracao da loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-general-schedule-close>Cancelar</button><button class="button button-primary" type="button" data-general-schedule-apply><i data-lucide="check"></i><span>Aplicar configuracoes</span></button></div></footer>
+          <footer><span>As alterações serão salvas com a configuração da loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-general-schedule-close>Cancelar</button><button class="button button-primary" type="button" data-general-schedule-apply><i data-lucide="check"></i><span>Aplicar configurações</span></button></div></footer>
         </dialog>
         <dialog id="limited-days-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="limited-days-title">
           <header><div><span class="eyebrow">AGENDA</span><h2 id="limited-days-title">Limite de vagas</h2><p>Defina os dias e a quantidade maxima de clientes.</p></div><button class="icon-button" type="button" data-limited-days-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
@@ -2046,7 +2046,7 @@ function scheduleSettingsView() {
             <input name="limitedDaysEnabled" type="hidden" value="false" />
             <input name="limitedDayRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.limitedDayRules))}" />
             <label class="setting-toggle checkbox-label" for="settings-limited-days">
-              <span><strong>Limitar vagas em dias especificos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
+              <span><strong>Limitar vagas em dias específicos</strong><small>Define o total de clientes que a loja pode receber nos dias escolhidos.</small></span>
               <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
@@ -2060,27 +2060,27 @@ function scheduleSettingsView() {
           <footer><span>O limite vale para cada dia selecionado.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-limited-days-close>Cancelar</button><button class="button button-primary" type="button" data-limited-days-apply><i data-lucide="check"></i><span>Aplicar limite</span></button></div></footer>
         </dialog>
         <dialog id="mei-quota-dialog" class="role-details-dialog mei-quota-dialog" aria-labelledby="mei-quota-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="mei-quota-title">Cotas do MEI</h2><p>Defina os dias e os limites de agendamento por periodo.</p></div><button class="icon-button" type="button" data-mei-quota-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="mei-quota-title">Cotas do MEI</h2><p>Defina os dias e os limites de agendamento por período.</p></div><button class="icon-button" type="button" data-mei-quota-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="meiQuotaEnabled" type="hidden" value="false" />
             <input name="meiQuotaRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.meiQuotaRules))}" />
             <label class="setting-toggle checkbox-label" for="settings-mei-quota-enabled">
-              <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manha e da tarde.</small></span>
+              <span><strong>Aplicar cotas ao cargo MEI</strong><small>Limita separadamente os agendamentos da manhã e da tarde.</small></span>
               <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
             <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaRules" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
               <legend>Cotas por dia da semana</legend>
-              <small>O periodo e definido pelo horario agendado para o cliente.</small>
+              <small>O período e definido pelo horário agendado para o cliente.</small>
               <div class="schedule-rule-list">${meiQuotaRuleRows}</div>
               <small class="field-error"></small>
-              <small>Manha: antes das 12:00. Tarde: a partir das 12:00.</small>
+              <small>Manhã: antes das 12:00. Tarde: a partir das 12:00.</small>
             </fieldset>
           </div>
           <footer><span>As cotas sao individuais para cada MEI.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-mei-quota-close>Cancelar</button><button class="button button-primary" type="button" data-mei-quota-apply><i data-lucide="check"></i><span>Aplicar cotas</span></button></div></footer>
         </dialog>
         <dialog id="ophthalmology-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="ophthalmology-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Atendimento oftalmologico</h2><p>Defina quando a triagem deve encaminhar o cliente ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Atendimento oftalmológico</h2><p>Defina quando a triagem deve encaminhar o cliente ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="ophthalmologyRoutingEnabled" type="hidden" value="false" />
             <input name="ophthalmologyWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyWeekdays))}" />
@@ -2092,36 +2092,36 @@ function scheduleSettingsView() {
             <label class="setting-toggle checkbox-label" for="settings-ophthalmology-enabled"><span><strong>Ativar triagem para oftalmologista</strong><small>Catarata informada na patologia ou na cirurgia direciona para esta agenda.</small></span><input id="settings-ophthalmology-enabled" name="ophthalmologyRoutingEnabled" type="checkbox" value="true" ${selected.ophthalmologyRoutingEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
             <div class="ophthalmology-settings ${selected.ophthalmologyRoutingEnabled ? '' : 'is-disabled'}" data-ophthalmology-fields>
               <div class="field" data-field="ophthalmologyMinimumAge"><label for="settings-ophthalmology-age">Perguntar sobre cirurgia a partir de</label><div class="number-with-unit"><input id="settings-ophthalmology-age" name="ophthalmologyMinimumAge" type="number" min="0" max="120" step="1" value="${selected.ophthalmologyMinimumAge}" /><span>anos</span></div><small class="field-error"></small></div>
-              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="ophthalmologyHoursRules"><legend>Escala do oftalmologista</legend><small>Ative os dias e defina o horario especifico de cada atendimento.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Inicio</span><span>Fim</span></div><div class="schedule-rule-list">${ophthalmologyHoursRuleRows}</div><small class="field-error"></small></fieldset>
+              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="ophthalmologyHoursRules"><legend>Escala do oftalmologista</legend><small>Ative os dias e defina o horário específico de cada atendimento.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${ophthalmologyHoursRuleRows}</div><small class="field-error"></small></fieldset>
               <div class="notice notice-info ophthalmology-criteria"><i data-lucide="info"></i><span>Critérios iniciais: patologia Catarata ou cirurgia de Catarata. Novos critérios podem ser adicionados depois.</span></div>
             </div>
           </div>
-          <footer><span>A configuracao vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar triagem</span></button></div></footer>
+          <footer><span>A configuração vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar triagem</span></button></div></footer>
         </dialog>
         <dialog id="transport-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="transport-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="transport-title">Transporte</h2><p>Defina os dias e horarios em que a loja oferece transporte.</p></div><button class="icon-button" type="button" data-transport-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="transport-title">Transporte</h2><p>Defina os dias e horários em que a loja oferece transporte.</p></div><button class="icon-button" type="button" data-transport-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="transportEnabled" type="hidden" value="false" />
             <input name="transportHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.transportHoursRules))}" />
-            <label class="setting-toggle checkbox-label" for="settings-transport-enabled"><span><strong>Disponibilizar transporte</strong><small>Permite registrar clientes e acompanhantes que precisam do veiculo.</small></span><input id="settings-transport-enabled" name="transportEnabled" type="checkbox" value="true" ${selected.transportEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
-            <fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte esta disponivel.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Inicio</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
+            <label class="setting-toggle checkbox-label" for="settings-transport-enabled"><span><strong>Disponibilizar transporte</strong><small>Permite registrar clientes e acompanhantes que precisam do veículo.</small></span><input id="settings-transport-enabled" name="transportEnabled" type="checkbox" value="true" ${selected.transportEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
+            <fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte está disponível.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
           </div>
-          <footer><span>Nao define viagens nem fechamento do veiculo.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-transport-close>Cancelar</button><button class="button button-primary" type="button" data-transport-apply><i data-lucide="check"></i><span>Aplicar transporte</span></button></div></footer>
+          <footer><span>Não define viagens nem fechamento do veículo.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-transport-close>Cancelar</button><button class="button button-primary" type="button" data-transport-apply><i data-lucide="check"></i><span>Aplicar transporte</span></button></div></footer>
         </dialog>
         <dialog id="offline-capture-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="offline-capture-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="offline-capture-title">Cadastro offline</h2><p>Controle se a equipe pode cadastrar leads sem conexao nesta loja.</p></div><button class="icon-button" type="button" data-offline-capture-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="offline-capture-title">Cadastro offline</h2><p>Controle se a equipe pode cadastrar leads sem conexão nesta loja.</p></div><button class="icon-button" type="button" data-offline-capture-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <input name="offlineCaptureEnabled" type="hidden" value="false" />
             <label class="setting-toggle checkbox-label" for="settings-offline-capture-enabled">
-              <span><strong>Permitir cadastros sem internet</strong><small>Quando ativo, somente os dados do lead podem ser salvos offline. Data e horario continuam bloqueados.</small></span>
+              <span><strong>Permitir cadastros sem internet</strong><small>Quando ativo, somente os dados do lead podem ser salvos offline. Data e horário continuam bloqueados.</small></span>
               <input id="settings-offline-capture-enabled" name="offlineCaptureEnabled" type="checkbox" value="true" ${selected.offlineCaptureEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <div class="notice notice-info"><i data-lucide="info"></i><span>Os cadastros offline aparecem em Meus cadastros e sincronizam automaticamente. Ao desativar, novos cadastros passam a exigir conexao; registros pendentes nao sao apagados.</span></div>
+            <div class="notice notice-info"><i data-lucide="info"></i><span>Os cadastros offline aparecem em Meus cadastros e sincronizam automaticamente. Ao desativar, novos cadastros passam a exigir conexão; registros pendentes não sao apagados.</span></div>
           </div>
-          <footer><span>O recurso permanece desativado por padrao.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-offline-capture-close>Cancelar</button><button class="button button-primary" type="button" data-offline-capture-apply><i data-lucide="check"></i><span>Aplicar configuracao</span></button></div></footer>
+          <footer><span>O recurso permanece desativado por padrão.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-offline-capture-close>Cancelar</button><button class="button button-primary" type="button" data-offline-capture-apply><i data-lucide="check"></i><span>Aplicar configuração</span></button></div></footer>
         </dialog>
-        <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuracao'}</span></button>
+        <button class="button button-primary button-block" type="submit" ${loading || saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar configuração'}</span></button>
       </form>
     </section>`;
 }
@@ -2138,12 +2138,12 @@ function roleProfilesSettingsView() {
   const editorPermissionLayout = `<div class="role-details-column">${editorPermissionGroups[0]}${editorPermissionGroups[2]}</div><div class="role-details-column">${editorPermissionGroups[1]}</div>`;
   const rows = roleProfiles.map((profile) => `<article class="service-catalog-row role-catalog-row ${editingRoleId === profile.id ? 'is-editing' : ''}">
     <span class="service-catalog-icon"><i data-lucide="shield-check"></i></span>
-    <button class="role-catalog-name" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissoes do perfil ${escapeHtml(profile.name)}"><strong>${escapeHtml(profile.name)}</strong><span>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados proprios'}</span></button>
-    <div class="service-catalog-duration role-catalog-permissions"><span>Permissoes</span><strong>${profile.permissions.length} ativa(s)</strong></div>
-    <span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrao ajustado' : 'Padrao' : 'Personalizado'}</span>
+    <button class="role-catalog-name" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissões do perfil ${escapeHtml(profile.name)}"><strong>${escapeHtml(profile.name)}</strong><span>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados próprios'}</span></button>
+    <div class="service-catalog-duration role-catalog-permissions"><span>Permissões</span><strong>${profile.permissions.length} ativa(s)</strong></div>
+    <span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrão ajustado' : 'Padrão' : 'Personalizado'}</span>
     <div class="service-catalog-actions role-catalog-actions">
       ${profile.system
-        ? `<button class="icon-button" type="button" data-role-details="${escapeHtml(profile.id)}" title="${profile.baseRole === 'admin' ? 'Visualizar permissoes' : 'Configurar permissoes'}" ${saving ? 'disabled' : ''}><i data-lucide="${profile.baseRole === 'admin' ? 'eye' : 'pencil'}"></i></button>`
+        ? `<button class="icon-button" type="button" data-role-details="${escapeHtml(profile.id)}" title="${profile.baseRole === 'admin' ? 'Visualizar permissões' : 'Configurar permissões'}" ${saving ? 'disabled' : ''}><i data-lucide="${profile.baseRole === 'admin' ? 'eye' : 'pencil'}"></i></button>`
         : `<button class="icon-button" type="button" data-role-edit="${escapeHtml(profile.id)}" title="Editar cargo" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button><button class="icon-button role-delete-button" type="button" data-role-delete="${escapeHtml(profile.id)}" title="Excluir cargo" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>`}
     </div>
   </article>`).join('');
@@ -2164,28 +2164,28 @@ function roleProfilesSettingsView() {
     : '';
 
   return `<section class="service-catalog-panel role-catalog-panel">
-    <div class="service-catalog-heading"><div><span class="eyebrow">EQUIPE</span><h2>Cargos cadastrados</h2><p>Defina o alcance e as permissoes de cada cargo da equipe.</p></div><button class="button button-primary" type="button" data-role-new><i data-lucide="circle-plus"></i><span>Adicionar cargo</span></button></div>
+    <div class="service-catalog-heading"><div><span class="eyebrow">EQUIPE</span><h2>Cargos cadastrados</h2><p>Defina o alcance e as permissões de cada cargo da equipe.</p></div><button class="button button-primary" type="button" data-role-new><i data-lucide="circle-plus"></i><span>Adicionar cargo</span></button></div>
     <div class="service-catalog-list role-catalog-list">${rows}</div>
   </section>
   ${roleEditorOpen ? `<dialog id="role-editor-dialog" class="role-details-dialog role-editor-dialog" aria-labelledby="role-editor-title">
     <form id="role-profile-form" class="role-editor-form" novalidate>
-      <header><div><span class="eyebrow">CARGO DA EQUIPE</span><h2 id="role-editor-title">${editingRoleId ? 'Editar cargo' : 'Novo cargo'}</h2><p>Configure individualmente o que este cargo podera acessar.</p></div><button class="icon-button" type="button" data-role-cancel aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <header><div><span class="eyebrow">CARGO DA EQUIPE</span><h2 id="role-editor-title">${editingRoleId ? 'Editar cargo' : 'Novo cargo'}</h2><p>Configure individualmente o que este cargo poderá acessar.</p></div><button class="icon-button" type="button" data-role-cancel aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
       <div class="role-editor-content">
         <div class="role-editor-basics">
           <div class="field" data-field="name"><label for="role-profile-name">Nome do cargo</label><input id="role-profile-name" name="name" maxlength="60" value="${escapeHtml(roleDraft.name)}" placeholder="Ex.: Supervisor de atendimento" required /><small class="field-error"></small></div>
           <div class="field" data-field="scope"><label for="role-profile-scope">Alcance dos dados</label><select id="role-profile-scope" name="scope">${scopeOptions}</select><small class="field-error"></small></div>
         </div>
-        <div class="role-permissions-heading"><strong>Permissoes</strong><span>As opcoes indisponiveis nao pertencem ao alcance selecionado.</span></div>
+        <div class="role-permissions-heading"><strong>Permissões</strong><span>As opções indisponíveis não pertencem ao alcance selecionado.</span></div>
         <div class="role-details-body role-editor-permissions-body" data-field="permissions">${editorPermissionLayout}<small class="field-error"></small></div>
       </div>
-      <footer><span><strong data-role-editor-count>${roleDraft.permissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-role-cancel>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alteracoes' : 'Criar cargo'}</span></button></div></footer>
+      <footer><span><strong data-role-editor-count>${roleDraft.permissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissões ativadas</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-role-cancel>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingRoleId ? 'Salvar alterações' : 'Criar cargo'}</span></button></div></footer>
     </form>
   </dialog>` : ''}
-  ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir cargo?</h2><p id="delete-role-description">O cargo <strong>${escapeHtml(deleting.name)}</strong> sera removido. A exclusao so sera permitida se nenhuma pessoa estiver usando este cargo.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir cargo</button></div></dialog>` : ''}
+  ${deleting ? `<dialog id="delete-role-dialog" class="confirmation-dialog" aria-labelledby="delete-role-title" aria-describedby="delete-role-description"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-role-title">Excluir cargo?</h2><p id="delete-role-description">O cargo <strong>${escapeHtml(deleting.name)}</strong> será removido. A exclusão só será permitida se nenhuma pessoa estiver usando este cargo.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-role-delete-cancel>Cancelar</button><button class="button button-danger" type="button" data-role-delete-confirm="${escapeHtml(deleting.id)}" ${saving ? 'disabled' : ''}>Excluir cargo</button></div></dialog>` : ''}
   ${detailsProfile ? `<dialog id="role-details-dialog" class="role-details-dialog" aria-labelledby="role-details-title">
-    <header><div><span class="eyebrow">PERFIL DE ACESSO</span><h2 id="role-details-title">${escapeHtml(detailsProfile.name)}</h2><p>${detailsProfile.scope === 'admin' ? 'Acesso completo ao sistema' : detailsProfile.scope === 'stores' ? 'Acesso limitado as unidades permitidas' : 'Acesso aos proprios dados'}</p></div><button class="icon-button" type="button" data-role-details-close title="Fechar" aria-label="Fechar permissoes"><i data-lucide="circle-x"></i></button></header>
+    <header><div><span class="eyebrow">PERFIL DE ACESSO</span><h2 id="role-details-title">${escapeHtml(detailsProfile.name)}</h2><p>${detailsProfile.scope === 'admin' ? 'Acesso completo ao sistema' : detailsProfile.scope === 'stores' ? 'Acesso limitado às unidades permitidas' : 'Acesso aos próprios dados'}</p></div><button class="icon-button" type="button" data-role-details-close title="Fechar" aria-label="Fechar permissões"><i data-lucide="circle-x"></i></button></header>
     <div class="role-details-body">${detailGroupsLayout}</div>
-    <footer><span><strong data-role-details-count>${activeDetailPermissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissoes ativadas</span><div class="role-details-actions">${detailsEditable ? `<button class="button button-secondary" type="button" data-system-role-reset="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Restaurar padrao</span></button><button class="button button-secondary" type="button" data-role-details-close>Cancelar</button><button class="button button-primary" type="button" data-system-role-save="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar permissoes'}</span></button>` : '<button class="button button-primary" type="button" data-role-details-close>Concluir</button>'}</div></footer>
+    <footer><span><strong data-role-details-count>${activeDetailPermissions.length}</strong> de ${PERMISSION_GROUPS.flatMap((group) => group.permissions).length} permissões ativadas</span><div class="role-details-actions">${detailsEditable ? `<button class="button button-secondary" type="button" data-system-role-reset="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Restaurar padrão</span></button><button class="button button-secondary" type="button" data-role-details-close>Cancelar</button><button class="button button-primary" type="button" data-system-role-save="${escapeHtml(detailsProfile.id)}" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : 'Salvar permissões'}</span></button>` : '<button class="button button-primary" type="button" data-role-details-close>Concluir</button>'}</div></footer>
   </dialog>` : ''}`;
 }
 
@@ -2213,7 +2213,7 @@ function accessView() {
       </div>
       <div class="access-detail"><span>Perfil</span><strong>${escapeHtml(roleProfileLabel(access))}</strong></div>
       <div class="access-detail access-permissions"><span>Unidades</span><strong title="${escapeHtml(storeSummary.full)}">${escapeHtml(storeSummary.short)}</strong></div>
-      <div class="access-detail"><span>Codigo SavWin</span><strong>${escapeHtml(access.savwinCode || 'Nao informado')}</strong></div>
+      <div class="access-detail"><span>Código SavWin</span><strong>${escapeHtml(access.savwinCode || 'Não informado')}</strong></div>
       <div class="access-status"><span class="status-badge status-${access.active ? 'success' : 'danger'}">${access.active ? 'Ativo' : 'Bloqueado'}</span><small>Primeiro acesso: ${access.hasLoggedIn ? 'realizado' : 'pendente'}</small></div>
       <div class="access-actions">
         <button class="icon-button" type="button" data-access-edit="${escapeHtml(access.email)}" title="Editar acesso" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
@@ -2227,7 +2227,7 @@ function accessView() {
 
   return `
     <section class="page-toolbar">
-      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestao</span></button>
+      <button class="back-link" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button>
       <button class="button button-primary" type="button" data-access-new><i data-lucide="user-plus"></i><span>Novo acesso</span></button>
     </section>
     <section class="access-list-panel" aria-busy="${loading}">
@@ -2238,21 +2238,21 @@ function accessView() {
     </section>
     ${state.access.editorOpen ? `<dialog id="access-editor-dialog" class="access-editor-dialog" aria-labelledby="access-editor-title">
       <form id="access-form" class="access-form" novalidate>
-        <header><div><span class="eyebrow">ACESSO DA EQUIPE</span><h2 id="access-editor-title">${editingAccess ? 'Editar acesso' : 'Novo acesso'}</h2><p>${editingAccess ? 'Atualize os dados e permissoes desta pessoa.' : 'Cadastre os dados usados para entrar no FascinLead.'}</p></div><button class="icon-button" type="button" data-access-editor-close title="Fechar" aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+        <header><div><span class="eyebrow">ACESSO DA EQUIPE</span><h2 id="access-editor-title">${editingAccess ? 'Editar acesso' : 'Novo acesso'}</h2><p>${editingAccess ? 'Atualize os dados e permissões desta pessoa.' : 'Cadastre os dados usados para entrar no FascinLead.'}</p></div><button class="icon-button" type="button" data-access-editor-close title="Fechar" aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
         <div class="access-form-body">
           <div class="field access-field-wide" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" value="${escapeHtml(editingAccess?.displayName || '')}" required /><small class="field-error"></small></div>
           <div class="field access-field-wide" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(editingAccess?.email || '')}" placeholder="nome@exemplo.com" ${editingAccess ? 'readonly' : ''} required /><small class="field-error"></small></div>
-          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" value="${DEFAULT_TEAM_PASSWORD}" readonly required /><small data-access-password-help>Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.</small><small class="field-error"></small></div>`}
+          ${editingAccess ? '' : `<div class="field access-field-wide" data-field="password"><label for="access-password">Senha inicial</label><input id="access-password" name="password" type="text" minlength="6" maxlength="72" autocomplete="new-password" value="${DEFAULT_TEAM_PASSWORD}" readonly required /><small data-access-password-help>Senha padrão para o primeiro acesso. A pessoa poderá alterá-la depois.</small><small class="field-error"></small></div>`}
           <div class="field" data-field="role"><label for="access-role-profile">Perfil / cargo</label><select id="access-role-profile" name="roleProfileId" required>${roleProfileOptions}</select><small class="field-error"></small></div>
           <div class="field" data-field="phone"><label for="access-phone">Telefone</label><input id="access-phone" name="phone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" value="${escapeHtml(formatBrazilianPhone(editingAccess?.phone || ''))}" placeholder="(81) 99999-9999" required /><small class="field-error"></small></div>
           <div id="access-primary-store-field" class="field" data-field="storeId"><label for="access-store">Unidade principal</label><select id="access-store" name="storeId" required>${storeOptions}</select><small class="field-error"></small></div>
-          <div class="field" data-field="savwinCode"><label for="access-savwin-code">Codigo SavWin</label><input id="access-savwin-code" name="savwinCode" maxlength="30" value="${escapeHtml(editingAccess?.savwinCode || '')}" placeholder="Opcional" /><small class="field-error"></small></div>
+          <div class="field" data-field="savwinCode"><label for="access-savwin-code">Código SavWin</label><input id="access-savwin-code" name="savwinCode" maxlength="30" value="${escapeHtml(editingAccess?.savwinCode || '')}" placeholder="Opcional" /><small class="field-error"></small></div>
           <fieldset id="access-stores-field" class="field access-store-picker access-field-wide" data-field="storeIds" hidden><legend>Unidades permitidas</legend><div>${storeChecks}</div><small class="field-error"></small></fieldset>
         </div>
-        <footer><button class="button button-secondary" type="button" data-access-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingAccess ? 'Salvar alteracoes' : 'Criar acesso'}</span></button></footer>
+        <footer><button class="button button-secondary" type="button" data-access-editor-close>Cancelar</button><button class="button button-primary" type="submit" ${saving ? 'disabled' : ''}><i data-lucide="save"></i><span>${saving ? 'Salvando...' : editingAccess ? 'Salvar alterações' : 'Criar acesso'}</span></button></footer>
       </form>
     </dialog>` : ''}
-    ${deletingAccess ? `<dialog id="delete-access-dialog" class="confirmation-dialog" aria-labelledby="delete-access-title"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-access-title">Excluir acesso?</h2><p>O acesso de <strong>${escapeHtml(deletingAccess.displayName)}</strong> sera removido. O historico de leads e atividades sera preservado.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-access-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-access-delete-confirm="${escapeHtml(deletingAccess.email)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir acesso</span></button></div></dialog>` : ''}`;
+    ${deletingAccess ? `<dialog id="delete-access-dialog" class="confirmation-dialog" aria-labelledby="delete-access-title"><div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div><h2 id="delete-access-title">Excluir acesso?</h2><p>O acesso de <strong>${escapeHtml(deletingAccess.displayName)}</strong> será removido. O histórico de leads e atividades será preservado.</p><div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-access-delete-cancel>Cancelar</button><button class="button button-danger-solid" type="button" data-access-delete-confirm="${escapeHtml(deletingAccess.email)}" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i><span>Excluir acesso</span></button></div></dialog>` : ''}`;
 }
 
 function goalStatus(goal) {
@@ -2334,16 +2334,16 @@ function goalsView() {
           <div class="goal-card-footer"><span>${formatGoalDate(group.startDate)} a ${formatGoalDate(group.endDate)} · ${escapeHtml(storeLabel(group.storeId))}</span><strong>${group.remaining ? `${group.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
         </article>`;
       }).join('')
-    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captacao para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
+    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captação para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
 
   const creator = goalManagerView && editorOpen ? `<dialog id="goal-editor-dialog" class="access-editor-dialog goal-editor-dialog" aria-labelledby="goal-editor-title">
     <form id="goal-form" class="goal-form ${duplicatingGroupId ? 'is-duplicating' : ''}" novalidate>
-      <header><div><span class="eyebrow">META DA EQUIPE</span><h2 id="goal-editor-title">${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</h2><p>${duplicatingGroupId ? 'Revise os dados da copia antes de criar.' : 'Defina a quantidade de leads por colaborador no periodo.'}</p></div><button class="icon-button" type="button" data-cancel-goal-edit aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+      <header><div><span class="eyebrow">META DA EQUIPE</span><h2 id="goal-editor-title">${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</h2><p>${duplicatingGroupId ? 'Revise os dados da cópia antes de criar.' : 'Defina a quantidade de leads por colaborador no período.'}</p></div><button class="icon-button" type="button" data-cancel-goal-edit aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
       <div class="goal-editor-body">
-        <div class="field" data-field="title"><label for="goal-title">Titulo</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
+        <div class="field" data-field="title"><label for="goal-title">Título</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
         <div class="goal-form-grid">
           <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
-          <div class="field" data-field="startDate"><label for="goal-start">Inicio</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
+          <div class="field" data-field="startDate"><label for="goal-start">Início</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
           <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
         </div>
         <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin() || goalStores.length > 1
@@ -2351,22 +2351,22 @@ function goalsView() {
           : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
         <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span data-goal-selected-count>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
       </div>
-      <footer><button class="button button-secondary" type="button" data-cancel-goal-edit>Cancelar</button><button class="button button-primary" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alteracoes' : duplicatingGroupId ? 'Criar copia' : 'Criar metas'}</span></button></footer>
+      <footer><button class="button button-secondary" type="button" data-cancel-goal-edit>Cancelar</button><button class="button button-primary" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alterações' : duplicatingGroupId ? 'Criar cópia' : 'Criar metas'}</span></button></footer>
     </form>
   </dialog>` : '';
   const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
       <div><span>Metas</span><strong>${groups.length}</strong></div>
       <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
-      <div><span>Captacoes contabilizadas</span><strong>${totalCaptured}</strong></div>
+      <div><span>Captações contabilizadas</span><strong>${totalCaptured}</strong></div>
     </section>`;
   const results = `<section class="goals-results" aria-busy="${loading}">
-      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Objetivos atribuidos'}</strong><span>${groups.length} meta(s)</span></div></div>
+      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Objetivos atribuídos'}</strong><span>${groups.length} meta(s)</span></div></div>
       ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
     </section>`;
 
   return `
     ${goalManagerView ? `<section class="service-catalog-heading goals-heading">
-      <div><span class="eyebrow">METAS</span><h2>${goalManagerView ? 'Metas da equipe' : 'Minhas metas'}</h2><p>${goalManagerView ? 'Defina objetivos de captacao e acompanhe o desempenho da equipe.' : 'Acompanhe seus objetivos e o progresso das captacoes.'}</p></div>
+      <div><span class="eyebrow">METAS</span><h2>${goalManagerView ? 'Metas da equipe' : 'Minhas metas'}</h2><p>${goalManagerView ? 'Defina objetivos de captação e acompanhe o desempenho da equipe.' : 'Acompanhe seus objetivos e o progresso das captações.'}</p></div>
       <div class="goals-heading-actions"><button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>${goalManagerView ? '<button class="button button-primary" type="button" data-goal-new><i data-lucide="circle-plus"></i><span>Nova meta</span></button>' : ''}</div>
     </section>` : ''}
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
@@ -2376,19 +2376,19 @@ function goalsView() {
       : `<section class="personal-goals">${metrics}${results}</section>`}
     ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
       <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
-      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta &ldquo;${escapeHtml(selectedGroup.title)}&rdquo; sera removida de ${selectedGroup.goals.length} colaborador(es). As captacoes permanecem intactas.</p></div>
+      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta &ldquo;${escapeHtml(selectedGroup.title)}&rdquo; será removida de ${selectedGroup.goals.length} colaborador(es). As captações permanecem intactas.</p></div>
       <div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-close-goal-dialog>Cancelar</button><button class="button button-danger-solid" type="button" data-confirm-delete-goal="${escapeHtml(selectedGroup.id)}"><i data-lucide="trash-2"></i><span>Excluir meta</span></button></div>
     </dialog>` : ''}`;
 }
 
 function bottomNav() {
-  const items = [['home', 'house', 'Inicio']];
+  const items = [['home', 'house', 'Início']];
   if (hasAccess('leads.create')) items.push(['new', 'circle-plus', 'Novo']);
   if (hasAccess('leads.view_own')) items.push(['leads', 'clipboard-list', 'Cadastros']);
   if (hasAccess('followups.own') && !hasAccess('followups.team')) items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
-  if (canManage()) items.push(['management', 'bar-chart-3', 'Gestao']);
+  if (canManage()) items.push(['management', 'bar-chart-3', 'Gestão']);
   const followUpCount = pendingFollowUps().length;
-  return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegacao principal">${items.map(([route, icon, label]) => `
+  return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegação principal">${items.map(([route, icon, label]) => `
     <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
@@ -2431,7 +2431,7 @@ function render() {
   if (state.updateAction) {
     root.insertAdjacentHTML('beforeend', `<aside class="update-banner" role="status">
       <i data-lucide="download"></i>
-      <span>Nova versao disponivel.</span>
+      <span>Nova versão disponível.</span>
       <button class="button button-primary" type="button" data-action="update-app">Atualizar agora</button>
     </aside>`);
   }
@@ -2478,7 +2478,7 @@ function handleConnectivityChange() {
     notice.hidden = online;
     notice.querySelector('span').textContent = blocked
       ? 'Cadastro offline desativado. Reconecte-se antes de salvar este cadastro.'
-      : 'Cadastro offline ativo. Os dados do lead serao preservados, mas data e horario so poderao ser escolhidos com internet.';
+      : 'Cadastro offline ativo. Os dados do lead serão preservados, mas data e horário só poderão ser escolhidos com internet.';
   }
   if (!online) {
     state.newLeadSchedule.appointmentDate = '';
@@ -2588,7 +2588,7 @@ function bindPageEvents() {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!navigator.onLine && !state.offlineCapture.enabled) {
-        showToast('O cadastro offline esta desativado. Reconecte-se para salvar.', 'danger', 'wifi-off');
+        showToast('O cadastro offline está desativado. Reconecte-se para salvar.', 'danger', 'wifi-off');
         return;
       }
       const rawValues = leadFormValues(form);
@@ -2617,8 +2617,8 @@ function bindPageEvents() {
         })
           .find((slot) => slot.time === values.appointmentTime);
         if (!selectedSlot?.available) {
-          const field = setFieldErrors(form, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
-          showToast('O horario escolhido nao esta mais disponivel.', 'danger', 'circle-alert');
+          const field = setFieldErrors(form, { appointmentTime: 'Este horário não está mais disponível. Escolha outro.' });
+          showToast('O horário escolhido não está mais disponível.', 'danger', 'circle-alert');
           revealFirstFormError(field);
           startDayAppointmentsSubscription();
           return;
@@ -2632,7 +2632,7 @@ function bindPageEvents() {
       } catch {
         submitButton.disabled = false;
         showToast(
-          navigator.onLine ? 'Nao foi possivel preparar este cadastro.' : 'Nao foi possivel salvar o cadastro neste aparelho.',
+          navigator.onLine ? 'Não foi possível preparar este cadastro.' : 'Não foi possível salvar o cadastro neste aparelho.',
           'danger',
           'circle-alert'
         );
@@ -2650,7 +2650,7 @@ function bindPageEvents() {
           await result.localSavePromise;
         } catch {
           submitButton.disabled = false;
-          showToast('Nao foi possivel salvar o cadastro neste aparelho.', 'danger', 'circle-alert');
+          showToast('Não foi possível salvar o cadastro neste aparelho.', 'danger', 'circle-alert');
           return;
         }
       }
@@ -2660,13 +2660,13 @@ function bindPageEvents() {
         } catch (error) {
           submitButton.disabled = false;
           if (controlledAppointment) {
-            const field = setFieldErrors(form, { appointmentTime: 'Nao foi possivel confirmar este horario. Atualize e escolha novamente.' });
+            const field = setFieldErrors(form, { appointmentTime: 'Não foi possível confirmar este horário. Atualize e escolha novamente.' });
             revealFirstFormError(field);
             startDayAppointmentsSubscription();
           }
           const message = error?.code === 'permission-denied'
-            ? 'O cadastro nao foi aceito pelo servidor. Seus dados foram mantidos; atualize a pagina e tente novamente.'
-            : 'Nao foi possivel salvar o cadastro. Verifique a conexao e tente novamente.';
+            ? 'O cadastro não foi aceito pelo servidor. Seus dados foram mantidos; atualize a página e tente novamente.'
+            : 'Não foi possível salvar o cadastro. Verifique a conexão e tente novamente.';
           showToast(message, 'danger', 'circle-alert');
           return;
         }
@@ -2678,7 +2678,7 @@ function bindPageEvents() {
         ? 'Cadastro salvo somente neste navegador.'
         : navigator.onLine
           ? 'Cadastro salvo com sucesso.'
-          : 'Cadastro salvo neste aparelho. Ele sera sincronizado quando a internet voltar.');
+          : 'Cadastro salvo neste aparelho. Ele será sincronizado quando a internet voltar.');
     });
   }
 
@@ -2701,7 +2701,7 @@ function bindPageEvents() {
     editLeadForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!navigator.onLine) {
-        showToast('Conecte-se a internet para alterar ou agendar este cadastro.', 'danger', 'wifi-off');
+        showToast('Conecte-se à internet para alterar ou agendar este cadastro.', 'danger', 'wifi-off');
         return;
       }
       const managementEdit = editLeadForm.dataset.management === 'true';
@@ -2750,14 +2750,14 @@ function bindPageEvents() {
           showToast('Lead atualizado com sucesso.');
         } catch (error) {
           submitButton.disabled = false;
-          showToast(error?.code === 'permission-denied' ? 'Seu perfil nao pode alterar este lead.' : 'Nao foi possivel atualizar o lead.', 'danger', 'circle-alert');
+          showToast(error?.code === 'permission-denied' ? 'Seu perfil não pode alterar este lead.' : 'Não foi possível atualizar o lead.', 'danger', 'circle-alert');
         }
         return;
       }
 
       const result = updateLead(editLeadForm.dataset.leadId, values, state.demoMode, () => {
         if (!values.appointmentDate || !values.appointmentTime) {
-          state.dataError = 'A correcao nao foi aceita pela nuvem. Verifique o acesso e tente novamente.';
+          state.dataError = 'A correção não foi aceita pela nuvem. Verifique o acesso e tente novamente.';
           render();
         }
       }, existingLead);
@@ -2772,12 +2772,12 @@ function bindPageEvents() {
           await result.writePromise;
         } catch {
           submitButton.disabled = false;
-          setFieldErrors(editLeadForm, { appointmentTime: 'Este horario nao esta mais disponivel. Escolha outro.' });
+          setFieldErrors(editLeadForm, { appointmentTime: 'Este horário não está mais disponível. Escolha outro.' });
           return;
         }
       }
       navigate('leads');
-      showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : values.appointmentDate ? 'Agendamento salvo com sucesso.' : 'Alteracoes salvas com sucesso.');
+      showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : values.appointmentDate ? 'Agendamento salvo com sucesso.' : 'Alterações salvas com sucesso.');
     });
   }
 
@@ -2812,7 +2812,7 @@ function bindPageEvents() {
     } catch (error) {
       state.authError = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(error?.code)
         ? 'E-mail ou senha incorretos.'
-        : error.message || 'Nao foi possivel entrar.';
+        : error.message || 'Não foi possível entrar.';
       render();
     }
   });
@@ -2925,7 +2925,7 @@ function bindPageEvents() {
       const submitButton = appointmentCreateForm.querySelector('[type="submit"]');
       submitButton.disabled = true;
       const result = saveLead(values, { ...state.profile, storeId }, state.demoMode, () => {
-        state.appointmentCreate.error = 'O cadastro nao foi aceito pela nuvem.';
+        state.appointmentCreate.error = 'O cadastro não foi aceito pela nuvem.';
         render();
       });
       setFieldErrors(appointmentCreateForm, result.errors || {});
@@ -2942,7 +2942,7 @@ function bindPageEvents() {
         showToast('Cadastro adicionado a agenda.');
       } catch {
         state.appointmentCreate.saving = false;
-        setFieldErrors(appointmentCreateForm, { appointmentTime: 'Este horario acabou de ser ocupado. Escolha outro.' });
+        setFieldErrors(appointmentCreateForm, { appointmentTime: 'Este horário acabou de ser ocupado. Escolha outro.' });
         submitButton.disabled = false;
       }
     });
@@ -2969,7 +2969,7 @@ function bindPageEvents() {
         passwordInput.value = administrator ? '' : DEFAULT_TEAM_PASSWORD;
         passwordHelp.textContent = administrator
           ? 'Defina uma senha exclusiva para o acesso administrativo.'
-          : 'Senha padrao para o primeiro acesso. A pessoa podera altera-la depois.';
+          : 'Senha padrão para o primeiro acesso. A pessoa poderá alterá-la depois.';
       }
       if (mei && creatingAccess && new FormData(accessForm).getAll('storeIds').length <= 1) {
         accessForm.querySelectorAll('[name="storeIds"]').forEach((input) => { input.checked = true; });
@@ -3035,8 +3035,8 @@ function bindPageEvents() {
             await createTeamPasswordAccount(result.data.email, result.data.password);
           } catch (error) {
             credentialWarning = error?.code === 'auth/email-already-in-use'
-              ? ' O e-mail ja possuia uma conta; a senha nao foi alterada.'
-              : ' A autorizacao foi salva, mas nao foi possivel criar a senha inicial.';
+              ? ' O e-mail já possuía uma conta; a senha não foi alterada.'
+              : ' A autorização foi salva, mas não foi possível criar a senha inicial.';
           }
         }
         state.access.editorOpen = false;
@@ -3046,8 +3046,8 @@ function bindPageEvents() {
       } catch (error) {
         state.access.saving = false;
         state.access.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao possui permissao para gerenciar acessos.'
-          : 'Nao foi possivel salvar o acesso. Verifique a conexao e tente novamente.';
+          ? 'Seu perfil não possui permissão para gerenciar acessos.'
+          : 'Não foi possível salvar o acesso. Verifique a conexão e tente novamente.';
         render();
       }
     });
@@ -3130,8 +3130,8 @@ function bindPageEvents() {
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode gerenciar perfis e permissoes.'
-          : 'Nao foi possivel salvar o perfil.';
+          ? 'Seu perfil não pode gerenciar perfis e permissões.'
+          : 'Não foi possível salvar o perfil.';
         render();
         document.querySelector('#role-editor-dialog')?.showModal();
       }
@@ -3232,12 +3232,12 @@ function bindPageEvents() {
         state.settings.editingServiceId = '';
         if (!state.demoMode) await loadServiceCatalogData();
         else render();
-        showToast('Servico salvo com sucesso.');
+        showToast('Serviço salvo com sucesso.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode gerenciar servicos.'
-          : 'Nao foi possivel salvar o servico.';
+          ? 'Seu perfil não pode gerenciar serviços.'
+          : 'Não foi possível salvar o serviço.';
         render();
       }
     });
@@ -3530,7 +3530,7 @@ function bindPageEvents() {
       if (enabled && rules.some((rule) => !Number.isInteger(rule.morningQuota) || rule.morningQuota < 0 || rule.morningQuota > 100
         || !Number.isInteger(rule.afternoonQuota) || rule.afternoonQuota < 0 || rule.afternoonQuota > 100
         || rule.morningQuota + rule.afternoonQuota < 1)) {
-        errors.meiQuotaRules = 'Informe cotas validas em cada dia selecionado.';
+        errors.meiQuotaRules = 'Informe cotas válidas em cada dia selecionado.';
       }
       setFieldErrors(meiQuotaDialog, errors);
       if (Object.keys(errors).length) return;
@@ -3843,12 +3843,12 @@ function bindPageEvents() {
         }
         state.settings.saving = false;
         render();
-        showToast('Configuracao da agenda salva.');
+        showToast('Configuração da agenda salva.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode alterar estas configuracoes.'
-          : 'Nao foi possivel salvar a configuracao.';
+          ? 'Seu perfil não pode alterar estas configurações.'
+          : 'Não foi possível salvar a configuração.';
         render();
       }
     });
@@ -3925,8 +3925,8 @@ function bindPageEvents() {
       } catch (error) {
         state.goals.saving = false;
         state.goals.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao possui permissao para salvar esta meta.'
-          : 'Nao foi possivel salvar a meta. Verifique a conexao e tente novamente.';
+          ? 'Seu perfil não possui permissão para salvar esta meta.'
+          : 'Não foi possível salvar a meta. Verifique a conexão e tente novamente.';
         render();
         reopenGoalEditor();
       }
@@ -3954,7 +3954,7 @@ function subscribeProfileLeads() {
       ensureLeadDetailSchedule();
     },
     () => {
-      state.dataError = 'Nao foi possivel carregar os cadastros. Verifique sua conexao ou permissao.';
+      state.dataError = 'Não foi possível carregar os cadastros. Verifique sua conexão ou permissão.';
       render();
     }
   );
@@ -4017,7 +4017,7 @@ function startFollowUpScheduleSubscription() {
       })
       .catch(() => {
         state.followUps.loaded = true;
-        state.followUps.error = 'Nao foi possivel carregar as configuracoes das lojas. Usando 30 minutos.';
+        state.followUps.error = 'Não foi possível carregar as configurações das lojas. Usando 30 minutos.';
         render();
       });
   } else try {
@@ -4031,13 +4031,13 @@ function startFollowUpScheduleSubscription() {
       },
       () => {
         state.followUps.loaded = true;
-        state.followUps.error = 'Nao foi possivel carregar a tolerancia da loja. Usando 30 minutos.';
+        state.followUps.error = 'Não foi possível carregar a tolerância da loja. Usando 30 minutos.';
         render();
       }
     );
   } catch {
     state.followUps.loaded = true;
-    state.followUps.error = 'Nao foi possivel carregar a tolerancia da loja. Usando 30 minutos.';
+    state.followUps.error = 'Não foi possível carregar a tolerância da loja. Usando 30 minutos.';
   }
 
   if (hasAccess('followups.team')) {
@@ -4051,13 +4051,13 @@ function startFollowUpScheduleSubscription() {
         },
         (error) => {
           state.followUps.error = error?.code === 'permission-denied'
-            ? 'Seu perfil nao pode consultar os retornos desta equipe.'
-            : 'Nao foi possivel acompanhar os retornos da equipe.';
+            ? 'Seu perfil não pode consultar os retornos desta equipe.'
+            : 'Não foi possível acompanhar os retornos da equipe.';
           render();
         }
       );
     } catch {
-      state.followUps.error = 'Nao foi possivel acompanhar os retornos da equipe.';
+      state.followUps.error = 'Não foi possível acompanhar os retornos da equipe.';
     }
   }
 }
@@ -4070,13 +4070,13 @@ async function loadManagementData() {
   const rangeInDays = (end - start) / 86_400_000;
 
   if (!startDate || !endDate || Number.isNaN(rangeInDays) || rangeInDays < 0) {
-    state.management.error = 'Informe um periodo valido.';
+    state.management.error = 'Informe um período válido.';
     render();
     return;
   }
 
   if (rangeInDays > 92) {
-    state.management.error = 'Consulte no maximo 93 dias por vez para preservar a cota do sistema.';
+    state.management.error = 'Consulte no máximo 93 dias por vez para preservar a cota do sistema.';
     render();
     return;
   }
@@ -4104,8 +4104,8 @@ async function loadManagementData() {
     state.management.page = 1;
   } catch (error) {
     state.management.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao possui permissao para esta consulta.'
-      : 'Nao foi possivel carregar o painel. Verifique a conexao e tente novamente.';
+      ? 'Seu perfil não possui permissão para esta consulta.'
+      : 'Não foi possível carregar o painel. Verifique a conexão e tente novamente.';
   } finally {
     state.management.loading = false;
     render();
@@ -4166,14 +4166,14 @@ function startLeadDetailDayAppointmentsSubscription(lead) {
       () => {
         if (state.leadDetailSchedule.appointmentDate !== appointmentDate) return;
         state.leadDetailSchedule.appointmentLoading = false;
-        state.leadDetailSchedule.error = 'Nao foi possivel consultar os horarios.';
+        state.leadDetailSchedule.error = 'Não foi possível consultar os horários.';
         refreshLeadDetailAppointmentTime(existingLeadForDetail());
       },
       lead.storeId
     );
   } catch {
     state.leadDetailSchedule.appointmentLoading = false;
-    state.leadDetailSchedule.error = 'Nao foi possivel consultar os horarios.';
+    state.leadDetailSchedule.error = 'Não foi possível consultar os horários.';
     refreshLeadDetailAppointmentTime(lead);
   }
 }
@@ -4200,7 +4200,7 @@ async function ensureLeadDetailSchedule() {
   } catch {
     state.leadDetailSchedule.storeId = lead.storeId;
     state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
-    state.leadDetailSchedule.error = 'Nao foi possivel carregar a agenda desta loja.';
+    state.leadDetailSchedule.error = 'Não foi possível carregar a agenda desta loja.';
   } finally {
     state.leadDetailSchedule.loading = false;
     render();
@@ -4243,8 +4243,8 @@ function startAppointmentsSubscription() {
     },
     (error) => {
       state.appointments.error = error?.code === 'permission-denied'
-        ? 'Seu perfil nao possui permissao para consultar esta agenda.'
-        : 'Nao foi possivel acompanhar a agenda. Verifique a conexao e tente novamente.';
+        ? 'Seu perfil não possui permissão para consultar esta agenda.'
+        : 'Não foi possível acompanhar a agenda. Verifique a conexão e tente novamente.';
       state.appointments.loading = false;
       state.appointments.loaded = false;
       stopAppointmentsSubscription();
@@ -4288,7 +4288,7 @@ async function openAppointmentCreateDialog() {
     }
     state.appointmentCreate.serviceId = servicesForStore(state.appointmentCreate.services, preferredStoreId)[0]?.id || '';
   } catch {
-    state.appointmentCreate.error = 'Nao foi possivel carregar os horarios das lojas.';
+    state.appointmentCreate.error = 'Não foi possível carregar os horários das lojas.';
   } finally {
     state.appointmentCreate.loading = false;
     render();
@@ -4344,10 +4344,10 @@ function refreshAppointmentTimeControl() {
   dateField?.classList.toggle('is-fully-booked', fullyBooked);
   dateField?.classList.toggle('is-date-restricted', Boolean(appointmentDate && !dateAllowed));
   if (dateStatus) dateStatus.textContent = !transportDateAllowed
-    ? 'Nao ha transporte disponivel neste dia.'
+    ? 'Não há transporte disponível neste dia.'
     : !routeDateAllowed
-      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista nao atende neste dia.' : 'A loja nao funciona neste dia.'
-    : fullyBooked ? 'Dia sem horarios disponiveis.' : '';
+      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista não atende neste dia.' : 'A loja não funciona neste dia.'
+    : fullyBooked ? 'Dia sem horários disponíveis.' : '';
 }
 
 function refreshNewLeadAmetropiaField() {
@@ -4405,14 +4405,14 @@ function startDayAppointmentsSubscription() {
       },
       () => {
         state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
+        state.newLeadSchedule.error = 'Não foi possível consultar os horários desta data.';
         refreshAppointmentTimeControl();
       },
       selectedNewLeadStoreId()
     );
   } catch {
     state.newLeadSchedule.loading = false;
-    state.newLeadSchedule.error = 'Nao foi possivel consultar os horarios desta data.';
+    state.newLeadSchedule.error = 'Não foi possível consultar os horários desta data.';
     refreshAppointmentTimeControl();
   }
 }
@@ -4480,7 +4480,7 @@ async function ensureNewLeadSchedule() {
         state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
         state.newLeadSchedule.loaded = true;
         state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = 'Usando a configuracao padrao da agenda.';
+        state.newLeadSchedule.error = 'Usando a configuração padrão da agenda.';
         if (firstLoad) {
           render();
           return;
@@ -4523,8 +4523,8 @@ async function loadSettingsData() {
     state.settings.loaded = true;
   } catch (error) {
     state.settings.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao pode consultar estas configuracoes.'
-      : 'Nao foi possivel carregar as configuracoes das lojas.';
+      ? 'Seu perfil não pode consultar estas configurações.'
+      : 'Não foi possível carregar as configurações das lojas.';
   } finally {
     state.settings.loading = false;
     render();
@@ -4541,8 +4541,8 @@ async function loadRoleProfilesData() {
   } catch (error) {
     state.settings.saving = false;
     state.settings.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao pode consultar os perfis de acesso.'
-      : 'Nao foi possivel carregar os perfis de acesso.';
+      ? 'Seu perfil não pode consultar os perfis de acesso.'
+      : 'Não foi possível carregar os perfis de acesso.';
     render();
   }
 }
@@ -4558,8 +4558,8 @@ async function loadServiceCatalogData() {
   } catch (error) {
     state.settings.saving = false;
     state.settings.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao pode consultar os servicos.'
-      : 'Nao foi possivel carregar os servicos.';
+      ? 'Seu perfil não pode consultar os serviços.'
+      : 'Não foi possível carregar os serviços.';
     render();
   }
 }
@@ -4582,13 +4582,13 @@ async function loadAccessData() {
       state.settings.roleProfiles = roleProfiles.map((item) => ({ ...item, permissions: [...item.permissions] }));
     } catch {
       state.settings.roleProfiles = SYSTEM_ROLE_PROFILES.map((item) => ({ ...item, permissions: [...item.permissions] }));
-      state.access.error = 'Os acessos foram carregados, mas os perfis personalizados estao temporariamente indisponiveis.';
+      state.access.error = 'Os acessos foram carregados, mas os perfis personalizados estão temporariamente indisponíveis.';
     }
     state.access.loaded = true;
   } catch (error) {
     state.access.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao possui permissao para consultar acessos.'
-      : 'Nao foi possivel carregar os acessos. Verifique a conexao e tente novamente.';
+      ? 'Seu perfil não possui permissão para consultar acessos.'
+      : 'Não foi possível carregar os acessos. Verifique a conexão e tente novamente.';
   } finally {
     state.access.loading = false;
     state.access.saving = false;
@@ -4620,8 +4620,8 @@ async function loadGoalsData() {
     }
   } catch (error) {
     state.goals.error = error?.code === 'permission-denied'
-      ? 'Seu perfil nao possui permissao para consultar estas metas.'
-      : 'Nao foi possivel carregar as metas. Verifique a conexao e tente novamente.';
+      ? 'Seu perfil não possui permissão para consultar estas metas.'
+      : 'Não foi possível carregar as metas. Verifique a conexão e tente novamente.';
   } finally {
     state.goals.loading = false;
     state.goals.saving = false;
@@ -4666,7 +4666,7 @@ async function handleAction(action) {
       await signInWithGoogle();
     } catch (error) {
       state.loading = false;
-      state.authError = error.message || 'Nao foi possivel entrar com o Google.';
+      state.authError = error.message || 'Não foi possível entrar com o Google.';
       render();
     }
   }
@@ -4683,12 +4683,12 @@ async function handleAction(action) {
       if (error?.code === 'auth/email-already-in-use') {
         try {
           await requestPasswordReset(values.email);
-          state.authMessage = 'Este acesso ja estava preparado. Enviamos um link para voce definir sua senha.';
+          state.authMessage = 'Este acesso já estava preparado. Enviamos um link para você definir sua senha.';
         } catch (resetError) {
-          state.authError = resetError.message || 'Nao foi possivel enviar a definicao de senha.';
+          state.authError = resetError.message || 'Não foi possível enviar a definição de senha.';
         }
       } else {
-        state.authError = error.message || 'Nao foi possivel criar o primeiro acesso.';
+        state.authError = error.message || 'Não foi possível criar o primeiro acesso.';
       }
     }
     render();
@@ -4700,9 +4700,9 @@ async function handleAction(action) {
     state.authMessage = '';
     try {
       await requestPasswordReset(email);
-      state.authMessage = 'Enviamos as instrucoes de recuperacao para o e-mail informado.';
+      state.authMessage = 'Enviamos as instruções de recuperação para o e-mail informado.';
     } catch (error) {
-      state.authError = error.message || 'Nao foi possivel enviar a recuperacao de senha.';
+      state.authError = error.message || 'Não foi possível enviar a recuperação de senha.';
     }
     render();
   }
@@ -4857,7 +4857,7 @@ async function handleAction(action) {
       const storeIds = storeId ? [storeId] : profileStoreIds(state.profile);
       state.savwin.result = await consultLocalSavwinSales({ startDate, endDate, storeIds });
     } catch (error) {
-      state.savwin.error = error.message || 'Nao foi possivel consultar o SavWin.';
+      state.savwin.error = error.message || 'Não foi possível consultar o SavWin.';
     } finally {
       state.savwin.loading = false;
       render();
@@ -4928,7 +4928,7 @@ export async function startApp() {
         state.settings.services.filter((item) => item.id !== service.id), storeId
       ).length);
       if (service.active && uncoveredStoreIds.length) {
-        showToast('Mantenha pelo menos um servico ativo em cada unidade atendida.', 'warning', 'circle-alert');
+        showToast('Mantenha pelo menos um serviço ativo em cada unidade atendida.', 'warning', 'circle-alert');
         return;
       }
       state.settings.saving = true;
@@ -4944,14 +4944,14 @@ export async function startApp() {
           await setAppointmentServiceActive(state.profile, service, !service.active);
           await loadServiceCatalogData();
         }
-        showToast(service.active ? 'Servico desativado.' : 'Servico ativado.');
+        showToast(service.active ? 'Serviço desativado.' : 'Serviço ativado.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode alterar este servico.'
+          ? 'Seu perfil não pode alterar este serviço.'
           : error?.code === 'last-active-service'
             ? error.message
-            : 'Nao foi possivel alterar o servico.';
+            : 'Não foi possível alterar o serviço.';
         render();
       }
       return;
@@ -4981,7 +4981,7 @@ export async function startApp() {
             state.settings.services.filter((item) => item.id !== service.id), storeId
           ).length) : [];
           if (uncoveredStoreIds.length) {
-            const error = new Error('Mantenha pelo menos um servico ativo em cada unidade atendida.');
+            const error = new Error('Mantenha pelo menos um serviço ativo em cada unidade atendida.');
             error.code = 'last-active-service';
             throw error;
           }
@@ -4993,15 +4993,15 @@ export async function startApp() {
         state.settings.pendingDeleteServiceId = '';
         if (!state.demoMode) await loadServiceCatalogData();
         else render();
-        showToast('Servico excluido.');
+        showToast('Serviço excluído.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.pendingDeleteServiceId = '';
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode excluir este servico.'
+          ? 'Seu perfil não pode excluir este serviço.'
           : error?.code === 'last-active-service'
             ? error.message
-            : 'Nao foi possivel excluir o servico.';
+            : 'Não foi possível excluir o serviço.';
         render();
       }
       return;
@@ -5058,7 +5058,7 @@ export async function startApp() {
           const result = await saveSystemRolePermissions(state.profile, roleProfileId, state.settings.detailsRolePermissions);
           if (!result.isValid) {
             state.settings.saving = false;
-            showToast(result.errors.permissions || 'Escolha permissoes validas.', 'danger', 'circle-alert');
+            showToast(result.errors.permissions || 'Escolha permissões válidas.', 'danger', 'circle-alert');
             render();
             return;
           }
@@ -5067,12 +5067,12 @@ export async function startApp() {
         state.settings.detailsRolePermissions = [];
         if (!state.demoMode) await loadRoleProfilesData();
         else render();
-        showToast('Permissoes do perfil atualizadas.');
+        showToast('Permissões do perfil atualizadas.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode alterar estas permissoes.'
-          : error?.message || 'Nao foi possivel salvar as permissoes.';
+          ? 'Seu perfil não pode alterar estas permissões.'
+          : error?.message || 'Não foi possível salvar as permissões.';
         render();
       }
       return;
@@ -5097,12 +5097,12 @@ export async function startApp() {
         state.settings.detailsRolePermissions = [];
         if (!state.demoMode) await loadRoleProfilesData();
         else render();
-        showToast('Permissoes restauradas para o padrao.');
+        showToast('Permissões restauradas para o padrão.');
       } catch (error) {
         state.settings.saving = false;
         state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode restaurar estas permissoes.'
-          : error?.message || 'Nao foi possivel restaurar o perfil.';
+          ? 'Seu perfil não pode restaurar estas permissões.'
+          : error?.message || 'Não foi possível restaurar o perfil.';
         render();
       }
       return;
@@ -5149,11 +5149,11 @@ export async function startApp() {
           }
           state.settings.pendingDeleteRoleId = '';
           if (!state.demoMode) await loadRoleProfilesData();
-          showToast('Cargo excluido.');
+          showToast('Cargo excluído.');
         } catch (error) {
           state.settings.saving = false;
           state.settings.pendingDeleteRoleId = '';
-          state.settings.error = error?.code === 'role-in-use' ? error.message : 'Nao foi possivel excluir o perfil.';
+          state.settings.error = error?.code === 'role-in-use' ? error.message : 'Não foi possível excluir o perfil.';
           render();
         }
       }
@@ -5198,7 +5198,7 @@ export async function startApp() {
             requestAnimationFrame(() => document.querySelector('#follow-up-captor-dialog')?.showModal());
           }
         } catch {
-          showToast('O WhatsApp foi aberto, mas o contato nao foi registrado.', 'warning', 'circle-alert');
+          showToast('O WhatsApp foi aberto, mas o contato não foi registrado.', 'warning', 'circle-alert');
         }
       }
     }
@@ -5249,8 +5249,8 @@ export async function startApp() {
         showToast(attendance === 'attended' ? 'Comparecimento registrado.' : 'Falta registrada.');
       } catch (error) {
         showToast(error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode alterar este agendamento.'
-          : 'Nao foi possivel salvar o comparecimento.', 'danger', 'circle-alert');
+          ? 'Seu perfil não pode alterar este agendamento.'
+          : 'Não foi possível salvar o comparecimento.', 'danger', 'circle-alert');
       } finally {
         state.appointments.updatingId = '';
         render();
@@ -5297,10 +5297,10 @@ export async function startApp() {
         state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
         state.management.activeLead = null;
         navigate(returnRoute);
-        showToast('Lead excluido definitivamente.');
+        showToast('Lead excluído definitivamente.');
       } catch (error) {
         confirmDeleteButton.disabled = false;
-        showToast(error?.code === 'permission-denied' ? 'Seu perfil nao pode excluir este lead.' : 'Nao foi possivel excluir o lead.', 'danger', 'circle-alert');
+        showToast(error?.code === 'permission-denied' ? 'Seu perfil não pode excluir este lead.' : 'Não foi possível excluir o lead.', 'danger', 'circle-alert');
       }
     }
     const routeButton = event.target.closest('[data-route]');
@@ -5340,7 +5340,7 @@ export async function startApp() {
         await loadAccessData();
         showToast(access.active ? 'Acesso bloqueado.' : 'Acesso reativado.');
       } catch (error) {
-        state.access.error = error.message || 'Nao foi possivel alterar o acesso.';
+        state.access.error = error.message || 'Não foi possível alterar o acesso.';
         render();
       }
     }
@@ -5378,11 +5378,11 @@ export async function startApp() {
         await deleteAccess(state.profile, access);
         state.access.pendingDeleteEmail = '';
         await loadAccessData();
-        showToast('Acesso excluido. O historico da pessoa foi preservado.');
+        showToast('Acesso excluído. O histórico da pessoa foi preservado.');
       } catch (error) {
         state.access.saving = false;
         confirmDeleteAccessButton.disabled = false;
-        showToast(error?.message || 'Nao foi possivel excluir o acesso.', 'danger', 'circle-alert');
+        showToast(error?.message || 'Não foi possível excluir o acesso.', 'danger', 'circle-alert');
       }
     }
     const newGoalButton = event.target.closest('[data-goal-new]');
@@ -5427,7 +5427,7 @@ export async function startApp() {
       state.goals.editingGroupId = '';
       state.goals.duplicatingGroupId = group.id;
       state.goals.draft = duplicateGoalDraft(group);
-      showToast('Meta duplicada no formulario. Revise e salve.');
+      showToast('Meta duplicada no formulário. Revise e salve.');
       requestAnimationFrame(() => {
         document.querySelector('#goal-editor-dialog')?.showModal();
         const titleInput = document.querySelector('#goal-title');
@@ -5471,8 +5471,8 @@ export async function startApp() {
       } catch (error) {
         state.goals.pendingDeleteGroupId = '';
         state.goals.error = error?.code === 'permission-denied'
-          ? 'Seu perfil nao pode excluir esta meta.'
-          : 'Nao foi possivel excluir a meta.';
+          ? 'Seu perfil não pode excluir esta meta.'
+          : 'Não foi possível excluir a meta.';
         render();
       }
     }
@@ -5537,7 +5537,7 @@ export async function startApp() {
   try {
     await completeRedirectSignIn();
   } catch (error) {
-    state.authError = error.message || 'Nao foi possivel concluir o acesso.';
+    state.authError = error.message || 'Não foi possível concluir o acesso.';
   }
 
   observeAuth(async (firebaseUser) => {
@@ -5583,12 +5583,12 @@ export async function startApp() {
         ensureGoalsData();
         ensureSettingsData();
       }, (error) => {
-        state.dataError = error?.message || 'Nao foi possivel atualizar as permissoes deste acesso.';
+        state.dataError = error?.message || 'Não foi possível atualizar as permissões deste acesso.';
         render();
       });
     } catch (error) {
       state.profile = null;
-      state.authError = error.message || 'Acesso nao autorizado.';
+      state.authError = error.message || 'Acesso não autorizado.';
     } finally {
       state.loading = false;
       render();

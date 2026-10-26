@@ -36,7 +36,7 @@ async function runTransaction(mode, operation) {
     };
     transaction.onabort = () => {
       database.close();
-      reject(transaction.error || request.error || new Error('A gravacao local foi interrompida.'));
+      reject(transaction.error || request.error || new Error('A gravação local foi interrompida.'));
     };
   });
 }

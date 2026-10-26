@@ -13,7 +13,7 @@ function firebaseAccessToken() {
       encoding: 'utf8', shell: true, stdio: ['ignore', 'ignore', 'ignore']
     });
   } catch {
-    // A CLI pode encerrar com erro no Windows depois de ja renovar o token.
+    // A CLI pode encerrar com erro no Windows depois de já renovar o token.
   }
   const raw = execSync('npx firebase-tools login:list --json', {
     encoding: 'utf8', shell: true, stdio: ['ignore', 'pipe', 'ignore']
@@ -93,7 +93,7 @@ function buildWrites(services, leads) {
   const defaultSources = [...(canonical ? [canonical] : []), ...legacyDefaults];
   const durations = new Set(defaultSources.map((service) => service.durationMinutes));
   if (durations.size > 1) {
-    throw new Error('Os servicos padrao possuem duracoes diferentes. Ajuste as duracoes antes de consolidar.');
+    throw new Error('Os serviços padrão possuem durações diferentes. Ajuste as durações antes de consolidar.');
   }
 
   const now = new Date().toISOString();
@@ -184,7 +184,7 @@ async function main() {
     duplicateServicesToRemove: result.legacyDefaults.length
   }, null, 2));
   if (!APPLY) {
-    console.log('Nenhuma gravacao realizada. Use --apply para confirmar.');
+    console.log('Nenhuma gravação realizada. Use --apply para confirmar.');
     return;
   }
   if (result.writes.length) await commitWrites(result.writes, accessToken);

@@ -308,7 +308,7 @@ export function validateStoreSchedule(value) {
   const validTransportHoursRules = normalizeHoursRules(rawTransportHoursRules, [], '', '');
 
   if (!Number.isInteger(rawDuration) || rawDuration < 5 || rawDuration > 180) {
-    errors.appointmentDurationMinutes = 'Informe uma duracao entre 5 e 180 minutos.';
+    errors.appointmentDurationMinutes = 'Informe uma duração entre 5 e 180 minutos.';
   }
   if (!Number.isInteger(rawNoShowGrace) || rawNoShowGrace < 0 || rawNoShowGrace > 240) {
     errors.noShowGraceMinutes = 'Informe um alerta entre 0 e 240 minutos.';
@@ -319,8 +319,8 @@ export function validateStoreSchedule(value) {
     && rawRescheduleAfter <= rawNoShowGrace) {
     errors.rescheduleAfterMinutes = 'O reagendamento deve ser sugerido depois do alerta de atraso.';
   }
-  if (opening === null) errors.openingTime = 'Informe um horario inicial valido.';
-  if (closing === null) errors.closingTime = 'Informe um horario final valido.';
+  if (opening === null) errors.openingTime = 'Informe um horário inicial válido.';
+  if (closing === null) errors.closingTime = 'Informe um horário final válido.';
   if (opening !== null && closing !== null && opening >= closing) {
     errors.closingTime = 'O encerramento deve ser depois da abertura.';
   }
@@ -329,7 +329,7 @@ export function validateStoreSchedule(value) {
   }
   if (schedule.schedulingMode === 'controlled'
     && (!rawStoreHoursRules.length || validStoreHoursRules.length !== rawStoreHoursRules.length)) {
-    errors.storeHoursRules = 'Configure ao menos um dia com horarios validos para a loja.';
+    errors.storeHoursRules = 'Configure ao menos um dia com horários válidos para a loja.';
   }
   if (schedule.schedulingMode === 'controlled' && validStoreHoursRules.some((rule) => (
     timeToMinutes(rule.closingTime) - timeToMinutes(rule.openingTime) < schedule.appointmentDurationMinutes
@@ -342,23 +342,23 @@ export function validateStoreSchedule(value) {
     errors.limitedDayRules = 'Configure ao menos um dia com limite entre 1 e 100 vagas.';
   }
   if (meiQuotaEnabled && (!meiQuotaRules.length || validMeiRules.length !== meiQuotaRules.length)) {
-    errors.meiQuotaRules = 'Configure ao menos um dia com cotas validas para manha e tarde.';
+    errors.meiQuotaRules = 'Configure ao menos um dia com cotas válidas para manhã e tarde.';
   }
   if (ophthalmologyEnabled && (!Number.isInteger(ophthalmologyMinimumAge) || ophthalmologyMinimumAge < 0 || ophthalmologyMinimumAge > 120)) {
     errors.ophthalmologyMinimumAge = 'Informe uma idade entre 0 e 120 anos.';
   }
   if (ophthalmologyEnabled
     && (!rawOphthalmologyHoursRules.length || validOphthalmologyHoursRules.length !== rawOphthalmologyHoursRules.length)) {
-    errors.ophthalmologyHoursRules = 'Configure ao menos um dia com horarios validos para o oftalmologista.';
+    errors.ophthalmologyHoursRules = 'Configure ao menos um dia com horários válidos para o oftalmologista.';
   }
-  if (ophthalmologyEnabled && ophthalmologyOpening === null) errors.ophthalmologyOpeningTime = 'Informe um horario inicial valido.';
-  if (ophthalmologyEnabled && ophthalmologyClosing === null) errors.ophthalmologyClosingTime = 'Informe um horario final valido.';
+  if (ophthalmologyEnabled && ophthalmologyOpening === null) errors.ophthalmologyOpeningTime = 'Informe um horário inicial válido.';
+  if (ophthalmologyEnabled && ophthalmologyClosing === null) errors.ophthalmologyClosingTime = 'Informe um horário final válido.';
   if (ophthalmologyEnabled && ophthalmologyOpening !== null && ophthalmologyClosing !== null
     && ophthalmologyOpening >= ophthalmologyClosing) {
-    errors.ophthalmologyClosingTime = 'O encerramento deve ser depois do inicio.';
+    errors.ophthalmologyClosingTime = 'O encerramento deve ser depois do início.';
   }
   if (transportEnabled && (!rawTransportHoursRules.length || validTransportHoursRules.length !== rawTransportHoursRules.length)) {
-    errors.transportHoursRules = 'Configure ao menos um dia com horarios validos para o transporte.';
+    errors.transportHoursRules = 'Configure ao menos um dia com horários válidos para o transporte.';
   }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };

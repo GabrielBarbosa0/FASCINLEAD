@@ -8,14 +8,14 @@ export const APPOINTMENT_ATTENDANCE = new Set(['pending', 'attended', 'missed'])
 
 function appointmentsQuery(profile, monthKey, selectedStoreId = '') {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)) {
-    const error = new Error('Agenda indisponivel para este perfil.');
+    const error = new Error('Agenda indisponível para este perfil.');
     error.code = 'permission-denied';
     throw error;
   }
 
   const { startDate, endDate } = monthRange(monthKey);
   if (selectedStoreId && !canAccessStore(profile, selectedStoreId)) {
-    const error = new Error('Unidade nao autorizada.');
+    const error = new Error('Unidade não autorizada.');
     error.code = 'permission-denied';
     throw error;
   }
@@ -45,7 +45,7 @@ export async function setAppointmentAttendance(profile, lead, attendance) {
   if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)
     || !APPOINTMENT_ATTENDANCE.has(attendance)
     || (profile.role === 'manager' && !canAccessStore(profile, lead.storeId))) {
-    const error = new Error('Status de comparecimento nao autorizado.');
+    const error = new Error('Status de comparecimento não autorizado.');
     error.code = 'permission-denied';
     throw error;
   }

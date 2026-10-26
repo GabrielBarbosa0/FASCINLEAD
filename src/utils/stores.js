@@ -10,7 +10,7 @@ export const STORE_IDS = new Set(STORES.map((store) => store.id));
 const SURUBIM_SHARED_STORE_IDS = Object.freeze(['loja-02', 'loja-06']);
 
 export function appointmentResourceId(storeId) {
-  return SURUBIM_SHARED_STORE_IDS.includes(storeId) ? 'consultorio-surubim' : storeId;
+  return SURUBIM_SHARED_STORE_IDS.includes(storeId) ? 'consultório-surubim' : storeId;
 }
 
 export function appointmentResourceStoreIds(storeId) {

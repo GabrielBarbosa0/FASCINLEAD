@@ -56,14 +56,18 @@ export function isFollowUpContacted(lead) {
     && lead.followUpContactedAppointmentKey === followUpAppointmentKey(lead));
 }
 
-export function buildWhatsAppFollowUpUrl(lead, stage = 'reschedule') {
+export function buildWhatsAppFollowUpUrl(lead, stage = 'reschedule', senderName = '') {
   const phone = String(lead?.phone || lead?.phoneSearch || '').replace(/\D/g, '');
   if (!phone) return '';
   const internationalPhone = phone.startsWith('55') ? phone : `55${phone}`;
   const customerName = String(lead?.preferredName || lead?.fullName || '').trim();
-  const greeting = customerName ? `Ola, ${customerName}!` : 'Ola!';
+  const attendantName = String(senderName || '').trim();
+  const greeting = customerName ? `Olá, ${customerName}!` : 'Olá!';
+  const introduction = attendantName
+    ? `Sou ${attendantName}, da Óticas Fascinante.`
+    : 'Somos da equipe das Óticas Fascinante.';
   const message = stage === 'late'
-    ? `${greeting} Seu atendimento estava marcado para ${lead.appointmentTime}. Voce esta a caminho?`
-    : `${greeting} Sentimos sua falta no horario agendado. Voce gostaria de reagendar seu atendimento?`;
+    ? `${greeting} Seu atendimento estava marcado para ${lead.appointmentTime}. Você está a caminho?`
+    : `${greeting} Tudo bem? ${introduction} Vi que você não conseguiu comparecer ao seu atendimento. Gostaria de reagendar? Posso ajudar a encontrar um novo horário que fique melhor para você.`;
   return `https://wa.me/${internationalPhone}?text=${encodeURIComponent(message)}`;
 }

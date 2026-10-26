@@ -32,10 +32,10 @@ export function validateAppointmentService(value = {}) {
 
   if (data.name.length < 2 || data.name.length > 80) errors.name = 'Informe um nome entre 2 e 80 caracteres.';
   if (!data.storeIds.length || data.storeIds.some((storeId) => !STORE_IDS.has(storeId))) {
-    errors.storeIds = 'Escolha pelo menos uma unidade valida.';
+    errors.storeIds = 'Escolha pelo menos uma unidade válida.';
   }
   if (!Number.isInteger(data.durationMinutes) || data.durationMinutes < 10 || data.durationMinutes > 180 || data.durationMinutes % 10 !== 0) {
-    errors.durationMinutes = 'Informe uma duracao entre 10 e 180 minutos, em intervalos de 10.';
+    errors.durationMinutes = 'Informe uma duração entre 10 e 180 minutos, em intervalos de 10.';
   }
 
   return { data, errors, isValid: Object.keys(errors).length === 0 };

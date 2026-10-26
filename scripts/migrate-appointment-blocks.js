@@ -149,7 +149,7 @@ async function main() {
     conflicts: migration.conflicts.slice(0, 20)
   }, null, 2));
   if (!APPLY) {
-    console.log('Nenhuma gravacao realizada. Use --apply para confirmar.');
+    console.log('Nenhuma gravação realizada. Use --apply para confirmar.');
     return;
   }
   if (migration.writes.length) await commitWrites(migration.writes, accessToken);

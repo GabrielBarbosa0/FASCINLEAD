@@ -12,31 +12,31 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'receptionist'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
   await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
-  await expect(page.locator('.profile-card').getByText('Atendente de balcao', { exact: true })).toBeVisible();
+  await expect(page.locator('.profile-card').getByText('Atendente de balcão', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Agenda de exames/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Retornos da equipe/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Retornos pendentes/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Painel de gestao/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Painel de gestão/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Metas/ })).toHaveCount(0);
 
-  const navigation = page.getByRole('navigation', { name: 'Navegacao principal' });
-  await expect(navigation.getByRole('button', { name: 'Gestao' })).toHaveCount(0);
+  const navigation = page.getByRole('navigation', { name: 'Navegação principal' });
+  await expect(navigation.getByRole('button', { name: 'Gestão' })).toHaveCount(0);
   await expect(navigation.getByRole('button', { name: 'Retornos' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('receptionist-home-menus.png'), fullPage: true });
 
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   await expect(page.getByRole('heading', { name: 'Agenda de exames' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Voltar ao inicio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Voltar ao início' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('receptionist-permitted-menus.png'), fullPage: true });
 
   await page.goto('/#/management');
-  await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
-  await expect(page.getByText('Seu perfil nao possui acesso aos dados gerenciais.')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
+  await expect(page.getByText('Seu perfil não possui acesso aos dados gerenciais.')).toHaveCount(0);
 });
 
 test('requires a destination store for a multi-store MEI capture', async ({ page }) => {
@@ -51,11 +51,11 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await expect(store.locator('option[value="loja-04"]')).toHaveText('Loja 04 - Carpina');
   await expect(store.locator('option[value="loja-05"]')).toHaveText('Loja 05 - Limoeiro');
   await expect(store.locator('option[value="loja-06"]')).toHaveText('Loja 06 - Surubim');
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeDisabled();
+  await expect(page.getByLabel('Data do pré-agendamento')).toBeDisabled();
   await store.selectOption('loja-02');
   await expect(store).toHaveValue('loja-02');
-  await expect(page.getByLabel('Servico do agendamento')).toBeEnabled();
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
+  await expect(page.getByLabel('Serviço do agendamento')).toBeEnabled();
+  await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
   await page.getByLabel('Nome *').fill('Cliente preservado');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('RG', { exact: true }).fill('1234567');
@@ -63,13 +63,13 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await page.getByLabel('Data de nascimento *').fill('1960-04-12');
   await page.getByLabel('Como prefere ser chamado').fill('Cliente');
   await page.getByLabel('Catarata', { exact: true }).check();
-  await page.getByLabel('Ja realizou cirurgia nos olhos? *').selectOption('yes');
+  await page.getByLabel('Já realizou cirurgia nos olhos? *').selectOption('yes');
   await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
-  await page.getByLabel('Observacao rapida').fill('Manter estas informacoes');
-  const serviceId = await page.getByLabel('Servico do agendamento').inputValue();
+  await page.getByLabel('Observação rápida').fill('Manter estas informações');
+  const serviceId = await page.getByLabel('Serviço do agendamento').inputValue();
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + 7);
-  await page.getByLabel('Data do pre-agendamento').fill(futureDate.toISOString().slice(0, 10));
+  await page.getByLabel('Data do pré-agendamento').fill(futureDate.toISOString().slice(0, 10));
 
   await store.selectOption('loja-04');
   await expect(page.getByLabel('Nome *')).toHaveValue('Cliente preservado');
@@ -79,18 +79,18 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await expect(page.getByLabel('Data de nascimento *')).toHaveValue('1960-04-12');
   await expect(page.getByLabel('Como prefere ser chamado')).toHaveValue('Cliente');
   await expect(page.getByLabel('Catarata', { exact: true })).toBeChecked();
-  await expect(page.getByLabel('Ja realizou cirurgia nos olhos? *')).toHaveValue('yes');
+  await expect(page.getByLabel('Já realizou cirurgia nos olhos? *')).toHaveValue('yes');
   await expect(page.getByLabel('Qual cirurgia? *')).toHaveValue('cataract');
-  await expect(page.getByLabel('Observacao rapida')).toHaveValue('Manter estas informacoes');
-  await expect(page.getByLabel('Servico do agendamento')).toHaveValue(serviceId);
-  await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('');
+  await expect(page.getByLabel('Observação rápida')).toHaveValue('Manter estas informações');
+  await expect(page.getByLabel('Serviço do agendamento')).toHaveValue(serviceId);
+  await expect(page.getByLabel('Data do pré-agendamento')).toHaveValue('');
 });
 
 test('captures and lists a lead in development mode', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'FascinLead' })).toBeVisible();
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
   await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
   await page.screenshot({
     path: testInfo.outputPath('home.png'),
@@ -141,7 +141,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.locator('[data-birth-age]')).toHaveText(/\d+ anos/);
   await page.getByLabel('Sexo').selectOption('female');
   await page.getByLabel('Rua', { exact: true }).fill('Rua das Flores');
-  await page.getByLabel('Numero', { exact: true }).fill('SN');
+  await page.getByLabel('Número', { exact: true }).fill('SN');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   for (const removedPathology of ['Olho seco', 'Degeneracao macular', 'Descolamento de retina']) {
@@ -149,8 +149,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   }
   await page.getByLabel('Glaucoma').check();
   await page.getByLabel('Diabetes').check();
-  await page.getByLabel('Data do pre-agendamento').fill('2026-10-02');
-  await page.getByLabel('Horario disponivel').selectOption('14:20');
+  await page.getByLabel('Data do pré-agendamento').fill('2026-10-02');
+  await page.getByLabel('Horário disponível').selectOption('14:20');
   await page.screenshot({
     path: testInfo.outputPath('new-lead.png'),
     fullPage: true
@@ -164,19 +164,19 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
 
   await page.getByRole('button', { name: 'Ver cadastro de Cliente Exemplo' }).click();
   await expect(page.getByRole('heading', { name: 'Cliente Exemplo', level: 2 })).toBeVisible();
-  await expect(page.getByLabel('Data do pre-agendamento')).toHaveValue('2026-10-02');
-  await expect(page.getByLabel('Horario')).toHaveValue('14:20');
+  await expect(page.getByLabel('Data do pré-agendamento')).toHaveValue('2026-10-02');
+  await expect(page.getByLabel('Horário')).toHaveValue('14:20');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
   await expect(page.getByLabel('Data de nascimento')).toHaveValue('1985-04-12');
   await expect(page.locator('[data-birth-age]')).toHaveText(/\d+ anos/);
   await expect(page.getByLabel('Sexo')).toHaveValue('female');
   await expect(page.getByLabel('Rua', { exact: true })).toHaveValue('Rua das Flores');
-  await expect(page.getByLabel('Numero', { exact: true })).toHaveValue('S/N');
+  await expect(page.getByLabel('Número', { exact: true })).toHaveValue('S/N');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   await expect(page.getByLabel('Glaucoma')).toBeChecked();
   await expect(page.getByLabel('Diabetes')).toBeChecked();
-  const pathologies = page.getByRole('group', { name: 'Patologias e condicoes de saude' });
-  await pathologies.getByLabel('Nao possui').check();
+  const pathologies = page.getByRole('group', { name: 'Patologias e condições de saúde' });
+  await pathologies.getByLabel('Não possui').check();
   await expect(page.getByLabel('Glaucoma')).not.toBeChecked();
   await expect(page.getByLabel('Diabetes')).not.toBeChecked();
   await page.screenshot({
@@ -184,8 +184,8 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
     fullPage: true
   });
   await page.getByLabel('Nome *').fill('Cliente Corrigido');
-  await page.getByLabel('Observacao rapida').fill('Prefere contato pela tarde');
-  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await page.getByLabel('Observação rápida').fill('Prefere contato pela tarde');
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
 
   await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   await expect(page.getByText('Cliente Corrigido')).toBeVisible();
@@ -229,13 +229,13 @@ test('shows lead deletion below save wherever an authorized user opens the detai
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
-  await page.getByLabel('Nome *').fill('Lead com exclusao');
+  await page.getByLabel('Nome *').fill('Lead com exclusão');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('Data de nascimento').fill('1985-04-12');
   await page.getByRole('button', { name: 'Salvar cadastro' }).click();
-  await page.getByRole('button', { name: 'Ver cadastro de Lead com exclusao' }).click();
+  await page.getByRole('button', { name: 'Ver cadastro de Lead com exclusão' }).click();
 
-  const saveButton = page.getByRole('button', { name: 'Salvar alteracoes' });
+  const saveButton = page.getByRole('button', { name: 'Salvar alterações' });
   const deleteButton = page.getByRole('button', { name: 'Excluir lead', exact: true });
   await expect(deleteButton).toBeVisible();
   const positions = await Promise.all([
@@ -252,21 +252,21 @@ test('routes cataract clients to configured ophthalmology days', async ({ page }
   await page.getByLabel('Loja de destino').selectOption('loja-06');
 
   await page.getByLabel('Data de nascimento').fill('1960-01-01');
-  await expect(page.getByLabel('Ja realizou cirurgia nos olhos? *')).toBeVisible();
+  await expect(page.getByLabel('Já realizou cirurgia nos olhos? *')).toBeVisible();
   await expect(page.getByLabel('Qual cirurgia? *')).toBeVisible();
   await expect(page.getByLabel('Qual cirurgia? *')).toBeDisabled();
-  await page.getByLabel('Ja realizou cirurgia nos olhos? *').selectOption('yes');
+  await page.getByLabel('Já realizou cirurgia nos olhos? *').selectOption('yes');
   await expect(page.getByLabel('Qual cirurgia? *')).toBeEnabled();
   await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
   await page.getByLabel('Catarata', { exact: true }).check();
   await expect(page.getByText('Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.')).toBeVisible();
 
-  await page.getByLabel('Data do pre-agendamento').fill('2026-10-22');
-  await expect(page.getByLabel('Horario disponivel')).toBeDisabled();
-  await expect(page.getByText('O oftalmologista nao atende neste dia.')).toBeVisible();
+  await page.getByLabel('Data do pré-agendamento').fill('2026-10-22');
+  await expect(page.getByLabel('Horário disponível')).toBeDisabled();
+  await expect(page.getByText('O oftalmologista não atende neste dia.')).toBeVisible();
 
-  await page.getByLabel('Data do pre-agendamento').fill('2026-10-24');
-  const timeSelect = page.getByLabel('Horario disponivel');
+  await page.getByLabel('Data do pré-agendamento').fill('2026-10-24');
+  const timeSelect = page.getByLabel('Horário disponível');
   await expect(timeSelect).toBeEnabled();
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="11:40"]')).toHaveCount(1);
@@ -331,9 +331,9 @@ test('opens goal creation in a modal from the goals heading', async ({ page }, t
   await newGoalButton.click();
   const dialog = page.getByRole('dialog', { name: 'Nova meta' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel('Titulo')).toHaveValue('Meta de captacoes');
+  await expect(dialog.getByLabel('Título')).toHaveValue('Meta de captações');
   await expect(dialog.getByLabel('Quantidade')).toHaveValue('20');
-  await expect(dialog.getByLabel('Inicio')).toBeVisible();
+  await expect(dialog.getByLabel('Início')).toBeVisible();
   await expect(dialog.getByLabel('Fim')).toBeVisible();
   await expect(dialog.getByLabel('Loja')).toBeVisible();
   await expect(dialog.getByRole('group', { name: /Colaboradores/ })).toBeVisible();
@@ -356,7 +356,7 @@ test('configures multiple permitted stores for a manager access', async ({ page 
   await expect(page.getByLabel('Senha inicial')).toHaveValue('mudar123');
   await expect(page.getByLabel('Senha inicial')).toHaveAttribute('readonly', '');
   await expect(page.getByLabel('Telefone')).toBeVisible();
-  await expect(page.getByLabel('Codigo SavWin')).toBeVisible();
+  await expect(page.getByLabel('Código SavWin')).toBeVisible();
   await page.getByLabel('Perfil / cargo').selectOption('system-admin');
   await expect(page.getByLabel('Senha inicial')).toHaveValue('');
   await expect(page.getByLabel('Senha inicial')).not.toHaveAttribute('readonly', '');
@@ -386,7 +386,7 @@ test('keeps management actions and filters organized at intermediate widths', as
   await page.setViewportSize({ width: 1120, height: 820 });
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Painel de gestao/ }).click();
+  await page.getByRole('button', { name: /Painel de gestão/ }).click();
   await expect(page.getByRole('heading', { name: 'Painel de leads' })).toBeVisible();
   await page.getByLabel('Nome ou telefone').pressSequentially('pedro');
   await expect(page.getByLabel('Nome ou telefone')).toHaveValue('pedro');
@@ -475,14 +475,14 @@ test('hides disabled ametropias in management details without erasing saved valu
   });
 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Painel de gestao/ }).click();
+  await page.getByRole('button', { name: /Painel de gestão/ }).click();
   await page.getByRole('button', { name: /Cliente com ametropia oculta/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Cliente com ametropia oculta', level: 2 })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
-  await expect(page.getByRole('group', { name: 'Patologias e condicoes de saude' })).toBeVisible();
-  await page.getByLabel('Observacao rapida').fill('Cadastro revisado pela gestao');
-  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await expect(page.getByRole('group', { name: 'Patologias e condições de saúde' })).toBeVisible();
+  await page.getByLabel('Observação rápida').fill('Cadastro revisado pela gestão');
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
 
   const savedAmetropias = await page.evaluate(() => JSON.parse(localStorage.getItem('fascinlead:demo-leads'))[0].ametropiaIds);
   expect(savedAmetropias).toEqual(['myopia']);
@@ -545,15 +545,15 @@ test('shows management reports and dashboard grouped by store and captor', async
   }, { capturedAtClient });
 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Painel de gestao/ }).click();
-  await expect(page.getByRole('button', { name: 'Relatorios' })).toBeVisible();
-  await page.getByRole('button', { name: 'Relatorios' }).click();
+  await page.getByRole('button', { name: /Painel de gestão/ }).click();
+  await expect(page.getByRole('button', { name: 'Relatórios' })).toBeVisible();
+  await page.getByRole('button', { name: 'Relatórios' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Relatorios' })).toBeVisible();
-  await expect(page.getByText('Defina o intervalo do relatorio')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Relatórios' })).toBeVisible();
+  await expect(page.getByText('Defina o intervalo do relatório')).toBeVisible();
   await expect(page.getByLabel('Data inicial')).toBeVisible();
   await expect(page.getByLabel('Data final')).toBeVisible();
-  const metrics = page.getByRole('region', { name: 'Indicadores do periodo' });
+  const metrics = page.getByRole('region', { name: 'Indicadores do período' });
   await expect(metrics.locator('div', { hasText: 'Cadastros' }).locator('strong')).toHaveText('3');
   await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
   await expect(metrics.locator('div', { hasText: 'Comparecimentos' }).locator('strong')).toHaveText('1');
@@ -561,38 +561,38 @@ test('shows management reports and dashboard grouped by store and captor', async
   await expect(page.getByRole('heading', { name: 'Resultados por unidade' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Agendamentos por dia da semana' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Agendamentos por horario' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agendamentos por horário' })).toBeVisible();
   await expect(page.getByText('Quinta', { exact: true })).toBeVisible();
-  await expect(page.getByText('Predominio: Manha')).toBeVisible();
+  await expect(page.getByText('Predominio: Manhã')).toBeVisible();
   const reportDate = capturedAtClient.slice(0, 10);
   await page.getByLabel('Data inicial').fill(reportDate);
   await page.getByLabel('Data final').fill(reportDate);
-  await page.getByRole('button', { name: 'Aplicar periodo' }).click();
+  await page.getByRole('button', { name: 'Aplicar período' }).click();
   await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
   await expect(page.getByText('Loja 02', { exact: true })).toBeVisible();
   await expect(page.getByText('Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByText('Captador Loja 06', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('reports.png'), fullPage: true });
 
-  await page.getByRole('button', { name: 'Voltar para gestao' }).click();
+  await page.getByRole('button', { name: 'Voltar para gestão' }).click();
   await page.getByRole('button', { name: 'Dashboard' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   const dashboardMetrics = page.getByRole('region', { name: 'Indicadores do dashboard' });
   await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
   await expect(page.getByRole('heading', { name: 'Cadastros por dia' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Situacao dos agendamentos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Situação dos agendamentos' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Desempenho por loja' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
   await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
   await page.getByLabel('Data inicial').fill(reportDate);
   await page.getByLabel('Data final').fill(reportDate);
-  await page.getByRole('button', { name: 'Aplicar periodo' }).click();
+  await page.getByRole('button', { name: 'Aplicar período' }).click();
   await expect(page.getByLabel('Data inicial')).toHaveValue(reportDate);
   await expect(page.getByLabel('Data final')).toHaveValue(reportDate);
   await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
   await page.getByRole('button', { name: 'Consultar SavWin' }).click();
   await expect(page.getByText('SavWin conectado localmente')).toBeVisible();
-  await expect(page.getByText('4 item(ns) encontrados em 2 OS no periodo.')).toBeVisible();
+  await expect(page.getByText('4 item(ns) encontrados em 2 OS no período.')).toBeVisible();
   expect(savwinRequest.storeCodes).toEqual(['2', '4', '5', '6']);
   expect(savwinRequest.startDate).toBe(reportDate);
   expect(savwinRequest.endDate).toBe(reportDate);
@@ -630,8 +630,8 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
     await page.getByLabel('Nome *').fill(name);
     await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
     await page.getByLabel('Data de nascimento *').fill('1985-04-12');
-    await page.getByLabel('Data do pre-agendamento').fill(date);
-    await page.getByLabel('Horario disponivel').selectOption(time);
+    await page.getByLabel('Data do pré-agendamento').fill(date);
+    await page.getByLabel('Horário disponível').selectOption(time);
     await page.getByRole('button', { name: 'Salvar cadastro' }).click();
     await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   }
@@ -640,7 +640,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await createAppointment('Cliente Agenda B', appointmentDate, '10:00');
   await createAppointment('Cliente Outro Dia', nextDate, '09:00');
 
-  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: 'Início', exact: true }).click();
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   const selectedDay = page.locator(`[data-appointment-date="${appointmentDate}"]`);
   await expect(selectedDay).toContainText('2 exames');
@@ -652,11 +652,11 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await page.getByRole('button', { name: 'Novo agendamento' }).click();
   const appointmentDialog = page.getByRole('dialog', { name: 'Novo agendamento' });
   await expect(appointmentDialog).toBeVisible();
-  await expect(appointmentDialog.getByLabel('Horario disponivel').locator('option[value="08:20"]')).toHaveCount(0);
+  await expect(appointmentDialog.getByLabel('Horário disponível').locator('option[value="08:20"]')).toHaveCount(0);
   await appointmentDialog.getByLabel('Nome *').fill('Cliente Direto Agenda');
   await appointmentDialog.getByLabel('Telefone ou WhatsApp *').fill('81988887777');
   await appointmentDialog.getByLabel('Data de nascimento *').fill('1985-04-12');
-  await appointmentDialog.getByLabel('Horario disponivel').selectOption('08:40');
+  await appointmentDialog.getByLabel('Horário disponível').selectOption('08:40');
   await page.screenshot({ path: testInfo.outputPath('appointment-create-modal.png'), fullPage: true });
   await appointmentDialog.getByRole('button', { name: 'Salvar cadastro' }).click();
   await expect(appointmentDialog).not.toBeVisible();
@@ -669,7 +669,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
   await expect(page.getByText('Comparecimento registrado.')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('appointments-attendance.png'), fullPage: true });
 
-  await page.getByRole('button', { name: 'Inicio', exact: true }).click();
+  await page.getByRole('button', { name: 'Início', exact: true }).click();
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   await page.locator(`[data-appointment-date="${appointmentDate}"]`).click();
   const persistedAttendance = page.getByRole('group', { name: 'Comparecimento de Cliente Agenda A' });
@@ -677,7 +677,7 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
 });
 
 test('keeps a long appointment list inside the calendar height', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop sidebar uses its own scroll area.');
+  test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop sidebar uses its own scroll área.');
 
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -759,7 +759,7 @@ test('keeps new registration beside the management return action', async ({ page
   await page.getByRole('button', { name: /Agenda de exames/ }).click();
   await page.locator(`[data-appointment-date="${appointmentDate}"]`).click();
   const heading = page.locator('.agenda-heading');
-  await expect(heading.getByRole('button', { name: 'Voltar para gestao' })).toBeVisible();
+  await expect(heading.getByRole('button', { name: 'Voltar para gestão' })).toBeVisible();
   await expect(heading.getByRole('button', { name: 'Novo agendamento' })).toBeVisible();
   await expect(page.locator('.agenda-day-heading').getByRole('button', { name: 'Novo agendamento' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Informar CPF|Atualizar CPF/ })).toHaveCount(0);
@@ -768,7 +768,7 @@ test('keeps new registration beside the management return action', async ({ page
   const dialog = page.getByRole('dialog', { name: 'Novo agendamento' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Salvar cadastro' })).toBeVisible();
-  await expect(dialog.getByText('Informacoes adicionais')).toHaveCount(0);
+  await expect(dialog.getByText('Informações adicionais')).toHaveCount(0);
   await expect(dialog.getByLabel('CPF', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Data de nascimento')).toBeVisible();
   await expect(dialog.getByLabel('Sexo')).toBeVisible();
@@ -939,9 +939,9 @@ test('alerts the captor about a missed appointment and prepares WhatsApp follow-
   await page.screenshot({ path: testInfo.outputPath('missed-follow-up.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Reagendar' }).click();
-  await page.getByLabel('Data do pre-agendamento').fill(futureDate);
-  await page.getByLabel('Horario').fill('10:00');
-  await page.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await page.getByLabel('Data do pré-agendamento').fill(futureDate);
+  await page.getByLabel('Horário').selectOption('10:00');
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
   await page.getByRole('button', { name: 'Retornos', exact: true }).click();
   await expect(page.getByText('Nenhum retorno pendente')).toBeVisible();
 });
@@ -1031,7 +1031,7 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await page.screenshot({ path: testInfo.outputPath('captor-pending-follow-ups-dialog.png'), fullPage: true });
   await captorDialog.getByRole('button', { name: 'Reagendar' }).click();
   await expect(page.getByRole('heading', { name: 'Cliente Aguardando' })).toBeVisible();
-  await expect(page.getByText('Cadastro nao encontrado. Volte para a lista e tente novamente.')).not.toBeVisible();
+  await expect(page.getByText('Cadastro não encontrado. Volte para a lista e tente novamente.')).not.toBeVisible();
   await page.evaluate(() => { location.hash = '#/follow-ups'; });
   await expect(page.getByRole('heading', { name: 'Retornos da equipe' })).toBeVisible();
   await page.locator('[data-follow-up-filter="contacted"]').click();
@@ -1060,9 +1060,9 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await awaitingCard.getByRole('button', { name: 'Reagendar' }).click();
   await expect(page.getByRole('heading', { name: 'Cliente Aguardando' })).toBeVisible();
   await expect(page.getByLabel('Nome *')).toBeDisabled();
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
-  await page.getByLabel('Data do pre-agendamento').fill(rescheduleDate);
-  await page.getByLabel('Horario').fill('10:30');
+  await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
+  await page.getByLabel('Data do pré-agendamento').fill(rescheduleDate);
+  await page.getByLabel('Horário').fill('10:30');
   await page.getByRole('button', { name: 'Salvar reagendamento' }).click();
   await expect(page.getByText('Lead atualizado com sucesso.')).toBeVisible();
 });
@@ -1123,13 +1123,13 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   test.setTimeout(90_000);
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Configuracoes/ }).click();
-  await expect(page.getByRole('heading', { name: 'Configuracoes' })).toBeVisible();
-  await expect(page.getByText('Configuracoes da agenda', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Configurações/ }).click();
+  await expect(page.getByRole('heading', { name: 'Configurações' })).toBeVisible();
+  await expect(page.getByText('Configurações da agenda', { exact: true })).toBeVisible();
 
   await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
   await page.getByRole('button', { name: 'Configurar agenda' }).click();
-  const generalScheduleDialog = page.getByRole('dialog', { name: 'Configuracoes gerais' });
+  const generalScheduleDialog = page.getByRole('dialog', { name: 'Configurações gerais' });
   const storeScheduleGap = await generalScheduleDialog.evaluate((dialog) => {
     const availability = dialog.querySelector('[name="schedulingMode"]').getBoundingClientRect();
     const legend = dialog.querySelector('[data-field="storeHoursRules"] legend').getBoundingClientRect();
@@ -1138,8 +1138,8 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   expect(storeScheduleGap).toBeLessThanOrEqual(40);
   await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
   await generalScheduleDialog.getByLabel('Exibir ametropias no cadastro').check();
-  await generalScheduleDialog.getByLabel('Alertar atraso apos').fill('5');
-  await generalScheduleDialog.getByLabel('Sugerir reagendamento apos').fill('30');
+  await generalScheduleDialog.getByLabel('Alertar atraso após').fill('5');
+  await generalScheduleDialog.getByLabel('Sugerir reagendamento após').fill('30');
   const graceLayout = await generalScheduleDialog.evaluate((dialog) => {
     const help = dialog.querySelector('#settings-no-show-help').getBoundingClientRect();
     const input = dialog.querySelector('#settings-no-show-grace').getBoundingClientRect();
@@ -1147,18 +1147,18 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   });
   expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
   await generalScheduleDialog.getByLabel('Gerar retorno automaticamente').check();
-  await generalScheduleDialog.getByLabel('Inicio de Quinta').fill('09:00');
+  await generalScheduleDialog.getByLabel('Início de Quinta').fill('09:00');
   await generalScheduleDialog.getByLabel('Fim de Quinta').fill('17:00');
-  await generalScheduleDialog.getByLabel('Inicio de Sabado').fill('08:00');
+  await generalScheduleDialog.getByLabel('Início de Sabado').fill('08:00');
   await generalScheduleDialog.getByLabel('Fim de Sabado').fill('12:00');
   await page.screenshot({ path: testInfo.outputPath('general-schedule-dialog.png') });
-  await generalScheduleDialog.getByRole('button', { name: 'Aplicar configuracoes' }).click();
+  await generalScheduleDialog.getByRole('button', { name: 'Aplicar configurações' }).click();
   await expect(generalScheduleDialog).not.toBeVisible();
   await expect(page.getByText('7 dias abertos')).toBeVisible();
   await page.getByRole('button', { name: 'Configurar limite' }).click();
   const limitedDaysDialog = page.getByRole('dialog', { name: 'Limite de vagas' });
-  await expect(limitedDaysDialog.getByLabel('Limitar vagas em dias especificos')).not.toBeChecked();
-  await limitedDaysDialog.getByLabel('Limitar vagas em dias especificos').check();
+  await expect(limitedDaysDialog.getByLabel('Limitar vagas em dias específicos')).not.toBeChecked();
+  await limitedDaysDialog.getByLabel('Limitar vagas em dias específicos').check();
   const limitedDaysGroup = limitedDaysDialog.getByRole('group', { name: 'Limite por dia da semana' });
   await expect(limitedDaysGroup.getByRole('checkbox', { name: 'Quarta', exact: true })).toBeChecked();
   await expect(limitedDaysGroup.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
@@ -1174,16 +1174,16 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   const meiQuotaGroup = meiQuotaDialog.getByRole('group', { name: 'Cotas por dia da semana' });
   await expect(meiQuotaGroup.getByRole('checkbox', { name: 'Quarta', exact: true })).toBeChecked();
   await expect(meiQuotaGroup.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
-  await meiQuotaDialog.getByLabel('Cota da manha de Quarta').fill('4');
+  await meiQuotaDialog.getByLabel('Cota da manhã de Quarta').fill('4');
   await meiQuotaDialog.getByLabel('Cota da tarde de Quarta').fill('6');
-  await meiQuotaDialog.getByLabel('Cota da manha de Sabado').fill('2');
+  await meiQuotaDialog.getByLabel('Cota da manhã de Sabado').fill('2');
   await meiQuotaDialog.getByLabel('Cota da tarde de Sabado').fill('2');
   await page.screenshot({ path: testInfo.outputPath('mei-quota-dialog.png') });
   await meiQuotaDialog.getByRole('button', { name: 'Aplicar cotas' }).click();
   await expect(meiQuotaDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(2);
   await page.getByRole('button', { name: 'Configurar triagem' }).click();
-  const ophthalmologyDialog = page.getByRole('dialog', { name: 'Atendimento oftalmologico' });
+  const ophthalmologyDialog = page.getByRole('dialog', { name: 'Atendimento oftalmológico' });
   const ophthalmologyScheduleGap = await ophthalmologyDialog.evaluate((dialog) => {
     const minimumAge = dialog.querySelector('[name="ophthalmologyMinimumAge"]').getBoundingClientRect();
     const legend = dialog.querySelector('[data-field="ophthalmologyHoursRules"] legend').getBoundingClientRect();
@@ -1194,12 +1194,12 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(ophthalmologyDialog.getByLabel('Perguntar sobre cirurgia a partir de')).toHaveValue('55');
   await ophthalmologyDialog.getByRole('checkbox', { name: 'Quinta', exact: true }).check();
   await expect(ophthalmologyDialog).toBeVisible();
-  await ophthalmologyDialog.getByLabel('Inicio do oftalmologista em Quinta').fill('08:00');
+  await ophthalmologyDialog.getByLabel('Início do oftalmologista em Quinta').fill('08:00');
   await expect(ophthalmologyDialog).toBeVisible();
   await ophthalmologyDialog.getByLabel('Fim do oftalmologista em Quinta').fill('18:00');
   await expect(ophthalmologyDialog).toBeVisible();
   await expect(ophthalmologyDialog.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
-  await ophthalmologyDialog.getByLabel('Inicio do oftalmologista em Sabado').fill('08:00');
+  await ophthalmologyDialog.getByLabel('Início do oftalmologista em Sabado').fill('08:00');
   await ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado').fill('12:00');
   await expect(ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado')).toHaveValue('12:00');
   await page.screenshot({ path: testInfo.outputPath('ophthalmology-weekly-schedule-dialog.png') });
@@ -1210,24 +1210,24 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   const transportDialog = page.getByRole('dialog', { name: 'Transporte' });
   await transportDialog.getByLabel('Disponibilizar transporte').check();
   await transportDialog.getByRole('checkbox', { name: 'Quarta', exact: true }).check();
-  await transportDialog.getByLabel('Inicio do transporte em Quarta').fill('13:00');
+  await transportDialog.getByLabel('Início do transporte em Quarta').fill('13:00');
   await transportDialog.getByLabel('Fim do transporte em Quarta').fill('17:00');
   await transportDialog.getByRole('checkbox', { name: 'Sabado', exact: true }).check();
-  await transportDialog.getByLabel('Inicio do transporte em Sabado').fill('08:00');
+  await transportDialog.getByLabel('Início do transporte em Sabado').fill('08:00');
   await transportDialog.getByLabel('Fim do transporte em Sabado').fill('12:00');
   await page.screenshot({ path: testInfo.outputPath('transport-weekly-schedule-dialog.png') });
   await transportDialog.getByRole('button', { name: 'Aplicar transporte' }).click();
   await expect(transportDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(4);
-  await page.getByRole('button', { name: 'Salvar configuracao' }).click();
-  await expect(page.getByText('Configuracao da agenda salva.')).toBeVisible();
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  await expect(page.getByText('Configuração da agenda salva.')).toBeVisible();
   if (!testInfo.project.name.includes('mobile')) {
     await page.getByRole('button', { name: 'Configurar agenda' }).click();
-    await expect(generalScheduleDialog.getByLabel('Alertar atraso apos')).toHaveValue('5');
-    await expect(generalScheduleDialog.getByLabel('Sugerir reagendamento apos')).toHaveValue('30');
+    await expect(generalScheduleDialog.getByLabel('Alertar atraso após')).toHaveValue('5');
+    await expect(generalScheduleDialog.getByLabel('Sugerir reagendamento após')).toHaveValue('30');
     await expect(generalScheduleDialog.getByLabel('Gerar retorno automaticamente')).toBeChecked();
     await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).toBeChecked();
-    await expect(generalScheduleDialog.getByLabel('Inicio de Quinta')).toHaveValue('09:00');
+    await expect(generalScheduleDialog.getByLabel('Início de Quinta')).toHaveValue('09:00');
     await expect(generalScheduleDialog.getByLabel('Fim de Quinta')).toHaveValue('17:00');
     await expect(generalScheduleDialog.getByLabel('Fim de Sabado')).toHaveValue('12:00');
     await generalScheduleDialog.getByRole('button', { name: 'Cancelar' }).click();
@@ -1236,9 +1236,9 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
     await expect(limitedDaysDialog.getByLabel('Vagas de Sabado')).toHaveValue('4');
     await limitedDaysDialog.getByRole('button', { name: 'Cancelar' }).click();
     await page.getByRole('button', { name: 'Configurar cotas' }).click();
-    await expect(meiQuotaDialog.getByLabel('Cota da manha de Quarta')).toHaveValue('4');
+    await expect(meiQuotaDialog.getByLabel('Cota da manhã de Quarta')).toHaveValue('4');
     await expect(meiQuotaDialog.getByLabel('Cota da tarde de Quarta')).toHaveValue('6');
-    await expect(meiQuotaDialog.getByLabel('Cota da manha de Sabado')).toHaveValue('2');
+    await expect(meiQuotaDialog.getByLabel('Cota da manhã de Sabado')).toHaveValue('2');
     await expect(meiQuotaDialog.getByLabel('Cota da tarde de Sabado')).toHaveValue('2');
     await meiQuotaDialog.getByRole('button', { name: 'Cancelar' }).click();
   }
@@ -1251,35 +1251,35 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Transporte', { exact: true }).selectOption('true');
   await expect(page.getByLabel('Tem acompanhante?')).toBeEnabled();
   await page.getByLabel('Tem acompanhante?').selectOption('true');
-  await page.getByLabel('Data do pre-agendamento').fill('2026-10-24');
-  await expect(page.getByText('Transporte disponivel das 08:00 as 12:00.')).toBeVisible();
-  await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(1);
-  await expect(page.getByLabel('Horario disponivel').locator('option[value="11:40"]')).toHaveCount(1);
-  await expect(page.getByLabel('Horario disponivel').locator('option[value="12:00"]')).toHaveCount(0);
+  await page.getByLabel('Data do pré-agendamento').fill('2026-10-24');
+  await expect(page.getByText('Transporte disponível das 08:00 às 12:00.')).toBeVisible();
+  await expect(page.getByLabel('Horário disponível').locator('option[value="08:00"]')).toHaveCount(1);
+  await expect(page.getByLabel('Horário disponível').locator('option[value="11:40"]')).toHaveCount(1);
+  await expect(page.getByLabel('Horário disponível').locator('option[value="12:00"]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('transport-lead-fields.png'), fullPage: true });
   await page.getByLabel('Transporte', { exact: true }).selectOption('false');
   await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
   const date = new Date();
   date.setDate(date.getDate() + 1);
   const appointmentDate = date.toISOString().slice(0, 10);
-  await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
-  const timeSelect = page.getByLabel('Horario disponivel');
+  await page.getByLabel('Data do pré-agendamento').fill(appointmentDate);
+  const timeSelect = page.getByLabel('Horário disponível');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:30"]')).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath('available-slots.png'), fullPage: true });
 
-  await page.getByLabel('Nome *').fill('Cliente Horario Ocupado');
+  await page.getByLabel('Nome *').fill('Cliente Horário Ocupado');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('Data de nascimento *').fill('1985-04-12');
   await timeSelect.selectOption('08:00');
   await page.getByRole('button', { name: 'Salvar cadastro' }).click();
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
-  await page.getByLabel('Data do pre-agendamento').fill(appointmentDate);
-  await expect(page.getByLabel('Horario disponivel').locator('option[value="08:00"]')).toHaveCount(0);
-  await expect(page.getByLabel('Horario disponivel').locator('option[value="08:10"]')).toHaveCount(0);
+  await page.getByLabel('Data do pré-agendamento').fill(appointmentDate);
+  await expect(page.getByLabel('Horário disponível').locator('option[value="08:00"]')).toHaveCount(0);
+  await expect(page.getByLabel('Horário disponível').locator('option[value="08:10"]')).toHaveCount(0);
 });
 
 test('hides transport fields from new registrations when transport is disabled', async ({ page }) => {
@@ -1297,7 +1297,7 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Configuracoes/ }).click();
+  await page.getByRole('button', { name: /Configurações/ }).click();
   const layout = await page.locator('.settings-layout').evaluate((element) => {
     const form = element.querySelector('.settings-form').getBoundingClientRect();
     const cards = [...element.querySelectorAll('.schedule-config-launch')].map((item) => item.getBoundingClientRect());
@@ -1316,7 +1316,7 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   expect(layout.overflow).toBeLessThanOrEqual(1);
   await expect(page.locator('.schedule-preview')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Configurar agenda' })).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Configuracoes gerais' })).not.toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Configurações gerais' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Configurar limite' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Limite de vagas' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Configurar cotas' })).toBeVisible();
@@ -1330,8 +1330,8 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await expect(offlineDialog).toBeVisible();
   await expect(offlineDialog.getByLabel('Permitir cadastros sem internet')).not.toBeChecked();
   await offlineDialog.getByLabel('Permitir cadastros sem internet').check();
-  await offlineDialog.getByRole('button', { name: 'Aplicar configuracao' }).click();
-  await page.getByRole('button', { name: 'Salvar configuracao' }).click();
+  await offlineDialog.getByRole('button', { name: 'Aplicar configuração' }).click();
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
   await expect(page.getByRole('button', { name: 'Sync', exact: true })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('schedule-settings-intermediate.png'), fullPage: true });
   await page.setViewportSize({ width: 900, height: 768 });
@@ -1341,9 +1341,9 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await expect(page.locator('#lead-form')).toBeVisible();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeHidden();
-  await expect(page.getByLabel('Horario disponivel')).toBeHidden();
-  await expect(page.getByText(/somente os dados do lead serao salvos/i)).toBeVisible();
+  await expect(page.getByLabel('Data do pré-agendamento')).toBeHidden();
+  await expect(page.getByLabel('Horário disponível')).toBeHidden();
+  await expect(page.getByText(/somente os dados do lead serão salvos/i)).toBeVisible();
   await page.getByLabel('Nome *').fill('Cliente Offline');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999990000');
   await page.getByLabel('Data de nascimento').fill('1980-01-01');
@@ -1354,54 +1354,54 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.context().setOffline(false);
   await expect(offlineLead).toContainText('Aguardando agendamento');
   await offlineLead.click();
-  await expect(page.getByLabel('Data do pre-agendamento')).toBeEnabled();
+  await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
   const scheduleDate = new Date();
   scheduleDate.setDate(scheduleDate.getDate() + 7);
-  await page.getByLabel('Data do pre-agendamento').fill(scheduleDate.toISOString().slice(0, 10));
-  await expect(page.getByLabel('Horario disponivel')).toBeVisible();
-  await expect(page.getByLabel('Horario disponivel')).toBeEnabled();
-  expect(await page.getByLabel('Horario disponivel').locator('option').count()).toBeGreaterThan(1);
+  await page.getByLabel('Data do pré-agendamento').fill(scheduleDate.toISOString().slice(0, 10));
+  await expect(page.getByLabel('Horário disponível')).toBeVisible();
+  await expect(page.getByLabel('Horário disponível')).toBeEnabled();
+  expect(await page.getByLabel('Horário disponível').locator('option').count()).toBeGreaterThan(1);
 });
 
 test('shows the role and permission editor on desktop and mobile', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Configuracoes/ }).click();
-  await page.getByRole('tab', { name: 'Perfis e permissoes' }).click();
+  await page.getByRole('button', { name: /Configurações/ }).click();
+  await page.getByRole('tab', { name: 'Perfis e permissões' }).click();
 
   await expect(page.getByText('Cargos cadastrados', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Adicionar cargo' })).toBeVisible();
   await expect(page.locator('#role-profile-form')).toHaveCount(0);
   await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
   await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
-  await expect(page.getByText('Atendente de balcao', { exact: true })).toBeVisible();
+  await expect(page.getByText('Atendente de balcão', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
   await expect(page.getByText('MEI', { exact: true })).toBeVisible();
   await expect(page.locator('.role-catalog-row')).toHaveCount(5);
-  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
-  const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcao' });
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
+  const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcão' });
   await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
-  await expect(receptionistDialog.getByText('6 de 18 permissoes ativadas')).toBeVisible();
+  await expect(receptionistDialog.getByText('6 de 18 permissões ativadas')).toBeVisible();
   await receptionistDialog.getByLabel('Registrar comparecimento e falta').uncheck();
-  await expect(receptionistDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
-  await receptionistDialog.getByRole('button', { name: 'Salvar permissoes' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
+  await expect(receptionistDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
+  await receptionistDialog.getByRole('button', { name: 'Salvar permissões' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
   await expect(receptionistDialog.getByLabel('Registrar comparecimento e falta')).not.toBeChecked();
-  await receptionistDialog.getByRole('button', { name: 'Restaurar padrao' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Atendente de balcao' }).click();
+  await receptionistDialog.getByRole('button', { name: 'Restaurar padrão' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
   await expect(receptionistDialog.getByLabel('Registrar comparecimento e falta')).toBeChecked();
   await receptionistDialog.getByRole('button', { name: 'Cancelar' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Administrador' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Administrador' }).click();
   const administratorDialog = page.getByRole('dialog', { name: 'Administrador' });
   await expect(administratorDialog.locator('.role-details-permission.is-active')).toHaveCount(18);
   await expect(administratorDialog.locator('[data-system-role-permission]:enabled')).toHaveCount(0);
   await administratorDialog.getByRole('button', { name: 'Concluir' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissoes do perfil Colaborador' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Colaborador' }).click();
   const detailsDialog = page.getByRole('dialog', { name: 'Colaborador' });
   await expect(detailsDialog).toBeVisible();
   await expect(detailsDialog.locator('.role-details-permission')).toHaveCount(18);
   await expect(detailsDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
-  await expect(detailsDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
+  await expect(detailsDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('role-permissions-details.png') });
   await detailsDialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(detailsDialog).not.toBeVisible();
@@ -1411,14 +1411,14 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(editorDialog.locator('.role-details-permission')).toHaveCount(18);
   await expect(editorDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
   await expect(editorDialog.getByLabel('Cadastrar leads')).toBeChecked();
-  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).toBeDisabled();
-  await expect(editorDialog.getByText('5 de 18 permissoes ativadas')).toBeVisible();
+  await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeDisabled();
+  await expect(editorDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
   await editorDialog.getByLabel('Alcance dos dados').selectOption('stores');
-  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).toBeEnabled();
-  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).not.toBeChecked();
-  await editorDialog.getByLabel('Visualizar relatorios').check();
-  await expect(editorDialog.getByLabel('Acessar a gestao de leads')).toBeChecked();
-  await expect(editorDialog.getByText('7 de 18 permissoes ativadas')).toBeVisible();
+  await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeEnabled();
+  await expect(editorDialog.getByLabel('Acessar a gestão de leads')).not.toBeChecked();
+  await editorDialog.getByLabel('Visualizar relatórios').check();
+  await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeChecked();
+  await expect(editorDialog.getByText('7 de 18 permissões ativadas')).toBeVisible();
   await editorDialog.getByLabel('Nome do cargo').fill('Supervisor de teste');
   await editorDialog.getByRole('button', { name: 'Criar cargo' }).click();
   const customCard = page.locator('.role-catalog-row').filter({ hasText: 'Supervisor de teste' });
@@ -1429,11 +1429,11 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(editDialog).toBeVisible();
   await expect(editDialog.locator('.role-details-permission')).toHaveCount(18);
   await expect(editDialog.locator('.role-details-permission.is-active')).toHaveCount(7);
-  await expect(editDialog.getByLabel('Visualizar relatorios')).toBeChecked();
+  await expect(editDialog.getByLabel('Visualizar relatórios')).toBeChecked();
   await expect(editDialog.getByLabel('Nome do cargo')).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath('custom-role-editor.png') });
   await editDialog.getByLabel('Nome do cargo').fill('Supervisor atualizado');
-  await editDialog.getByRole('button', { name: 'Salvar alteracoes' }).click();
+  await editDialog.getByRole('button', { name: 'Salvar alterações' }).click();
   const updatedCard = page.locator('.role-catalog-row').filter({ hasText: 'Supervisor atualizado' });
   await expect(updatedCard).toBeVisible();
 
@@ -1459,13 +1459,13 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
 test('creates a service and uses its duration in new appointments', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Configuracoes/ }).click();
-  await page.getByRole('tab', { name: 'Servicos' }).click();
+  await page.getByRole('button', { name: /Configurações/ }).click();
+  await page.getByRole('tab', { name: 'Serviços' }).click();
 
-  await expect(page.getByText('Servicos cadastrados')).toBeVisible();
+  await expect(page.getByText('Serviços cadastrados')).toBeVisible();
   await expect(page.getByText('Exame de vista')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Novo servico' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Novo servico' });
+  await page.getByRole('button', { name: 'Novo serviço' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Novo serviço' });
   const serviceFieldsLayout = await dialog.evaluate((element) => {
     const name = element.querySelector('.service-name-field').getBoundingClientRect();
     const duration = element.querySelector('.service-duration-field').getBoundingClientRect();
@@ -1477,13 +1477,13 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   } else {
     expect(serviceFieldsLayout.durationTop).toBeGreaterThanOrEqual(serviceFieldsLayout.nameBottom);
   }
-  await dialog.getByLabel('Nome do servico').fill('Avaliacao especializada');
-  await dialog.getByLabel('Duracao').fill('40');
+  await dialog.getByLabel('Nome do serviço').fill('Avaliacao especializada');
+  await dialog.getByLabel('Duração').fill('40');
   await expect(dialog.getByText('Loja 02', { exact: true })).toHaveCSS('color', 'rgb(20, 32, 51)');
   await dialog.getByLabel('Loja 02').uncheck();
   await dialog.getByLabel('Loja 06').check();
   await dialog.getByLabel('Loja 04').check();
-  await dialog.getByRole('button', { name: 'Salvar servico' }).click();
+  await dialog.getByRole('button', { name: 'Salvar serviço' }).click();
 
   const serviceRow = page.locator('.service-catalog-row').filter({ hasText: 'Avaliacao especializada' });
   await expect(serviceRow).toBeVisible();
@@ -1493,25 +1493,25 @@ test('creates a service and uses its duration in new appointments', async ({ pag
 
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
-  await page.getByLabel('Servico do agendamento').selectOption({ label: 'Avaliacao especializada - 40 min' });
+  await page.getByLabel('Serviço do agendamento').selectOption({ label: 'Avaliacao especializada - 40 min' });
   const date = new Date();
   date.setDate(date.getDate() + 1);
-  await page.getByLabel('Data do pre-agendamento').fill(date.toISOString().slice(0, 10));
-  const timeSelect = page.getByLabel('Horario disponivel');
+  await page.getByLabel('Data do pré-agendamento').fill(date.toISOString().slice(0, 10));
+  const timeSelect = page.getByLabel('Horário disponível');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
   await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
 
   await page.evaluate(() => { window.location.hash = '#/settings'; });
-  await page.getByRole('tab', { name: 'Servicos' }).click();
+  await page.getByRole('tab', { name: 'Serviços' }).click();
   const savedServiceRow = page.locator('.service-catalog-row').filter({ hasText: 'Avaliacao especializada' });
-  await savedServiceRow.getByTitle('Excluir servico').click();
-  const deleteDialog = page.getByRole('dialog', { name: 'Excluir servico?' });
-  await expect(deleteDialog).toContainText('Os agendamentos ja cadastrados serao preservados.');
+  await savedServiceRow.getByTitle('Excluir serviço').click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Excluir serviço?' });
+  await expect(deleteDialog).toContainText('Os agendamentos já cadastrados serão preservados.');
   await deleteDialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(savedServiceRow).toBeVisible();
 
-  await savedServiceRow.getByTitle('Excluir servico').click();
-  await page.getByRole('dialog', { name: 'Excluir servico?' }).getByRole('button', { name: 'Excluir servico' }).click();
+  await savedServiceRow.getByTitle('Excluir serviço').click();
+  await page.getByRole('dialog', { name: 'Excluir serviço?' }).getByRole('button', { name: 'Excluir serviço' }).click();
   await expect(savedServiceRow).toHaveCount(0);
 });
