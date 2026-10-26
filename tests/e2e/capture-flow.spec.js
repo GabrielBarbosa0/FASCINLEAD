@@ -136,6 +136,25 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
     ]);
     expect(Math.abs(routeBox.y - typeBox.y)).toBeLessThan(2);
     expect(Math.abs(routeBox.y - priceBox.y)).toBeLessThan(2);
+  } else {
+    const billingLayout = await page.locator('.exam-billing-fields').evaluate((element) => {
+      const container = element.getBoundingClientRect();
+      const route = element.querySelector('[name="careRouteOverride"]').getBoundingClientRect();
+      const type = element.querySelector('[name="examPaymentType"]').getBoundingClientRect();
+      const price = element.querySelector('.exam-price-display').getBoundingClientRect();
+      return {
+        routeBottom: route.bottom,
+        typeTop: type.top,
+        priceTop: price.top,
+        priceWidth: price.width,
+        priceRight: price.right,
+        containerRight: container.right
+      };
+    });
+    expect(billingLayout.typeTop).toBeGreaterThanOrEqual(billingLayout.routeBottom);
+    expect(Math.abs(billingLayout.typeTop - billingLayout.priceTop)).toBeLessThan(2);
+    expect(billingLayout.priceWidth).toBeGreaterThanOrEqual(123);
+    expect(billingLayout.priceRight).toBeLessThanOrEqual(billingLayout.containerRight + 1);
   }
   await expect(examPaymentType).toHaveValue('paid');
   await expect(examPrice).toHaveText('R$ 150,00');
@@ -299,6 +318,84 @@ test('keeps the mobile form filled and explains why a registration was not saved
   await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Cadastro salvo');
   await expect(page.getByText('Cliente Mobile')).toBeVisible();
+});
+
+test('allows completing the service and scheduling a synchronized offline registration', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'receptionist'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.evaluate(() => {
+    const lead = {
+      id: 'synced-offline-without-service',
+      fullName: 'Cliente Sincronizado',
+      preferredName: '',
+      phone: '+5581999991234',
+      phoneSearch: '81999991234',
+      customerCpf: '',
+      customerRg: '',
+      birthDate: '1985-04-12',
+      sex: '',
+      street: '',
+      streetNumber: '',
+      neighborhood: '',
+      city: '',
+      state: 'PE',
+      interestId: 'eye-exam',
+      interestLabel: 'Exame de vista',
+      ametropiaIds: [],
+      pathologyIds: [],
+      eyeSurgeryStatus: '',
+      eyeSurgeryType: '',
+      eyeSurgeryDetails: '',
+      careRoute: 'optometrist',
+      careRouteOverride: 'optometrist',
+      careRouteReasons: [],
+      examPaymentType: 'paid',
+      needsTransport: false,
+      hasCompanion: false,
+      transportSeats: 0,
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentSchedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      notes: '',
+      source: 'street',
+      capturedAtClient: new Date().toISOString(),
+      capturedByUid: 'demo-receptionist',
+      capturedByName: 'Atendente de Teste',
+      storeId: 'loja-06',
+      installationId: 'test-installation',
+      appVersion: '0.1.0',
+      schemaVersion: 1,
+      syncState: 'synced',
+      fromCache: false
+    };
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([lead]));
+    window.dispatchEvent(new Event('fascinlead:demo-leads'));
+  });
+
+  await page.getByRole('button', { name: 'Cadastros', exact: true }).click();
+  await page.getByRole('button', { name: 'Ver cadastro de Cliente Sincronizado' }).click();
+  const service = page.getByLabel('Serviço do agendamento');
+  await expect(service).toBeVisible();
+  await expect(service).toBeEnabled();
+  await expect(service).not.toHaveValue('');
+
+  const scheduleDate = await page.evaluate(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().slice(0, 10);
+  });
+  await page.getByLabel('Data do pré-agendamento').fill(scheduleDate);
+  const time = page.getByLabel('Horário disponível');
+  await expect(time).toBeEnabled();
+  await time.selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText(/Cadastro atualizado neste navegador|Agendamento salvo com sucesso/);
+  await page.getByRole('button', { name: 'Ver cadastro de Cliente Sincronizado' }).click();
+  await expect(page.getByLabel('Serviço do agendamento')).not.toHaveValue('');
+  await expect(page.getByLabel('Data do pré-agendamento')).toHaveValue(scheduleDate);
 });
 
 test('blocks new offline registrations while the store feature is disabled', async ({ page }) => {

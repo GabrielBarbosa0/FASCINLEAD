@@ -214,6 +214,8 @@ const state = {
     storeId: '',
     appointmentDate: '',
     appointments: [],
+    services: [],
+    serviceId: '',
     error: '',
     settings: { ...DEFAULT_STORE_SCHEDULE }
   },
@@ -1297,6 +1299,14 @@ function findManagementLead(leadId) {
     || (state.management.activeLead?.id === leadId ? state.management.activeLead : null);
 }
 
+function selectedLeadDetailService(lead) {
+  const available = servicesForStore(state.leadDetailSchedule.services, lead?.storeId);
+  return available.find((service) => service.id === state.leadDetailSchedule.serviceId)
+    || available.find((service) => service.id === lead?.appointmentServiceId)
+    || available[0]
+    || defaultAppointmentService(lead?.storeId, lead?.appointmentDurationMinutes || state.leadDetailSchedule.settings.appointmentDurationMinutes);
+}
+
 function leadDetailAppointmentTimeField(lead) {
   const { settings, appointmentDate, appointments, appointmentLoading, error } = state.leadDetailSchedule;
   const selectedTime = appointmentDate === lead.appointmentDate ? lead.appointmentTime : '';
@@ -1312,7 +1322,7 @@ function leadDetailAppointmentTimeField(lead) {
     ? isOphthalmologyDateAllowed(settings, appointmentDate)
     : isStoreDateAllowed(settings, appointmentDate);
   const transportAllowed = !lead.needsTransport || isTransportDateAllowed(settings, appointmentDate);
-  const durationMinutes = Number(lead.appointmentDurationMinutes) || settings.appointmentDurationMinutes;
+  const durationMinutes = selectedLeadDetailService(lead).durationMinutes;
   const serviceSchedule = {
     ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(settings) : settings),
     appointmentDurationMinutes: durationMinutes
@@ -1327,7 +1337,7 @@ function leadDetailAppointmentTimeField(lead) {
         durationMinutes
       )))
     : [];
-  let placeholder = 'Escolha primeiro uma data';
+  let placeholder = appointmentDate ? 'Selecione um horário' : 'Escolha primeiro uma data';
   if (appointmentLoading) placeholder = 'Consultando horários...';
   else if (error) placeholder = 'Horários indisponíveis';
   else if (appointmentDate && !routeAllowed) placeholder = triage.careRoute === 'ophthalmologist'
@@ -1365,6 +1375,11 @@ function leadDetailView() {
   const showAmetropiaFields = state.leadDetailSchedule.storeId === lead.storeId
     && state.leadDetailSchedule.settings.showAmetropiaFields;
   const interests = INTERESTS.map((item) => `<option value="${item.id}" ${lead.interestId === item.id ? 'selected' : ''}>${item.label}</option>`).join('');
+  const selectedService = selectedLeadDetailService(lead);
+  const availableServices = servicesForStore(state.leadDetailSchedule.services, lead.storeId);
+  const serviceOptions = (availableServices.length ? availableServices : [selectedService])
+    .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
+    .join('');
   return `
     <section class="page-toolbar detail-toolbar">
       <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
@@ -1379,8 +1394,8 @@ function leadDetailView() {
       ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alterações e agendamento exigem internet.</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(state.leadDetailSchedule.settings.schedulingMode || lead.appointmentSchedulingMode || 'controlled')}" />
       ${triageConfigFields(state.leadDetailSchedule.settings)}
-      <input name="appointmentDurationMinutes" type="hidden" value="${Number(lead.appointmentDurationMinutes) || 20}" />
-      ${lead.appointmentServiceId ? `<input name="appointmentServiceId" type="hidden" value="${escapeHtml(lead.appointmentServiceId)}" /><input name="appointmentServiceName" type="hidden" value="${escapeHtml(lead.appointmentServiceName || 'Exame de vista')}" />` : ''}
+      <input name="appointmentDurationMinutes" type="hidden" value="${selectedService.durationMinutes}" />
+      <input name="appointmentServiceName" type="hidden" value="${escapeHtml(selectedService.name)}" />
       <div class="field" data-field="fullName"><label for="edit-fullName">Nome <span aria-hidden="true">*</span></label><input id="edit-fullName" name="fullName" autocomplete="name" maxlength="120" value="${escapeHtml(lead.fullName)}" required ${locked} /><small class="field-error"></small></div>
       <div class="field-row contact-fields"><div class="field" data-field="phone"><label for="edit-phone">Telefone ou WhatsApp <span aria-hidden="true">*</span></label><input id="edit-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="16" value="${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}" required ${locked} /><small class="field-error"></small></div><div class="field" data-field="customerRg"><label for="edit-customerRg">RG</label><input id="edit-customerRg" name="customerRg" maxlength="20" autocomplete="off" value="${escapeHtml(lead.customerRg || '')}" placeholder="0.000.000" ${locked} /><small class="field-error"></small></div></div>
       <div class="field-row identity-fields"><div class="field" data-field="customerCpf"><label for="edit-customerCpf">CPF</label><input id="edit-customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" value="${escapeHtml(formatBrazilianCpf(lead.customerCpf))}" placeholder="000.000.000-00" ${locked} /><small class="field-error"></small></div><div class="field" data-field="birthDate"><label for="edit-birthDate">Data de nascimento</label><input id="edit-birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" value="${escapeHtml(lead.birthDate)}" ${locked} /><small class="birth-age-hint" data-birth-age>${escapeHtml(birthAgeText(lead.birthDate))}</small><small class="field-error"></small></div><div class="field" data-field="sex"><label for="edit-sex">Sexo</label><select id="edit-sex" name="sex" ${locked}>${sexOptions(lead.sex)}</select><small class="field-error"></small></div></div>
@@ -1392,7 +1407,10 @@ function leadDetailView() {
         <div class="field address-city"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
       </div>
-      <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
+      <div class="field-row interest-service-fields">
+        <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
+        <div class="field" data-field="appointmentServiceId"><label for="edit-appointmentServiceId">Serviço do agendamento</label><select id="edit-appointmentServiceId" name="appointmentServiceId" ${locked}><option value="">Selecione o serviço</option>${serviceOptions}</select><small class="field-error"></small></div>
+      </div>
       ${showAmetropiaFields ? `<fieldset class="field ametropia-field" ${locked}>
         <legend>Ametropias</legend>
         <small>Marque todas que se aplicam.</small>
@@ -2801,6 +2819,13 @@ function bindPageEvents() {
     bindExclusiveOptions(editLeadForm, 'pathologyIds');
     bindEyeTriage(editLeadForm, state.leadDetailSchedule.settings);
     bindTransportFields(editLeadForm, state.leadDetailSchedule.settings);
+    editLeadForm.elements.appointmentServiceId?.addEventListener('change', () => {
+      state.leadDetailSchedule.serviceId = editLeadForm.elements.appointmentServiceId.value;
+      const service = selectedLeadDetailService(existingLeadForDetail());
+      editLeadForm.elements.appointmentServiceName.value = service.name;
+      editLeadForm.elements.appointmentDurationMinutes.value = service.durationMinutes;
+      refreshLeadDetailAppointmentTime(existingLeadForDetail());
+    });
     editLeadForm.elements.appointmentDate?.addEventListener('input', () => {
       state.leadDetailSchedule.appointmentDate = editLeadForm.elements.appointmentDate.value;
       startLeadDetailDayAppointmentsSubscription(existingLeadForDetail());
@@ -2877,9 +2902,18 @@ function bindPageEvents() {
       if (values.appointmentDate && values.appointmentTime && result.writePromise) {
         try {
           await result.writePromise;
-        } catch {
+        } catch (error) {
           submitButton.disabled = false;
-          setFieldErrors(editLeadForm, { appointmentTime: 'Este horário não está mais disponível. Escolha outro.' });
+          if (error?.code === 'appointment-slot-unavailable') {
+            const field = setFieldErrors(editLeadForm, { appointmentTime: 'Este horário acabou de ser ocupado. Escolha outro.' });
+            showToast('O horário escolhido acabou de ser ocupado.', 'danger', 'circle-alert');
+            revealFirstFormError(field);
+            startLeadDetailDayAppointmentsSubscription(existingLeadForDetail());
+          } else if (error?.code === 'permission-denied') {
+            showToast('Seu perfil não possui permissão para alterar este cadastro.', 'danger', 'circle-alert');
+          } else {
+            showToast('Não foi possível salvar o agendamento. Verifique a conexão e tente novamente.', 'danger', 'circle-alert');
+          }
           return;
         }
       }
@@ -4297,16 +4331,36 @@ async function ensureLeadDetailSchedule() {
   state.leadDetailSchedule.leadId = lead.id;
   state.leadDetailSchedule.appointmentDate = lead.appointmentDate || '';
   state.leadDetailSchedule.appointments = [];
+  state.leadDetailSchedule.services = [];
+  state.leadDetailSchedule.serviceId = lead.appointmentServiceId || '';
   state.leadDetailSchedule.error = '';
   try {
-    const settings = state.demoMode
-      ? state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId }
-      : await loadStoreSchedule(state.profile, lead.storeId);
+    const [settings, services] = state.demoMode
+      ? [
+          state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId },
+          state.settings.services.length
+            ? state.settings.services
+            : [defaultAppointmentService(lead.storeId, lead.appointmentDurationMinutes || DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)]
+        ]
+      : await Promise.all([
+          loadStoreSchedule(state.profile, lead.storeId),
+          loadAppointmentServices(state.profile)
+        ]);
     state.leadDetailSchedule.storeId = lead.storeId;
     state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...settings };
+    state.leadDetailSchedule.services = services;
+    if (!servicesForStore(state.leadDetailSchedule.services, lead.storeId).length) {
+      state.leadDetailSchedule.services.push(defaultAppointmentService(lead.storeId, state.leadDetailSchedule.settings.appointmentDurationMinutes));
+    }
+    const availableServices = servicesForStore(state.leadDetailSchedule.services, lead.storeId);
+    state.leadDetailSchedule.serviceId = availableServices.some((service) => service.id === lead.appointmentServiceId)
+      ? lead.appointmentServiceId
+      : availableServices[0]?.id || '';
   } catch {
     state.leadDetailSchedule.storeId = lead.storeId;
     state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
+    state.leadDetailSchedule.services = [defaultAppointmentService(lead.storeId, lead.appointmentDurationMinutes || DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)];
+    state.leadDetailSchedule.serviceId = state.leadDetailSchedule.services[0].id;
     state.leadDetailSchedule.error = 'Não foi possível carregar a agenda desta loja.';
   } finally {
     state.leadDetailSchedule.loading = false;
@@ -4936,6 +4990,8 @@ async function handleAction(action) {
       storeId: '',
       appointmentDate: '',
       appointments: [],
+      services: [],
+      serviceId: '',
       error: '',
       settings: { ...DEFAULT_STORE_SCHEDULE }
     };

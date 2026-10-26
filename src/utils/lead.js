@@ -244,6 +244,9 @@ export function validateLeadInput(input, options = {}) {
   if (input.appointmentServiceId && String(input.appointmentServiceId).length > 120) {
     errors.appointmentServiceId = 'Selecione um serviço válido.';
   }
+  if (appointmentDate && !input.appointmentServiceId) {
+    errors.appointmentServiceId = 'Selecione o serviço do agendamento.';
+  }
   const transportAllowedWeekdays = Array.isArray(input.transportAllowedWeekdays)
     ? input.transportAllowedWeekdays.map(Number)
     : [];

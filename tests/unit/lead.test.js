@@ -84,6 +84,17 @@ describe('lead validation', () => {
     expect(result.errors.appointmentTime).toBeDefined();
   });
 
+  it('requires a service when scheduling a registration', () => {
+    const result = validateLeadInput({
+      ...validInput,
+      appointmentServiceId: '',
+      appointmentServiceName: ''
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.appointmentServiceId).toBe('Selecione o serviço do agendamento.');
+  });
+
   it('creates the expected versioned document', () => {
     const now = new Date('2026-09-28T12:00:00.000Z');
     const result = createLeadDocument(validInput, profile, 'installation-test', now);

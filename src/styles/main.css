@@ -5268,6 +5268,30 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  .exam-billing-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(124px, 0.42fr);
+  }
+
+  .exam-billing-fields .eye-route-override {
+    grid-column: 1 / -1;
+  }
+
+  .exam-price-display {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .exam-price-field strong {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .exam-price-field small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .contact-fields {
     grid-template-columns: 1fr;
   }
