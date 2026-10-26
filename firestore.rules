@@ -130,6 +130,7 @@ service cloud.firestore {
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'examPaymentType',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
@@ -191,6 +192,7 @@ service cloud.firestore {
           || (data.appointmentServiceName is string
             && data.appointmentServiceName.size() >= 2
             && data.appointmentServiceName.size() <= 80))
+        && (!('examPaymentType' in data) || data.examPaymentType in ['paid', 'courtesy'])
         && data.source == 'street'
         && data.schemaVersion == 1;
     }
@@ -338,7 +340,7 @@ service cloud.firestore {
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'careRoute', 'careRouteOverride', 'examPaymentType',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
@@ -428,7 +430,7 @@ service cloud.firestore {
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'careRouteReasons',
+          'careRoute', 'careRouteOverride', 'examPaymentType',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',

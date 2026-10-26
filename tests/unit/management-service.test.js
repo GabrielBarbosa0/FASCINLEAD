@@ -52,11 +52,11 @@ describe('deleteManagementLead', () => {
     });
     expect(firestoreMocks.batch.delete).toHaveBeenNthCalledWith(2, {
       collectionName: 'appointmentSlots',
-      documentId: 'slot-consultório-surubim-2026-10-20-08:40'
+      documentId: 'slot-consultorio-surubim-2026-10-20-08:40'
     });
     expect(firestoreMocks.batch.delete).toHaveBeenNthCalledWith(3, {
       collectionName: 'appointmentSlots',
-      documentId: 'slot-consultório-surubim-2026-10-20-08:50'
+      documentId: 'slot-consultorio-surubim-2026-10-20-08:50'
     });
     expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce();
   });

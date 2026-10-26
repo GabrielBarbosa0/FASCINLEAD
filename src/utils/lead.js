@@ -51,6 +51,19 @@ export const EYE_SURGERIES = [
   { id: 'other', label: 'Outra' }
 ];
 
+export const EXAM_PRICES = Object.freeze({
+  optometrist: 150,
+  ophthalmologist: 200
+});
+
+export function examPricing(careRoute, paymentType = 'paid') {
+  const examPaymentType = paymentType === 'courtesy' ? 'courtesy' : 'paid';
+  return {
+    examPaymentType,
+    examPrice: examPaymentType === 'courtesy' ? 0 : EXAM_PRICES[careRoute] || EXAM_PRICES.optometrist
+  };
+}
+
 function normalizeAmetropias(values) {
   const requested = Array.isArray(values) ? values : [values].filter(Boolean);
   const validIds = new Set(AMETROPIAS.map((item) => item.id));
@@ -205,6 +218,7 @@ export function validateLeadInput(input, options = {}) {
     ophthalmologyPathologyIds: input.ophthalmologyPathologyIds,
     ophthalmologySurgeryIds: input.ophthalmologySurgeryIds
   });
+  const pricing = examPricing(triage.careRoute, input.examPaymentType);
   if (triage.surgeryQuestionRequired && !triage.eyeSurgeryStatus) {
     errors.eyeSurgeryStatus = 'Informe se o cliente já realizou cirurgia nos olhos.';
   }
@@ -265,7 +279,8 @@ export function validateLeadInput(input, options = {}) {
     needsTransport,
     hasCompanion,
     transportSeats: needsTransport ? (hasCompanion ? 2 : 1) : 0,
-    triage
+    triage,
+    pricing
   };
 }
 
@@ -302,6 +317,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       careRoute: validation.triage.careRoute,
       careRouteOverride: validation.triage.careRouteOverride,
       careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
+      examPaymentType: validation.pricing.examPaymentType,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,
@@ -358,7 +374,7 @@ export function createLeadUpdate(input) {
       eyeSurgeryDetails: validation.triage.eyeSurgeryDetails,
       careRoute: validation.triage.careRoute,
       careRouteOverride: validation.triage.careRouteOverride,
-      careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
+      examPaymentType: validation.pricing.examPaymentType,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,

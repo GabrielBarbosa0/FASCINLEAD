@@ -1,6 +1,6 @@
 import { formatBrazilianPhone } from './phone.js';
 import { STORES } from './stores.js';
-import { calculateAge } from './lead.js';
+import { calculateAge, examPricing } from './lead.js';
 
 function datePart(value) {
   if (!value) return '';
@@ -56,6 +56,8 @@ const CSV_COLUMNS = [
   ['Horário da captação', (lead) => timePart(lead.capturedAtClient)],
   ['Data do pré-agendamento', (lead) => inputDatePart(lead.appointmentDate)],
   ['Horário do pré-agendamento', (lead) => lead.appointmentTime],
+  ['Tipo do exame', (lead) => lead.examPaymentType === 'courtesy' ? 'Cortesia' : 'Pago'],
+  ['Valor do exame', (lead) => examPricing(lead.careRoute, lead.examPaymentType).examPrice],
   ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
   ['Precisa de transporte?', (lead) => lead.needsTransport ? 'Sim' : 'Não'],
   ['Levara acompanhante?', (lead) => lead.needsTransport && lead.hasCompanion ? 'Sim' : 'Não'],

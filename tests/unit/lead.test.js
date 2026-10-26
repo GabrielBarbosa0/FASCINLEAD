@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAge, createLeadDocument, createLeadUpdate, ophthalmologyTriage, validateLeadInput } from '../../src/utils/lead.js';
+import { calculateAge, createLeadDocument, createLeadUpdate, examPricing, ophthalmologyTriage, validateLeadInput } from '../../src/utils/lead.js';
 
 const validInput = {
   fullName: 'Cliente Exemplo',
@@ -109,6 +109,7 @@ describe('lead validation', () => {
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyIds: ['glaucoma', 'diabetes'],
       pathologyLabels: ['Glaucoma', 'Diabetes'],
+      examPaymentType: 'paid',
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -257,6 +258,22 @@ describe('lead validation', () => {
     expect(ophthalmologyTriage({ ...validInput, pathologyIds: ['cataract'] }, settings).careRoute).toBe('ophthalmologist');
     expect(ophthalmologyTriage({ ...validInput, pathologyIds: [], eyeSurgeryStatus: 'yes', eyeSurgeryType: 'cataract' }, settings).careRoute).toBe('ophthalmologist');
     expect(ophthalmologyTriage({ ...validInput, pathologyIds: ['glaucoma'] }, settings).careRoute).toBe('optometrist');
+  });
+
+  it('calculates paid and courtesy exam prices from the care route', () => {
+    expect(examPricing('optometrist', 'paid')).toEqual({ examPaymentType: 'paid', examPrice: 150 });
+    expect(examPricing('ophthalmologist', 'paid')).toEqual({ examPaymentType: 'paid', examPrice: 200 });
+    expect(examPricing('ophthalmologist', 'courtesy')).toEqual({ examPaymentType: 'courtesy', examPrice: 0 });
+
+    const result = createLeadUpdate({
+      ...validInput,
+      careRouteOverride: 'ophthalmologist',
+      examPaymentType: 'courtesy'
+    });
+    expect(result.data).toMatchObject({
+      careRoute: 'ophthalmologist',
+      examPaymentType: 'courtesy'
+    });
   });
 
   it('rejects ophthalmology appointments outside configured weekdays', () => {

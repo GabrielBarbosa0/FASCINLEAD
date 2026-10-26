@@ -63,7 +63,7 @@ import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwi
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, ophthalmologyTriage } from '../utils/lead.js';
+import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, examPricing, ophthalmologyTriage } from '../utils/lead.js';
 import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
@@ -785,10 +785,6 @@ function eyeSurgeryOptions(selectedId = '') {
   return EYE_SURGERIES.map((item) => `<option value="${item.id}" ${item.id === selectedId ? 'selected' : ''}>${item.label}</option>`).join('');
 }
 
-function canOverrideCareRoute() {
-  return isAdmin() || hasAccess('appointments.attendance') || hasAccess('management.access');
-}
-
 function triageConfigFields(settings) {
   return `<input name="ophthalmologyRoutingEnabled" type="hidden" value="${settings.ophthalmologyRoutingEnabled}" />
     <input name="ophthalmologyMinimumAge" type="hidden" value="${settings.ophthalmologyMinimumAge}" />
@@ -853,8 +849,9 @@ function bindTransportFields(form, settings, onChange = () => {}) {
   refresh();
 }
 
-function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOverride = false, idPrefix = 'eye') {
+function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefix = 'eye') {
   const triage = ophthalmologyTriage(values, settings);
+  const pricing = examPricing(triage.careRoute, values.examPaymentType);
   const showSurgeryQuestion = triage.surgeryQuestionRequired || Boolean(values.eyeSurgeryStatus);
   const showSurgeryType = values.eyeSurgeryStatus === 'yes';
   return `<section class="eye-triage-section" data-eye-triage>
@@ -862,7 +859,7 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOv
       <div class="field" data-field="eyeSurgeryStatus">
         <label for="${idPrefix}-surgery-status">Já realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
         <select id="${idPrefix}-surgery-status" name="eyeSurgeryStatus">${eyeSurgeryStatusOptions(values.eyeSurgeryStatus || '')}</select>
-        <small class="field-help">Pergunta obrigatoria a partir de ${settings.ophthalmologyMinimumAge} anos.</small>
+        <small class="field-help">Pergunta obrigatória a partir de ${settings.ophthalmologyMinimumAge} anos.</small>
         <small class="field-error"></small>
       </div>
       <div class="field eye-surgery-dependent ${showSurgeryType ? '' : 'is-disabled'}" data-field="eyeSurgeryType" data-eye-surgery-type>
@@ -876,13 +873,18 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, allowOv
         <small class="field-error"></small>
       </div>
     </div>
-    ${allowOverride ? `<div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automático</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>` : '<input name="careRouteOverride" type="hidden" value="automatic" />'}
-    <div class="eye-route-status ${triage.careRoute === 'ophthalmologist' ? 'is-ophthalmology' : ''}" data-eye-route-status ${triage.careRoute === 'ophthalmologist' ? '' : 'hidden'}><i data-lucide="stethoscope"></i><span>Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.</span></div>
+    <div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automático</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>
+    <div class="field-row exam-billing-fields">
+      <div class="field"><label for="${idPrefix}-exam-payment">Tipo do exame</label><select id="${idPrefix}-exam-payment" name="examPaymentType"><option value="paid" ${values.examPaymentType !== 'courtesy' ? 'selected' : ''}>Exame pago</option><option value="courtesy" ${values.examPaymentType === 'courtesy' ? 'selected' : ''}>Cortesia</option></select></div>
+      <div class="field exam-price-field"><span>Valor do exame</span><strong data-exam-price>${pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><small data-exam-price-detail>${triage.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista'}</small></div>
+    </div>
+    <div class="eye-route-status ${triage.careRoute === 'ophthalmologist' ? 'is-ophthalmology' : ''}" data-eye-route-status ${triage.careRoute === 'ophthalmologist' ? '' : 'hidden'}><i data-lucide="stethoscope"></i><span>Encaminhamento para oftalmologista. A agenda mostrará somente os dias configurados.</span></div>
   </section>`;
 }
 
 function enrichLeadTriage(values, settings) {
   const triage = ophthalmologyTriage(values, settings);
+  const pricing = examPricing(triage.careRoute, values.examPaymentType);
   return {
     ...values,
     ophthalmologyRoutingEnabled: settings.ophthalmologyRoutingEnabled,
@@ -898,7 +900,9 @@ function enrichLeadTriage(values, settings) {
     eyeSurgeryDetails: triage.eyeSurgeryDetails,
     careRoute: triage.careRoute,
     careRouteOverride: triage.careRouteOverride,
-    careRouteReasons: triage.careRouteReasons
+    careRouteReasons: triage.careRouteReasons,
+    examPaymentType: pricing.examPaymentType,
+    examPrice: pricing.examPrice
   };
 }
 
@@ -912,6 +916,8 @@ function bindEyeTriage(form, settings, onChange = () => {}) {
     const typeField = section.querySelector('[data-eye-surgery-type]');
     const detailsField = section.querySelector('[data-eye-surgery-details]');
     const routeStatus = section.querySelector('[data-eye-route-status]');
+    const price = section.querySelector('[data-exam-price]');
+    const priceDetail = section.querySelector('[data-exam-price-detail]');
     question.hidden = !triage.surgeryQuestionRequired && !values.eyeSurgeryStatus;
     const surgeryTypeEnabled = values.eyeSurgeryStatus === 'yes';
     typeField.classList.toggle('is-disabled', !surgeryTypeEnabled);
@@ -922,12 +928,18 @@ function bindEyeTriage(form, settings, onChange = () => {}) {
     form.elements.eyeSurgeryDetails.required = values.eyeSurgeryStatus === 'yes' && values.eyeSurgeryType === 'other';
     routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
     routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
+    const pricing = examPricing(triage.careRoute, values.examPaymentType);
+    price.textContent = pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    priceDetail.textContent = pricing.examPaymentType === 'courtesy'
+      ? 'Cortesia'
+      : triage.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista';
     onChange(values, triage);
   };
   form.elements.birthDate?.addEventListener('input', refresh);
   form.elements.eyeSurgeryStatus?.addEventListener('change', refresh);
   form.elements.eyeSurgeryType?.addEventListener('change', refresh);
   form.elements.careRouteOverride?.addEventListener('change', refresh);
+  form.elements.examPaymentType?.addEventListener('change', refresh);
   form.querySelectorAll('[name="pathologyIds"]').forEach((input) => input.addEventListener('change', refresh));
   refresh();
 }
@@ -945,7 +957,7 @@ const NEW_LEAD_DRAFT_FIELDS = [
   'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
   'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'appointmentServiceId',
   'ametropiaIds', 'pathologyIds', 'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-  'careRouteOverride', 'needsTransport', 'hasCompanion', 'notes'
+  'careRouteOverride', 'examPaymentType', 'needsTransport', 'hasCompanion', 'notes'
 ];
 
 function captureNewLeadDraft(form) {
@@ -1109,7 +1121,7 @@ function newLeadView() {
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions()}</div>
       </fieldset>
-      ${eyeTriageFields({}, state.newLeadSchedule.settings, canOverrideCareRoute(), 'new-lead-eye')}
+      ${eyeTriageFields({}, state.newLeadSchedule.settings, 'new-lead-eye')}
       ${state.newLeadSchedule.settings.transportEnabled
         ? transportFields({ appointmentDate: state.newLeadSchedule.appointmentDate }, state.newLeadSchedule.settings, 'new-lead-transport')
         : ''}
@@ -1362,7 +1374,7 @@ function leadDetailView() {
         <small>Marque todas que se aplicam.</small>
         <div class="ametropia-options">${pathologyOptions(lead.pathologyIds || [])}</div>
       </fieldset>
-      ${eyeTriageFields(lead, state.leadDetailSchedule.settings, canOverrideCareRoute() && !managerReschedule, 'edit-lead-eye')}
+      ${eyeTriageFields(lead, state.leadDetailSchedule.settings, 'edit-lead-eye')}
       ${transportFields(lead, state.leadDetailSchedule.settings, 'edit-lead-transport', Boolean(locked))}
       <div class="field-row appointment-fields">
         <div class="field" data-field="appointmentDate"><label for="edit-appointmentDate">Data do pré-agendamento</label><input id="edit-appointmentDate" name="appointmentDate" type="date" min="${toLocalDateInput(new Date())}" value="${escapeHtml(state.leadDetailSchedule.appointmentDate || lead.appointmentDate)}" ${locked} /><small class="schedule-date-status">${offlineEdit ? 'Conecte-se para escolher uma data.' : ''}</small><small class="field-error"></small></div>
@@ -1847,7 +1859,7 @@ function appointmentCreateDialog(allowedStores) {
         </div>
         ${schedule.showAmetropiaFields ? `<fieldset class="field ametropia-field"><legend>Ametropias</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${ametropiaOptions(draft.ametropiaIds || [])}</div></fieldset>` : ''}
         <fieldset class="field ametropia-field"><legend>Patologias e condições de saúde</legend><small>Marque todas que se aplicam.</small><div class="ametropia-options">${pathologyOptions(draft.pathologyIds || [])}</div></fieldset>
-        ${eyeTriageFields(draft, schedule, canOverrideCareRoute(), 'agenda-lead-eye')}
+        ${eyeTriageFields(draft, schedule, 'agenda-lead-eye')}
         ${schedule.transportEnabled
           ? transportFields({ ...draft, appointmentDate: state.appointments.selectedDate }, schedule, 'agenda-lead-transport')
           : ''}

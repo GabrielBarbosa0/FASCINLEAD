@@ -93,6 +93,7 @@ Campos minimos propostos:
 | Ametropias | Nao | Exibicao configuravel por loja |
 | Patologias | Nao | Opcoes clinicas usadas pela triagem |
 | Cirurgia nos olhos | Condicional | Obrigatoria a partir da idade configurada; informa o tipo quando a resposta for positiva |
+| Tipo do exame | Sim | `paid` ou `courtesy`; o padrao e exame pago |
 | Transporte | Nao | Sem transporte ou com transporte; aceita no maximo um acompanhante |
 | Data do pre-agendamento | Nao | Data prevista; exige horario quando informada |
 | Horario do pre-agendamento | Nao | Horario previsto; exige data quando informado |
@@ -112,6 +113,8 @@ Receita, fotos e geolocalizacao exata nao fazem parte do MVP. CPF, RG e os dados
 Novos cadastros exigem data de nascimento tanto na interface quanto nas regras do Firestore. Registros legados sem essa informacao continuam consultaveis e podem ser corrigidos ou reagendados; quando a data for informada, ela tambem sera validada nas edicoes.
 
 Ao trocar a loja de destino durante um novo cadastro, o formulario preserva os dados pessoais, endereco, interesse, triagem, transporte e observacoes. Data e horario sao limpos porque dependem da agenda da nova unidade; o servico permanece selecionado somente quando tambem estiver disponivel nela.
+
+O valor do exame nao e digitado nem persistido como uma segunda fonte de verdade. A interface e as exportacoes o calculam a partir de `examPaymentType` e do encaminhamento efetivo: optometrista pago custa R$ 150, oftalmologista pago custa R$ 200 e cortesia custa R$ 0. Alterar o encaminhamento recalcula o valor imediatamente.
 
 ### RF-03 - Operacao offline
 
@@ -155,7 +158,7 @@ O navegador nao garante execucao quando o PWA estiver completamente fechado. Por
 - Manter gestores somente com consulta e exportacao dos leads da propria loja.
 - Paginar resultados para evitar leituras desnecessarias no Firestore.
 
-O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, comparecimento, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban, venda ou valor, pois esses dados nao sao controlados pelo FascinLead.
+O CSV detalhado inclui identificadores do lead e do captador, dados do cliente, loja, data e hora da captacao, pre-agendamento opcional, tipo e valor calculado do exame, comparecimento, interesse, endereco, origem e observacoes. Nao inclui consentimento, status de funil, etapa de Kanban ou valor de venda, pois esses dados nao sao controlados pelo FascinLead.
 
 Esta tela e administrativa e nao transforma o produto em CRM: nao havera etapas de funil, tarefas comerciais ou historico de atendimento.
 
@@ -599,6 +602,7 @@ O identificador sera um UUID gerado no dispositivo. Isso torna a gravacao idempo
   "eyeSurgeryStatus": "yes",
   "eyeSurgeryType": "cataract",
   "careRoute": "ophthalmologist",
+  "examPaymentType": "paid",
   "needsTransport": true,
   "hasCompanion": false,
   "transportSeats": 1,

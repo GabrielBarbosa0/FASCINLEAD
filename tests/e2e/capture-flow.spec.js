@@ -56,6 +56,21 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await expect(store).toHaveValue('loja-02');
   await expect(page.getByLabel('Serviço do agendamento')).toBeEnabled();
   await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
+  const careRoute = page.getByLabel('Encaminhamento');
+  await expect(careRoute).toBeVisible();
+  await expect(careRoute.locator('option')).toHaveText(['Automático', 'Optometrista', 'Oftalmologista']);
+  await careRoute.selectOption('optometrist');
+  await expect(careRoute).toHaveValue('optometrist');
+  const examPaymentType = page.getByLabel('Tipo do exame');
+  const examPrice = page.locator('[data-exam-price]');
+  await expect(examPaymentType).toHaveValue('paid');
+  await expect(examPrice).toHaveText('R$ 150,00');
+  await careRoute.selectOption('ophthalmologist');
+  await expect(examPrice).toHaveText('R$ 200,00');
+  await examPaymentType.selectOption('courtesy');
+  await expect(examPrice).toHaveText('R$ 0,00');
+  await examPaymentType.selectOption('paid');
+  await careRoute.selectOption('automatic');
   await page.getByLabel('Nome *').fill('Cliente preservado');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
   await page.getByLabel('RG', { exact: true }).fill('1234567');
@@ -259,7 +274,7 @@ test('routes cataract clients to configured ophthalmology days', async ({ page }
   await expect(page.getByLabel('Qual cirurgia? *')).toBeEnabled();
   await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
   await page.getByLabel('Catarata', { exact: true }).check();
-  await expect(page.getByText('Encaminhamento para oftalmologista. A agenda mostrara somente os dias configurados.')).toBeVisible();
+  await expect(page.getByText('Encaminhamento para oftalmologista. A agenda mostrará somente os dias configurados.')).toBeVisible();
 
   await page.getByLabel('Data do pré-agendamento').fill('2026-10-22');
   await expect(page.getByLabel('Horário disponível')).toBeDisabled();

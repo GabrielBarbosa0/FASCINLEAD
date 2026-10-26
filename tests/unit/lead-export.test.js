@@ -26,6 +26,9 @@ describe('createLeadsCsv', () => {
       capturedByUid: 'captor-001',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
+      careRoute: 'ophthalmologist',
+      examPaymentType: 'paid',
+      examPrice: 200,
       appointmentAttendance: 'attended',
       source: 'street',
       notes: 'Contato pela manhã'
@@ -43,7 +46,9 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"Loja 06"');
     expect(csv).toContain('"02/10/2026";"14:30"');
     expect(csv).toContain('"Compareceu?"');
-    expect(csv).toContain('"14:30";"Sim"');
+    expect(csv).toContain('"Tipo do exame";"Valor do exame"');
+    expect(csv).toContain('"Pago";"200"');
+    expect(csv).toContain('"14:30";"Pago";"200";"Sim"');
     expect(csv).toContain('"Captação em campo"');
     expect(csv).toContain('"Ametropias"');
     expect(csv).toContain('"Miopia, Astigmatismo"');
