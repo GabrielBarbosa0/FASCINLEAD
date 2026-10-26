@@ -17,6 +17,7 @@ import { createLeadDocument, createLeadUpdate } from '../utils/lead.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { getInstallationId } from '../utils/installation.js';
 import { createId } from '../utils/id.js';
+import { canAccessStore } from '../utils/permissions.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
 import {
   listOfflineLeads,
@@ -339,6 +340,41 @@ async function synchronizeOfflineLeads(profile) {
     }
   }
   return { synchronized, failed };
+}
+
+export function markDemoAppointmentReminderDone(id, profile) {
+  const leads = readDemoLeads();
+  const index = leads.findIndex((lead) => lead.id === id && (
+    profile.role === 'admin' || (profile.role === 'manager' && canAccessStore(profile, lead.storeId))
+  ));
+  if (index === -1 || !leads[index].appointmentDate || !leads[index].appointmentTime) return false;
+  leads[index] = {
+    ...leads[index],
+    appointmentReminderSentAt: new Date().toISOString(),
+    appointmentReminderSentByUid: profile.uid,
+    appointmentReminderSentByName: profile.displayName,
+    appointmentReminderAppointmentKey: followUpAppointmentKey(leads[index])
+  };
+  writeDemoLeads(leads);
+  return true;
+}
+
+export function undoDemoAppointmentReminderDone(id, profile) {
+  const leads = readDemoLeads();
+  const index = leads.findIndex((lead) => lead.id === id && (
+    profile.role === 'admin' || (profile.role === 'manager' && canAccessStore(profile, lead.storeId))
+  ));
+  if (index === -1) return false;
+  const {
+    appointmentReminderSentAt,
+    appointmentReminderSentByUid,
+    appointmentReminderSentByName,
+    appointmentReminderAppointmentKey,
+    ...pendingLead
+  } = leads[index];
+  leads[index] = pendingLead;
+  writeDemoLeads(leads);
+  return true;
 }
 
 export async function synchronizeNow(demoMode, profile = null) {

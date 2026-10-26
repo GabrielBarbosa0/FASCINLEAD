@@ -204,6 +204,10 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 - Ao abrir o WhatsApp, o sistema registra o inicio do contato para o agendamento atual.
 - O gestor acompanha, em modo somente leitura, os retornos da propria loja agrupados por captador e o estado de cada contato; o administrador possui a mesma visao para todas as lojas.
 - Na visao por captadores, o nome abre um modal com todos os leads daquele captador que ainda aguardam o inicio do contato, mantendo as acoes de WhatsApp e reagendamento.
+- A tela inicial oferece o atalho `Confirmacoes` aos perfis que podem consultar a agenda. A tela lista os atendimentos de hoje ate os proximos seis dias, com nome, telefone, profissional, horario e unidade.
+- Cada item possui `Abrir WhatsApp`, que abre uma conversa individual com uma mensagem humanizada ja preenchida em nome do usuario conectado. O envio permanece manual e depende da confirmacao da pessoa responsavel pela agenda.
+- Depois do envio, a pessoa responsavel usa `Marcar como feito`. A tela separa `Pendentes` e `Feitos` e registra data, usuario e a chave do agendamento atual; um reagendamento futuro volta a ficar pendente automaticamente. Em caso de marcacao acidental, `Desfazer` remove somente essa conclusao e devolve o lembrete para `Pendentes`.
+- Esta primeira versao nao usa API oficial ou nao oficial do WhatsApp, nao dispara mensagens em lote e nao registra automaticamente que o cliente confirmou. A abertura do link tambem nao deve ser tratada como comprovante de envio.
 - O administrador configura, em `Acessos da equipe`, uma ou mais unidades permitidas para cada gestor. O administrador nao possui restricao de unidade e o captador permanece vinculado somente a loja principal.
 - A consulta e limitada a um mes e a 500 resultados para preservar as cotas gratuitas do Firestore.
 - Administradores configuram por loja o modo controlado ou livre, a duracao da consulta e o inicio e fim do expediente.
@@ -424,9 +428,10 @@ FASCINLEAD/
 7. `Relatorios`: indicadores, agrupamentos por unidade/captador e distribuicoes por dia e periodo do dia.
 8. `Acessos`: autorizacao, alteracao de perfil, unidades, telefone, codigo SavWin e bloqueio de usuarios por administradores.
 9. `Agenda`: calendario mensal dos pre-agendamentos para gestores e administradores.
-10. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
-11. `Metas`: criacao em modal, edicao, duplicacao, exclusao e acompanhamento individual ou da equipe.
-12. `Configuracoes`: agenda, servicos, perfis e permissoes, restritos a administradores.
+10. `Confirmacoes`: lista dos proximos atendimentos e abertura manual do WhatsApp com lembrete preenchido.
+11. `Retornos`: faltas vencidas, acesso do captador ao WhatsApp e acompanhamento da equipe pelo gestor.
+12. `Metas`: criacao em modal, edicao, duplicacao, exclusao e acompanhamento individual ou da equipe.
+13. `Configuracoes`: agenda, servicos, perfis e permissoes, restritos a administradores.
 
 ### 6.2 Navegacao mobile
 
@@ -625,6 +630,26 @@ Para leads captados offline, `appointmentDate` e `appointmentTime` permanecem va
 
 No envio do cadastro, a interface aguarda a confirmacao da gravacao online antes de limpar o formulario ou informar sucesso. Falhas de validacao preservam os valores digitados, exibem uma mensagem visivel e levam o foco ao primeiro campo invalido. Falhas do Firestore tambem preservam o formulario e mostram uma mensagem de permissao ou conexao; nenhum erro de gravacao deve terminar silenciosamente.
 
+#### Conclusao manual em `appointmentReminders`
+
+Cada documento representa o lembrete concluido para um agendamento especifico. O identificador combina lead, data e horario, permitindo que um reagendamento futuro gere outra pendencia sem apagar o historico anterior.
+
+```json
+{
+  "leadId": "lead-uuid",
+  "storeId": "loja-06",
+  "appointmentDate": "2026-10-27",
+  "appointmentTime": "14:30",
+  "appointmentKey": "2026-10-27|14:30",
+  "completedAt": "Timestamp",
+  "completedByUid": "firebase-uid",
+  "completedByName": "Nome do responsavel",
+  "schemaVersion": 1
+}
+```
+
+Essa colecao evita aumentar a complexidade das regras de atualizacao de `leads`. Apenas administradores e perfis de gestao com `appointments.view` para a unidade podem consultar ou concluir lembretes; a identidade gravada deve coincidir com o usuario autenticado.
+
 ### 7.7 Colecao `roleProfiles`
 
 ```json
@@ -706,6 +731,7 @@ O progresso nao e gravado no documento. Ele e calculado a partir dos leads sincr
 - `leads`: `storeId ASC, appointmentDate ASC`.
 - `leads`: `storeId ASC, updatedAtServer ASC` para a API incremental.
 - `appointmentSlots`: `storeId ASC, appointmentDate ASC`.
+- `appointmentReminders`: `storeId ASC, appointmentDate ASC`.
 - `appointmentServices`: `storeIds ARRAY_CONTAINS, active ASC`.
 
 Novos indices somente deverao ser adicionados a partir de consultas reais. Cada tela de gestao deve exigir periodo para evitar consultas amplas.

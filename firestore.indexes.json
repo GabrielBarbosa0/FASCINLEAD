@@ -50,6 +50,14 @@
       ]
     },
     {
+      "collectionGroup": "appointmentReminders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "storeId", "order": "ASCENDING" },
+        { "fieldPath": "appointmentDate", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "appointmentServices",
       "queryScope": "COLLECTION",
       "fields": [

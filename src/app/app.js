@@ -32,6 +32,7 @@ import {
   MessageCircle,
   Pencil,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -50,13 +51,13 @@ import {
 } from 'lucide';
 import { completeRedirectSignIn, createEmailPasswordAccess, createTeamPasswordAccount, loadAuthorizedProfile, observeAuth, observeAuthorizedProfile, requestPasswordReset, signInWithEmail, signInWithGoogle, signOutUser } from '../firebase/auth.js';
 import { isFirebaseConfigured } from '../firebase/client.js';
-import { markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
+import { markDemoAppointmentReminderDone, markDemoFollowUpContact, saveLead, subscribeToLeads, synchronizeNow, undoDemoAppointmentReminderDone, updateDemoAppointmentAttendance, updateLead } from '../services/lead-service.js';
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { deleteAccess, loadAccesses, saveAccess, setAccessActive } from '../services/access-service.js';
 import { deleteRoleProfile, loadRoleProfiles, resetSystemRolePermissions, saveRoleProfile, saveSystemRolePermissions } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
-import { APPOINTMENTS_QUERY_LIMIT, setAppointmentAttendance, subscribeToAppointments } from '../services/appointment-service.js';
+import { APPOINTMENTS_QUERY_LIMIT, markAppointmentReminderDone, setAppointmentAttendance, subscribeToAppointmentConfirmations, subscribeToAppointments, undoAppointmentReminderDone } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedule, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { deleteAppointmentService, ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
@@ -65,7 +66,7 @@ import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, m
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, examPricing, ophthalmologyTriage } from '../utils/lead.js';
 import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
-import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppAppointmentReminderUrl, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isAppointmentReminderDone, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
 import { DEFAULT_TEAM_PASSWORD, formatAccessStoreSummary } from '../utils/access.js';
@@ -112,6 +113,7 @@ const appIcons = {
   MessageCircle,
   Pencil,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -142,6 +144,7 @@ const state = {
   unsubscribeProfile: null,
   unsubscribeLeads: null,
   unsubscribeAppointments: null,
+  unsubscribeConfirmations: null,
   unsubscribeStoreSchedule: null,
   unsubscribeOfflineCapture: null,
   unsubscribeFollowUpSchedule: null,
@@ -171,6 +174,15 @@ const state = {
     month: monthKeyFromDate(),
     storeId: '',
     selectedDate: toLocalDateInput(new Date())
+  },
+  confirmations: {
+    loading: false,
+    loaded: false,
+    error: '',
+    records: [],
+    truncated: false,
+    filter: 'pending',
+    updatingId: ''
   },
   appointmentCreate: {
     loading: false,
@@ -417,6 +429,7 @@ function canAccessRoute(route) {
     dashboard: () => hasAccess('dashboard.view'),
     reports: () => hasAccess('reports.view'),
     appointments: () => hasAccess('appointments.view'),
+    confirmations: () => hasAccess('appointments.view'),
     access: () => isAdmin(),
     goals: () => hasAccess('goals.view_own') || hasAccess('goals.manage'),
     settings: () => isAdmin()
@@ -460,6 +473,16 @@ function formatAppointmentDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return 'Data indisponível';
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
     .format(new Date(`${value}T12:00:00`));
+}
+
+function addDaysToDateInput(value, days) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return toLocalDateInput(date);
+}
+
+function storeDisplayLabel(storeId = '') {
+  return STORES.find((store) => store.id === storeId)?.displayLabel || storeLabel(storeId);
 }
 
 function formatFollowUpAvailableAt(lead) {
@@ -562,6 +585,7 @@ function currentPageTitle() {
     dashboard: 'Dashboard',
     reports: 'Relatórios',
     appointments: 'Agenda de exames',
+    confirmations: 'Confirmações',
     access: 'Acessos da equipe',
     goals: 'Metas',
     settings: 'Configurações'
@@ -581,7 +605,7 @@ function headerView() {
       : storeSummary.short;
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
         <div>
           <p class="eyebrow">FASCINLEAD</p>
           <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
@@ -644,6 +668,11 @@ function homeView() {
       ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="appointments">
         <span class="action-icon"><i data-lucide="calendar-days"></i></span>
         <span><strong>Agenda de exames</strong><small>Visualizar os pré-agendamentos</small></span>
+        <i data-lucide="chevron-right"></i>
+      </button>` : ''}
+      ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="confirmations">
+        <span class="action-icon"><i data-lucide="message-circle"></i></span>
+        <span><strong>Confirmações</strong><small>Enviar lembretes aos clientes</small></span>
         <i data-lucide="chevron-right"></i>
       </button>` : ''}
       ${hasAccess('goals.view_own') || canManageGoals() ? `<button class="action-card" type="button" data-route="goals">
@@ -1711,7 +1740,8 @@ function appointmentsView() {
       const updating = updatingId === lead.id;
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
-        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador não informado')}</small>${lead.needsTransport ? `<small class="appointment-transport"><i data-lucide="bus-front"></i> Transporte · ${lead.hasCompanion ? 'com acompanhante' : 'sem acompanhante'}</small>` : ''}</div>
+        <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador não informado')}</small></div>
+        ${lead.needsTransport ? `<div class="appointment-transport"><i data-lucide="bus-front"></i><span>${lead.hasCompanion ? '<strong>Transporte + acompanhante</strong>' : '<strong>Transporte individual</strong>'}</span></div>` : ''}
         ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
           <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Não compareceu</span></button>
@@ -1755,12 +1785,77 @@ function appointmentsView() {
         <section class="agenda-day-details">
           <div class="agenda-day-heading">
             <div class="agenda-section-title"><i data-lucide="calendar-days"></i><div><h2>Agendamentos</h2><p>${escapeHtml(formatAppointmentDate(selectedDate))}</p></div></div>
-            ${transportCustomers.length ? `<div class="transport-day-summary"><i data-lucide="bus-front"></i><span><strong>${transportCustomers.length}</strong> cliente(s)</span><span><strong>${transportSeats}</strong> assento(s)</span></div>` : ''}
+            ${transportCustomers.length ? `<div class="transport-day-summary"><i data-lucide="bus-front"></i><span><strong>${transportCustomers.length}</strong> ${transportCustomers.length === 1 ? 'cliente' : 'clientes'} · <strong>${transportSeats}</strong> ${transportSeats === 1 ? 'assento' : 'assentos'}</span></div>` : ''}
           </div>
           <div class="appointment-list">${selectedItems}</div>
         </section>
       </aside>
     </section>${hasAccess('leads.create') ? createDialog : ''}`;
+}
+
+function confirmationsView() {
+  if (!hasAccess('appointments.view')) {
+    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso às confirmações da agenda.</span></div>`;
+  }
+
+  const today = toLocalDateInput(new Date());
+  const endDate = addDaysToDateInput(today, 6);
+  const source = state.demoMode ? state.leads : state.confirmations.records;
+  const allRecords = source.filter((lead) => lead.appointmentDate >= today
+    && lead.appointmentDate <= endDate
+    && lead.appointmentTime
+    && !['attended', 'missed'].includes(lead.appointmentAttendance))
+    .sort((a, b) => String(a.appointmentDate).localeCompare(String(b.appointmentDate))
+      || String(a.appointmentTime).localeCompare(String(b.appointmentTime))
+      || String(a.fullName || '').localeCompare(String(b.fullName || ''), 'pt-BR'));
+  const activeFilter = state.confirmations.filter || 'pending';
+  const doneCount = allRecords.filter(isAppointmentReminderDone).length;
+  const records = activeFilter === 'done'
+    ? allRecords.filter(isAppointmentReminderDone)
+    : activeFilter === 'all'
+      ? allRecords
+      : allRecords.filter((lead) => !isAppointmentReminderDone(lead));
+  const groups = records.reduce((result, lead) => {
+    if (!result.has(lead.appointmentDate)) result.set(lead.appointmentDate, []);
+    result.get(lead.appointmentDate).push(lead);
+    return result;
+  }, new Map());
+  const content = records.length
+    ? [...groups.entries()].map(([date, leads]) => `<section class="reminder-day-group">
+        <header class="reminder-day-heading"><div><i data-lucide="calendar-days"></i><h2>${escapeHtml(formatAppointmentDate(date))}</h2></div><span>${leads.length} ${leads.length === 1 ? 'agendamento' : 'agendamentos'}</span></header>
+        <div class="reminder-list">${leads.map((lead) => {
+          const professional = lead.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista';
+          const whatsAppUrl = buildWhatsAppAppointmentReminderUrl(lead, state.profile.displayName, storeDisplayLabel(lead.storeId));
+          const done = isAppointmentReminderDone(lead);
+          const updating = state.confirmations.updatingId === lead.id;
+          return `<article class="reminder-item">
+            <div class="reminder-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
+            <div class="reminder-person"><div class="reminder-person-heading"><strong>${escapeHtml(lead.fullName)}</strong><span class="status-badge ${done ? 'status-success' : 'status-warning'}">${done ? 'Feito' : 'Pendente'}</span></div><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch || lead.phone))}</span><small>${professional} · ${escapeHtml(storeDisplayLabel(lead.storeId))}</small>${done ? `<small class="reminder-completion">Marcado por ${escapeHtml(lead.appointmentReminderSentByName || 'Não informado')} em ${escapeHtml(formatDateTimeValue(lead.appointmentReminderSentAt))}</small>` : ''}</div>
+            <div class="reminder-actions">
+              <a class="button button-whatsapp reminder-whatsapp" href="${escapeHtml(whatsAppUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="message-circle"></i><span>Abrir WhatsApp</span></a>
+              ${done
+                ? `<button class="button button-secondary reminder-done" type="button" data-confirmation-undo="${escapeHtml(lead.id)}" ${updating ? 'disabled' : ''}><i data-lucide="rotate-ccw"></i><span>${updating ? 'Salvando...' : 'Desfazer'}</span></button>`
+                : `<button class="button button-primary reminder-done" type="button" data-confirmation-done="${escapeHtml(lead.id)}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>${updating ? 'Salvando...' : 'Marcar como feito'}</span></button>`}
+            </div>
+          </article>`;
+        }).join('')}</div>
+      </section>`).join('')
+    : `<div class="empty-state"><i data-lucide="${activeFilter === 'done' ? 'circle-check' : 'message-circle'}"></i><strong>${activeFilter === 'done' ? 'Nenhum lembrete feito' : activeFilter === 'all' ? 'Nenhuma confirmação no período' : 'Nenhuma confirmação pendente'}</strong><p>${activeFilter === 'done' ? 'Os lembretes marcados como feitos aparecerão aqui.' : activeFilter === 'all' ? 'Não há atendimentos nos próximos sete dias.' : 'Todos os lembretes deste período foram concluídos.'}</p></div>`;
+
+  return `<section class="management-heading page-actions-only reminder-toolbar">
+      <button class="button button-secondary" type="button" data-route="home"><i data-lucide="arrow-left"></i><span>Voltar ao início</span></button>
+      <div class="reminder-period"><span>Próximos 7 dias</span><strong>${allRecords.length} ${allRecords.length === 1 ? 'cliente' : 'clientes'}</strong></div>
+    </section>
+    ${state.confirmations.error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.confirmations.error)}</span></div>` : ''}
+    ${state.confirmations.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} agendamentos.</span></div>` : ''}
+    <section class="confirmation-metrics" aria-label="Resumo das confirmações">
+      <button class="metric follow-up-metric-filter ${activeFilter === 'all' ? 'is-active' : ''}" type="button" data-confirmation-filter="all" aria-pressed="${activeFilter === 'all'}"><span>Todos</span><strong>${allRecords.length}</strong><i data-lucide="calendar-days"></i></button>
+      <button class="metric metric-warning follow-up-metric-filter ${activeFilter === 'pending' ? 'is-active' : ''}" type="button" data-confirmation-filter="pending" aria-pressed="${activeFilter === 'pending'}"><span>Pendentes</span><strong>${allRecords.length - doneCount}</strong><i data-lucide="clock-3"></i></button>
+      <button class="metric metric-success follow-up-metric-filter ${activeFilter === 'done' ? 'is-active' : ''}" type="button" data-confirmation-filter="done" aria-pressed="${activeFilter === 'done'}"><span>Feitos</span><strong>${doneCount}</strong><i data-lucide="circle-check"></i></button>
+    </section>
+    <section class="reminder-content" aria-busy="${state.confirmations.loading}">
+      ${state.confirmations.loading ? '<div class="calendar-loading"><i data-lucide="refresh-cw"></i><span>Carregando confirmações...</span></div>' : content}
+    </section>`;
 }
 
 function appointmentCreateSchedule() {
@@ -2401,15 +2496,15 @@ function bottomNav() {
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestão']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegação principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'dashboard', 'reports', 'appointments', 'access', 'goals', 'settings'].includes(state.route);
+  const wideLayout = ['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -4225,6 +4320,43 @@ function stopAppointmentsSubscription() {
   state.unsubscribeAppointments = null;
 }
 
+function stopConfirmationsSubscription() {
+  state.unsubscribeConfirmations?.();
+  state.unsubscribeConfirmations = null;
+}
+
+function startConfirmationsSubscription() {
+  if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'confirmations') return;
+  stopConfirmationsSubscription();
+  const startDate = toLocalDateInput(new Date());
+  const endDate = addDaysToDateInput(startDate, 6);
+  state.confirmations.loading = true;
+  state.confirmations.loaded = false;
+  state.confirmations.error = '';
+  render();
+  state.unsubscribeConfirmations = subscribeToAppointmentConfirmations(
+    state.profile,
+    startDate,
+    endDate,
+    (result) => {
+      state.confirmations.records = result.records;
+      state.confirmations.truncated = result.truncated;
+      state.confirmations.loaded = true;
+      state.confirmations.loading = false;
+      render();
+    },
+    (error) => {
+      state.confirmations.error = error?.code === 'permission-denied'
+        ? 'Seu perfil não possui permissão para consultar estas confirmações.'
+        : 'Não foi possível carregar as confirmações. Verifique a conexão e tente novamente.';
+      state.confirmations.loading = false;
+      state.confirmations.loaded = false;
+      stopConfirmationsSubscription();
+      render();
+    }
+  );
+}
+
 function startAppointmentsSubscription() {
   if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'appointments') return;
   stopAppointmentsSubscription();
@@ -4311,6 +4443,12 @@ async function openAppointmentCreateDialog() {
 function ensureAppointmentsData() {
   if (state.route === 'appointments' && hasAccess('appointments.view') && !state.demoMode && !state.unsubscribeAppointments) {
     startAppointmentsSubscription();
+  }
+}
+
+function ensureConfirmationsData() {
+  if (state.route === 'confirmations' && hasAccess('appointments.view') && !state.demoMode && !state.unsubscribeConfirmations) {
+    startConfirmationsSubscription();
   }
 }
 
@@ -4725,6 +4863,7 @@ async function handleAction(action) {
     state.unsubscribeLeads?.();
     state.unsubscribeLeads = null;
     stopAppointmentsSubscription();
+    stopConfirmationsSubscription();
     stopNewLeadScheduleSubscriptions();
     stopOfflineCaptureSubscription();
     stopFollowUpScheduleSubscription();
@@ -4757,6 +4896,15 @@ async function handleAction(action) {
       month: monthKeyFromDate(),
       storeId: '',
       selectedDate: toLocalDateInput(new Date())
+    };
+    state.confirmations = {
+      loading: false,
+      loaded: false,
+      error: '',
+      records: [],
+      truncated: false,
+      filter: 'pending',
+      updatingId: ''
     };
     state.appointmentCreate = {
       loading: false,
@@ -4901,6 +5049,80 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const confirmationFilterButton = event.target.closest('[data-confirmation-filter]');
+    if (confirmationFilterButton) {
+      state.confirmations.filter = confirmationFilterButton.dataset.confirmationFilter;
+      render();
+      return;
+    }
+    const confirmationDoneButton = event.target.closest('[data-confirmation-done]');
+    if (confirmationDoneButton && !confirmationDoneButton.disabled) {
+      const records = state.demoMode ? state.leads : state.confirmations.records;
+      const lead = records.find((item) => item.id === confirmationDoneButton.dataset.confirmationDone);
+      if (!lead) return;
+      state.confirmations.updatingId = lead.id;
+      render();
+      try {
+        if (state.demoMode) {
+          if (!markDemoAppointmentReminderDone(lead.id, state.profile)) throw new Error('not-found');
+        } else {
+          await markAppointmentReminderDone(state.profile, lead);
+          const reminderUpdate = {
+            appointmentReminderSentAt: new Date().toISOString(),
+            appointmentReminderSentByUid: state.profile.uid,
+            appointmentReminderSentByName: state.profile.displayName,
+            appointmentReminderAppointmentKey: followUpAppointmentKey(lead)
+          };
+          state.confirmations.records = state.confirmations.records.map((item) => item.id === lead.id
+            ? { ...item, ...reminderUpdate }
+            : item);
+        }
+        showToast('Lembrete marcado como feito.');
+      } catch (error) {
+        showToast(error?.code === 'permission-denied'
+          ? 'Seu perfil não pode concluir este lembrete.'
+          : 'Não foi possível marcar o lembrete como feito.', 'danger', 'circle-alert');
+      } finally {
+        state.confirmations.updatingId = '';
+        render();
+      }
+      return;
+    }
+    const confirmationUndoButton = event.target.closest('[data-confirmation-undo]');
+    if (confirmationUndoButton && !confirmationUndoButton.disabled) {
+      const records = state.demoMode ? state.leads : state.confirmations.records;
+      const lead = records.find((item) => item.id === confirmationUndoButton.dataset.confirmationUndo);
+      if (!lead) return;
+      state.confirmations.updatingId = lead.id;
+      render();
+      try {
+        if (state.demoMode) {
+          if (!undoDemoAppointmentReminderDone(lead.id, state.profile)) throw new Error('not-found');
+        } else {
+          await undoAppointmentReminderDone(state.profile, lead);
+          state.confirmations.records = state.confirmations.records.map((item) => {
+            if (item.id !== lead.id) return item;
+            const {
+              appointmentReminderSentAt,
+              appointmentReminderSentByUid,
+              appointmentReminderSentByName,
+              appointmentReminderAppointmentKey,
+              ...pendingLead
+            } = item;
+            return pendingLead;
+          });
+        }
+        showToast('Conclusão do lembrete desfeita.');
+      } catch (error) {
+        showToast(error?.code === 'permission-denied'
+          ? 'Seu perfil não pode reabrir este lembrete.'
+          : 'Não foi possível desfazer a conclusão.', 'danger', 'circle-alert');
+      } finally {
+        state.confirmations.updatingId = '';
+        render();
+      }
+      return;
+    }
     const settingsSectionButton = event.target.closest('[data-settings-section]');
     if (settingsSectionButton) {
       state.settings.section = settingsSectionButton.dataset.settingsSection;
@@ -5501,6 +5723,7 @@ export async function startApp() {
       state.management.activeLead = null;
     }
     if (state.route !== 'appointments') stopAppointmentsSubscription();
+    if (state.route !== 'confirmations') stopConfirmationsSubscription();
     if (state.route !== 'new') {
       stopNewLeadScheduleSubscriptions();
       state.newLeadSchedule.loaded = false;
@@ -5516,6 +5739,7 @@ export async function startApp() {
     render();
     ensureManagementData();
     ensureAppointmentsData();
+    ensureConfirmationsData();
     ensureNewLeadSchedule();
     ensureLeadDetailSchedule();
     ensureAccessData();
@@ -5582,13 +5806,17 @@ export async function startApp() {
         state.access.loaded = false;
         state.goals.loaded = false;
         state.settings.loaded = false;
-        if (!hasAccess('appointments.view')) stopAppointmentsSubscription();
+        if (!hasAccess('appointments.view')) {
+          stopAppointmentsSubscription();
+          stopConfirmationsSubscription();
+        }
         subscribeProfileLeads();
         startOfflineCaptureSubscription();
         startFollowUpScheduleSubscription();
         render();
         ensureManagementData();
         ensureAppointmentsData();
+        ensureConfirmationsData();
         ensureNewLeadSchedule();
         ensureLeadDetailSchedule();
         ensureAccessData();
@@ -5606,6 +5834,7 @@ export async function startApp() {
       render();
       ensureManagementData();
       ensureAppointmentsData();
+      ensureConfirmationsData();
       ensureNewLeadSchedule();
       ensureLeadDetailSchedule();
       ensureAccessData();

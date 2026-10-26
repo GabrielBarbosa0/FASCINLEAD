@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appointmentFollowUps, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isFollowUpContacted } from '../../src/utils/follow-up.js';
+import { appointmentFollowUps, buildWhatsAppAppointmentReminderUrl, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isAppointmentReminderDone, isFollowUpContacted } from '../../src/utils/follow-up.js';
 
 const profile = { uid: 'captor-1', role: 'captor' };
 const lead = {
@@ -98,5 +98,28 @@ describe('missed appointment follow-ups', () => {
     const lateMessage = new URL(buildWhatsAppFollowUpUrl(lead, 'late')).searchParams.get('text');
     expect(lateMessage).toContain('Você está a caminho?');
     expect(lateMessage).not.toContain('reagendar');
+  });
+
+  it('builds the humanized appointment reminder approved for manual sending', () => {
+    const url = new URL(buildWhatsAppAppointmentReminderUrl({
+      ...lead,
+      appointmentDate: '2026-10-27',
+      appointmentTime: '14:30',
+      careRoute: 'ophthalmologist'
+    }, 'Gabriel', 'Loja 06 - Surubim'));
+    expect(url.pathname).toBe('/5581999991234');
+    expect(url.searchParams.get('text')).toBe(
+      'Olá, Clara! Tudo bem? Sou Gabriel, da ConsultVision, parceira das Óticas Fascinante.\n\nPassando para lembrar que seu atendimento com o oftalmologista está marcado para terça-feira, 27 de outubro, às 14:30, na Loja 06 - Surubim.\n\nPodemos confirmar sua presença? Se precisar alterar o horário, é só nos avisar por aqui.'
+    );
+  });
+
+  it('counts a manual reminder only for the current appointment', () => {
+    const completed = {
+      ...lead,
+      appointmentReminderSentAt: '2026-10-14T15:00:00.000Z',
+      appointmentReminderAppointmentKey: followUpAppointmentKey(lead)
+    };
+    expect(isAppointmentReminderDone(completed)).toBe(true);
+    expect(isAppointmentReminderDone({ ...completed, appointmentTime: '10:00' })).toBe(false);
   });
 });

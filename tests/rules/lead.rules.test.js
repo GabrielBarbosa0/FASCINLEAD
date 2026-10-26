@@ -118,6 +118,43 @@ describe('lead correction rules', () => {
     await assertFails(getDoc(doc(noAgendaDb, 'leads', 'lead-test')));
   });
 
+  it('lets an agenda profile complete only the current appointment reminder as itself', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'users', 'manager-uid'), {
+        roleProfileId: 'custom-agenda-only',
+        permissions: ['appointments.view']
+      });
+    });
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    const reminder = {
+      leadId: 'lead-test',
+      storeId: 'loja-06',
+      appointmentDate: '2026-10-15',
+      appointmentTime: '09:30',
+      appointmentKey: '2026-10-15|09:30',
+      completedAt: Timestamp.now(),
+      completedByUid: 'manager-uid',
+      completedByName: 'Gestor Teste',
+      schemaVersion: 1
+    };
+    const reminderRef = doc(db, 'appointmentReminders', 'lead-test__2026-10-15__09-30');
+    await assertSucceeds(setDoc(reminderRef, reminder));
+    await assertSucceeds(getDocs(query(
+      collection(db, 'appointmentReminders'),
+      where('storeId', '==', 'loja-06'),
+      where('appointmentDate', '>=', '2026-10-15'),
+      where('appointmentDate', '<=', '2026-10-21')
+    )));
+    const captorDb = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(deleteDoc(doc(captorDb, 'appointmentReminders', 'lead-test__2026-10-15__09-30')));
+    await assertSucceeds(deleteDoc(reminderRef));
+    await assertFails(setDoc(doc(db, 'appointmentReminders', 'forged-reminder'), {
+      ...reminder,
+      completedByUid: 'outro-uid',
+      completedByName: 'Outro Captador'
+    }));
+  });
+
   it('lets the captor create a lead without consent fields', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(setDoc(doc(db, 'leads', 'lead-without-consent'), {

@@ -18,6 +18,7 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Agenda de exames/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Confirmações/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Retornos da equipe/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Retornos pendentes/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Painel de gestão/ })).toHaveCount(0);
@@ -37,6 +38,70 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await page.goto('/#/management');
   await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
   await expect(page.getByText('Seu perfil não possui acesso aos dados gerenciais.')).toHaveCount(0);
+});
+
+test('lists upcoming appointments and prepares the manual WhatsApp reminder', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'receptionist'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  const appointmentDate = await page.evaluate(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  await page.evaluate(({ appointmentDate }) => {
+    const lead = {
+      id: 'appointment-confirmation',
+      fullName: 'Clara de Teste',
+      preferredName: 'Clara',
+      phone: '(81) 99999-1234',
+      phoneSearch: '81999991234',
+      storeId: 'loja-06',
+      capturedByUid: 'demo-receptionist',
+      appointmentDate,
+      appointmentTime: '14:30',
+      appointmentAttendance: 'pending',
+      careRoute: 'ophthalmologist',
+      capturedAtClient: new Date().toISOString()
+    };
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([lead]));
+    window.dispatchEvent(new Event('fascinlead:demo-leads'));
+  }, { appointmentDate });
+
+  await page.getByRole('button', { name: /Confirmações/ }).click();
+  await expect(page.getByRole('heading', { name: 'Confirmações' })).toBeVisible();
+  await expect(page.getByText('Clara de Teste', { exact: true })).toBeVisible();
+  await expect(page.getByText('(81) 99999-1234', { exact: true })).toBeVisible();
+  const whatsAppLink = page.getByRole('link', { name: 'Abrir WhatsApp' });
+  const href = await whatsAppLink.getAttribute('href');
+  const preparedMessage = new URL(href).searchParams.get('text');
+  expect(href).toContain('wa.me/5581999991234');
+  expect(preparedMessage).toContain('Olá, Clara! Tudo bem? Sou Atendente de Teste, da ConsultVision, parceira das Óticas Fascinante.');
+  expect(preparedMessage).toContain('atendimento com o oftalmologista');
+  expect(preparedMessage).toContain('às 14:30, na Loja 06 - Surubim.');
+  expect(preparedMessage).toContain('Podemos confirmar sua presença?');
+  const summary = page.getByRole('region', { name: 'Resumo das confirmações' });
+  await expect(summary.locator('[data-confirmation-filter="pending"] strong')).toHaveText('1');
+  await expect(summary.locator('[data-confirmation-filter="done"] strong')).toHaveText('0');
+  await page.getByRole('button', { name: 'Marcar como feito' }).click();
+  await expect(page.getByText('Lembrete marcado como feito.')).toBeVisible();
+  await expect(summary.locator('[data-confirmation-filter="pending"] strong')).toHaveText('0');
+  await expect(summary.locator('[data-confirmation-filter="done"] strong')).toHaveText('1');
+  await expect(page.getByText('Clara de Teste', { exact: true })).toHaveCount(0);
+  await summary.locator('[data-confirmation-filter="done"]').click();
+  await expect(page.getByText('Clara de Teste', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Marcado por Atendente de Teste em/)).toBeVisible();
+  await page.getByRole('button', { name: 'Desfazer' }).click();
+  await expect(page.getByText('Conclusão do lembrete desfeita.')).toBeVisible();
+  await expect(summary.locator('[data-confirmation-filter="pending"] strong')).toHaveText('1');
+  await expect(summary.locator('[data-confirmation-filter="done"] strong')).toHaveText('0');
+  await expect(page.getByText('Clara de Teste', { exact: true })).toHaveCount(0);
+  await summary.locator('[data-confirmation-filter="pending"]').click();
+  await expect(page.getByText('Clara de Teste', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Marcar como feito' })).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('manual-whatsapp-confirmations.png'), fullPage: true });
 });
 
 test('requires a destination store for a multi-store MEI capture', async ({ page }, testInfo) => {
@@ -752,6 +817,41 @@ test('keeps a long appointment list inside the calendar height', async ({ page }
   expect(layout.listScrollHeight).toBeGreaterThan(layout.listClientHeight);
   expect(layout.listOverflowY).toBe('auto');
   await page.screenshot({ path: testInfo.outputPath('appointments-scroll.png'), fullPage: true });
+});
+
+test('shows complete transport details in appointment cards', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const appointmentDate = `${now.getFullYear()}-${month}-18`;
+  await page.evaluate(({ appointmentDate }) => {
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([{
+      id: 'appointment-transport',
+      fullName: 'Cliente com transporte',
+      phoneSearch: '81999991234',
+      appointmentDate,
+      appointmentTime: '09:00',
+      appointmentAttendance: 'pending',
+      capturedByName: 'Captador de Teste',
+      capturedByUid: 'demo-admin',
+      storeId: 'loja-06',
+      needsTransport: true,
+      hasCompanion: true,
+      transportSeats: 2,
+      syncState: 'demo'
+    }]));
+    window.dispatchEvent(new Event('fascinlead:demo-leads'));
+  }, { appointmentDate });
+
+  await page.getByRole('button', { name: /Agenda de exames/ }).click();
+  await page.locator(`[data-appointment-date="${appointmentDate}"]`).click();
+  const transport = page.locator('.appointment-transport');
+  await expect(transport).toContainText('Transporte + acompanhante');
+  await expect(page.locator('.transport-day-summary')).toContainText('1 cliente · 2 assentos');
+  expect(await transport.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('appointment-transport.png'), fullPage: true });
 });
 
 test('keeps new registration beside the management return action', async ({ page }, testInfo) => {
