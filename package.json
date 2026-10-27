@@ -7,7 +7,7 @@
     "start": "vite --host 127.0.0.1 --open",
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "vite build --base=/FASCINLEAD/",
+    "build:pages": "vite build --base=/LEADFLOW/",
     "preview": "vite preview",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.js\"",
