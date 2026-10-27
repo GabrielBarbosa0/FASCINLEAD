@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
     createSavwinLocalProxy(env),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon-32.png', 'apple-touch-icon.png', 'leadflow-logo.png'],
+      includeAssets: ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png', 'leadflow-logo.png'],
       manifest: {
         name: 'LeadFlow',
         short_name: 'LeadFlow',
