@@ -231,6 +231,8 @@ Uma divida so pode ser marcada como concluida quando houver evidencia no codigo,
 | Erro de gravacao limpava o formulario | Formulario preserva os valores e destaca campos invalidos | Mitigado |
 | Testes de regras nao faziam parte do workflow do frontend | `npm run test:rules` incluido no GitHub Actions | Mitigado parcialmente; ainda falta E2E integrado |
 
+> **Nota do incidente:** o problema recente foi tecnico: a operacao ultrapassava o limite fixo de **1.000 expressoes avaliadas por requisicao** das regras do Firestore. Esse limite tambem existe no plano pago do Firebase; mudar de plano nao evita essa classe de erro.
+
 ## 8. Processo de manutencao
 
 - Toda nova divida recebe identificador, prioridade, impacto e criterio de conclusao.
