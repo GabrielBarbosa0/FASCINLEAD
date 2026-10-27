@@ -1486,9 +1486,9 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Data do pré-agendamento').fill(appointmentDate);
   const timeSelect = page.getByLabel('Horário disponível');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(0);
   await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:30"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="08:30"]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('available-slots.png'), fullPage: true });
 
   await page.getByLabel('Nome *').fill('Cliente Horário Ocupado');
@@ -1720,8 +1720,9 @@ test('creates a service and uses its duration in new appointments', async ({ pag
   await page.getByLabel('Data do pré-agendamento').fill(date.toISOString().slice(0, 10));
   const timeSelect = page.getByLabel('Horário disponível');
   await expect(timeSelect.locator('option[value="08:00"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(1);
-  await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(1);
+  await expect(timeSelect.locator('option[value="08:10"]')).toHaveCount(0);
+  await expect(timeSelect.locator('option[value="08:20"]')).toHaveCount(0);
+  await expect(timeSelect.locator('option[value="08:40"]')).toHaveCount(1);
 
   await page.evaluate(() => { window.location.hash = '#/settings'; });
   await page.getByRole('tab', { name: 'Serviços' }).click();

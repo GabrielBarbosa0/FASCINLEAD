@@ -73,8 +73,8 @@ describe('store schedule helpers', () => {
       openingTime: '08:00',
       closingTime: '09:20'
     });
-    expect(slots.map((slot) => slot.time)).toEqual(['08:00', '08:10', '08:20', '08:30', '08:40', '08:50']);
-    expect(slots.at(-1).endTime).toBe('09:20');
+    expect(slots.map((slot) => slot.time)).toEqual(['08:00', '08:30']);
+    expect(slots.at(-1).endTime).toBe('09:00');
   });
 
   it('marks overlapping appointments as unavailable', () => {
@@ -86,9 +86,7 @@ describe('store schedule helpers', () => {
     }, [{ id: 'lead-1', appointmentTime: '08:10' }]);
     expect(slots.map(({ time, available }) => [time, available])).toEqual([
       ['08:00', false],
-      ['08:10', false],
       ['08:20', false],
-      ['08:30', true],
       ['08:40', true]
     ]);
   });
@@ -140,9 +138,7 @@ describe('store schedule helpers', () => {
     }, [{ id: 'block-1', leadId: 'lead-1', appointmentTime: '08:00', blockTime: '08:10', durationMinutes: 20 }]);
     expect(slots.map(({ time, available }) => [time, available])).toEqual([
       ['08:00', false],
-      ['08:10', false],
       ['08:20', true],
-      ['08:30', true],
       ['08:40', true]
     ]);
   });

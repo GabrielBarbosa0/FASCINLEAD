@@ -504,7 +504,7 @@ export function buildAppointmentSlots(settings, appointments = [], ignoredLeadId
     .filter(Boolean);
 
   const slots = [];
-  for (let slotStart = start; slotStart + duration <= end; slotStart += APPOINTMENT_BLOCK_MINUTES) {
+  for (let slotStart = start; slotStart + duration <= end; slotStart += duration) {
     const slotEnd = slotStart + duration;
     const slotTime = minutesToTime(slotStart);
     const quota = appointmentQuotaStatus(

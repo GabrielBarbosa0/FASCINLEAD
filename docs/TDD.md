@@ -482,7 +482,7 @@ O selo `Online` ou `Offline` descrevera apenas a conectividade detectada pelo na
 
 #### Reservas de horario em `appointmentSlots`
 
-Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{recursoDeAgenda}-{data}-{hora}`), sem nome, telefone ou observacoes. O recurso e `consultorio-surubim` para Loja 02 e Loja 06 e corresponde ao proprio `storeId` para Loja 04 e Loja 05. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos, inclusive entre as duas lojas de Surubim.
+Cada bloco controlado de 10 minutos possui um documento minimo e deterministico (`slot-{recursoDeAgenda}-{data}-{hora}`), sem nome, telefone ou observacoes. O recurso e `consultorio-surubim` para Loja 02 e Loja 06 e corresponde ao proprio `storeId` para Loja 04 e Loja 05. Um atendimento de 20 minutos reserva dois documentos consecutivos; um de 10 minutos reserva um. Esses blocos sao uma protecao interna: as opcoes visiveis avancam conforme a duracao completa do servico, sem sobreposicao. Assim, um servico de 20 minutos oferece `08:00-08:20`, `08:20-08:40` e assim por diante. Uma reserva existente nao pode ser sobrescrita, evitando dupla ocupacao por captadores simultaneos, inclusive entre as duas lojas de Surubim.
 
 No fluxo online atual, o cadastro e todos os blocos exigidos pelo servico sao gravados no mesmo lote. Se qualquer bloco ja estiver ocupado, o lote inteiro falha e o usuario escolhe outro horario. O cadastro offline nunca inclui data, horario ou documentos em `appointmentSlots`.
 
