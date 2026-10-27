@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocFromServer,
   limit,
   onSnapshot,
   orderBy,
@@ -94,12 +95,9 @@ export function subscribeToLeads(profile, demoMode, onData, onError) {
     emit();
     removeConfirmedOfflineLeads();
   }, onError);
-  const leadsQuery = query(
-    collection(db, 'leads'),
-    where('capturedByUid', '==', profile.uid),
-    orderBy('capturedAtClient', 'desc'),
-    limit(100)
-  );
+  const constraints = [orderBy('capturedAtClient', 'desc'), limit(100)];
+  if (profile.role !== 'admin') constraints.unshift(where('capturedByUid', '==', profile.uid));
+  const leadsQuery = query(collection(db, 'leads'), ...constraints);
 
   const unsubscribeRemote = onSnapshot(
     leadsQuery,
@@ -342,10 +340,18 @@ async function synchronizeOfflineLeads(profile) {
   for (const lead of leads) {
     const { id, syncState, fromCache, ...data } = lead;
     try {
+      await updateOfflineLeadState(id, 'syncing');
       const leadReference = doc(db, 'leads', id);
       await runTransaction(db, async (transaction) => {
         const remoteLead = await transaction.get(leadReference);
-        if (remoteLead.exists()) return;
+        if (remoteLead.exists()) {
+          if (remoteLead.data().capturedByUid !== profile.uid) {
+            const error = new Error('O identificador local pertence a outro cadastro.');
+            error.code = 'offline-lead-id-conflict';
+            throw error;
+          }
+          return;
+        }
         transaction.set(leadReference, {
           ...data,
           appointmentDate: '',
@@ -354,8 +360,15 @@ async function synchronizeOfflineLeads(profile) {
           updatedAtServer: serverTimestamp()
         });
       });
+      const confirmedLead = await getDocFromServer(leadReference);
+      if (!confirmedLead.exists() || confirmedLead.data().capturedByUid !== profile.uid) {
+        const error = new Error('O cadastro não foi confirmado pelo servidor.');
+        error.code = 'offline-lead-not-confirmed';
+        throw error;
+      }
+      await removeOfflineLead(id);
       synchronized += 1;
-    } catch {
+    } catch (error) {
       await updateOfflineLeadState(id, 'error');
       failed += 1;
     }

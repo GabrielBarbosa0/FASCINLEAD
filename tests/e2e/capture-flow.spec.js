@@ -1571,9 +1571,9 @@ test('uses the available width in schedule settings', async ({ page }, testInfo)
   await page.getByRole('button', { name: 'Salvar cadastro' }).click();
   await expect(page.getByRole('heading', { name: 'Meus cadastros' })).toBeVisible();
   const offlineLead = page.getByRole('button', { name: 'Ver cadastro de Cliente Offline' });
-  await expect(offlineLead).toContainText('Aguardando agendamento');
+  await expect(offlineLead).toContainText('Somente neste navegador');
   await page.context().setOffline(false);
-  await expect(offlineLead).toContainText('Aguardando agendamento');
+  await expect(offlineLead).toContainText('Somente neste navegador');
   await offlineLead.click();
   await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
   const scheduleDate = new Date();

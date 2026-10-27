@@ -545,12 +545,16 @@ function filteredReportRecords() {
 }
 
 function syncLabel(lead) {
-  if (!lead.appointmentDate || !lead.appointmentTime) return ['Aguardando agendamento', 'warning'];
   if (lead.syncState === 'demo') return ['Somente neste navegador', 'neutral'];
+  if (lead.syncState === 'error') return ['Não sincronizado', 'danger'];
+  if (lead.syncState === 'syncing') return ['Sincronizando', 'warning'];
+  if (lead.syncState === 'pending') return ['Pendente de sincronização', 'warning'];
+  if (!lead.appointmentDate || !lead.appointmentTime) return ['Aguardando agendamento', 'warning'];
   return ['Agendado', 'success'];
 }
 
 function offlineSyncDetail(lead) {
+  if (lead.syncState === 'syncing') return 'Enviando cadastro para a nuvem.';
   if (lead.syncState === 'pending') return 'Salvo neste aparelho. Sincronização automática pendente.';
   if (lead.syncState === 'error') return 'Não foi possível sincronizar. O cadastro continua salvo neste aparelho.';
   return '';
@@ -1881,8 +1885,8 @@ function confirmationsView() {
     : `<div class="empty-state"><i data-lucide="${activeFilter === 'done' ? 'circle-check' : 'message-circle'}"></i><strong>${activeFilter === 'done' ? 'Nenhum lembrete feito' : activeFilter === 'all' ? 'Nenhuma confirmação no período' : 'Nenhuma confirmação pendente'}</strong><p>${activeFilter === 'done' ? 'Os lembretes marcados como feitos aparecerão aqui.' : activeFilter === 'all' ? 'Não há atendimentos nos próximos sete dias.' : 'Todos os lembretes deste período foram concluídos.'}</p></div>`;
 
   return `<section class="management-heading page-actions-only reminder-toolbar">
-      <button class="button button-secondary" type="button" data-route="home"><i data-lucide="arrow-left"></i><span>Voltar ao início</span></button>
       <div class="reminder-period"><span>Próximos 7 dias</span><strong>${allRecords.length} ${allRecords.length === 1 ? 'cliente' : 'clientes'}</strong></div>
+      <button class="button button-secondary" type="button" data-route="home"><i data-lucide="arrow-left"></i><span>Voltar ao início</span></button>
     </section>
     ${state.confirmations.error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.confirmations.error)}</span></div>` : ''}
     ${state.confirmations.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A lista atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} agendamentos.</span></div>` : ''}
@@ -2603,7 +2607,7 @@ function syncConnectivityIndicator() {
 function handleConnectivityChange() {
   syncConnectivityIndicator();
   if (navigator.onLine && state.profile && !state.demoMode) {
-    synchronizeNow(false, state.profile).catch(() => {});
+    synchronizePendingRegistrations(true);
   }
   if (state.route !== 'new') return;
 
@@ -2648,6 +2652,27 @@ function showToast(message, tone = 'success', icon = 'circle-check') {
     document.querySelector('#app .toast')?.remove();
     toastTimeoutId = null;
   }, 3200);
+}
+
+async function synchronizePendingRegistrations(announce = false) {
+  try {
+    const result = await synchronizeNow(false, state.profile);
+    if (result.failed > 0) {
+      showToast(
+        `${result.failed} cadastro(s) não foram confirmados pela nuvem e continuam salvos neste aparelho.`,
+        'danger',
+        'circle-alert'
+      );
+    } else if (announce && result.synchronized > 0) {
+      showToast(`${result.synchronized} cadastro(s) sincronizado(s) e salvo(s) na nuvem.`, 'success', 'cloud-check');
+    }
+    return result;
+  } catch (error) {
+    if (announce) {
+      showToast('Não foi possível confirmar os cadastros na nuvem. Eles continuam salvos neste aparelho.', 'danger', 'circle-alert');
+    }
+    return { synchronized: 0, failed: 0, error };
+  }
 }
 
 function setFieldErrors(form, errors) {
@@ -5831,7 +5856,7 @@ export async function startApp() {
   }, 60_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.profile && !state.demoMode) {
-      synchronizeNow(false, state.profile).catch(() => {});
+      synchronizePendingRegistrations();
     }
   });
 
@@ -5870,7 +5895,7 @@ export async function startApp() {
       state.demoMode = false;
       state.authError = '';
       subscribeProfileLeads();
-      if (navigator.onLine) synchronizeNow(false, state.profile).catch(() => {});
+      if (navigator.onLine) synchronizePendingRegistrations();
       startOfflineCaptureSubscription();
       startFollowUpScheduleSubscription();
       state.unsubscribeProfile = observeAuthorizedProfile(firebaseUser, (profile) => {

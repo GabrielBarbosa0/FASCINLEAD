@@ -771,13 +771,15 @@ O agendamento nao opera offline:
 | Agendado | Cadastro confirmado com data, horario e blocos reservados | Consultar na agenda |
 | Local de teste | Registro criado somente no modo de desenvolvimento | Nenhuma |
 
-O estado tecnico de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento. A situacao operacional exibida ao usuario prioriza `Aguardando agendamento` ou `Agendado`.
+O estado tecnico de sincronizacao e metadado local; nao sera salvo como verdade global dentro do proprio documento. Enquanto a nuvem nao confirmar o documento, a interface prioriza `Pendente de sincronizacao`, `Sincronizando` ou `Nao sincronizado`. `Aguardando agendamento` so pode ser exibido depois da confirmacao no servidor.
 
 Enquanto o formulario de nova captacao estiver aberto, uma mudanca de conectividade atualiza somente o aviso e os controles da agenda, preservando os demais campos preenchidos.
 
 ### 8.3 Processamento automatico da caixa de saida
 
-Ao detectar conexao, o aplicativo envia os cadastros locais do usuario autenticado em uma unica execucao de sincronizacao e aguarda a confirmacao individual. Chamadas simultaneas sao consolidadas e a aplicacao nao reinicia a rede do Firestore quando o navegador ja esta online. Falhas permanecem na caixa de saida para nova tentativa; nao existe comando manual nem mensagem de sucesso antes da confirmacao do servidor.
+Ao detectar conexao, o aplicativo envia os cadastros locais do usuario autenticado em uma unica execucao de sincronizacao e aguarda a confirmacao individual. Depois da gravacao, uma leitura direta do servidor deve comprovar que o documento existe no Firestore e pertence ao mesmo usuario antes de remove-lo da caixa de saida. Chamadas simultaneas sao consolidadas e a aplicacao nao reinicia a rede do Firestore quando o navegador ja esta online. Falhas permanecem na caixa de saida para nova tentativa; nao existe mensagem de sucesso antes dessa confirmacao.
+
+Depois de confirmado, o cadastro passa a ser consultavel em outros dispositivos. O autor continua vendo os proprios registros; administradores podem listar, editar e excluir qualquer cadastro, e gestores acessam os registros das lojas autorizadas pelo painel de gestao.
 
 ### 8.4 Conflitos
 

@@ -5,7 +5,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment
 } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, setDoc, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { createLeadDocument } from '../../src/utils/lead.js';
 
 const projectId = 'demo-fascinlead-leads';
@@ -509,6 +509,27 @@ describe('lead correction rules', () => {
 });
 
 describe('appointment calendar queries', () => {
+  it('lets an administrator list registrations from every user', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(getDocs(query(
+      collection(db, 'leads'),
+      orderBy('capturedAtClient', 'desc')
+    )));
+  });
+
+  it('requires a captor to scope the registration list to their own uid', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(getDocs(query(
+      collection(db, 'leads'),
+      orderBy('capturedAtClient', 'desc')
+    )));
+    await assertSucceeds(getDocs(query(
+      collection(db, 'leads'),
+      where('capturedByUid', '==', 'captor-uid'),
+      orderBy('capturedAtClient', 'desc')
+    )));
+  });
+
   it('lets a manager query appointments only from their own store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     const appointments = query(
