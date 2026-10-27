@@ -6,7 +6,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   waitForPendingWrites,
@@ -44,6 +43,24 @@ function setReservationBlock(batch, block, data) {
     blockTime: block.blockTime,
     createdAt: serverTimestamp()
   });
+}
+
+async function commitReservationBatch(batch, blocks, leadId) {
+  try {
+    await batch.commit();
+  } catch (error) {
+    if (error?.code !== 'permission-denied') throw error;
+    const checks = await Promise.allSettled(blocks.map((block) => (
+      getDocFromServer(doc(db, 'appointmentSlots', block.id))
+    )));
+    const occupied = checks.some((result) => (
+      result.status === 'fulfilled'
+      && result.value.exists()
+      && result.value.data().leadId !== leadId
+    ));
+    if (occupied) throw appointmentConflictError();
+    throw error;
+  }
 }
 
 function readDemoLeads() {
@@ -243,54 +260,36 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   let writePromise;
   if (localOnly) {
     const { id: ignoredId, syncState, fromCache, createdAtServer, ...localData } = existingLead;
-    const leadReference = doc(db, 'leads', id);
-    writePromise = runTransaction(db, async (transaction) => {
-      const remoteLead = await transaction.get(leadReference);
-      const slotSnapshots = await Promise.all(newBlocks.map((block) => transaction.get(doc(db, 'appointmentSlots', block.id))));
-      if (slotSnapshots.some((snapshot) => snapshot.exists() && snapshot.data().leadId !== id)) {
-        throw appointmentConflictError();
-      }
-      const completeLead = {
-        ...localData,
-        ...result.data,
-        ...(result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
-        ...(!remoteLead.exists() ? { createdAtServer: serverTimestamp() } : {}),
-        updatedAtServer: serverTimestamp()
-      };
-      transaction.set(leadReference, completeLead, { merge: true });
-      newBlocks.forEach((block) => setReservationBlock(transaction, block, {
-        storeId: existingLead.storeId,
-        appointmentDate: result.data.appointmentDate,
-        appointmentTime: result.data.appointmentTime,
-        durationMinutes: result.data.appointmentDurationMinutes,
-        leadId: id,
-        capturedByUid: existingLead.capturedByUid
-      }));
-    });
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), {
+      ...localData,
+      ...result.data,
+      ...(result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp()
+    }, { merge: true });
+    newBlocks.forEach((block) => setReservationBlock(batch, block, {
+      storeId: existingLead.storeId,
+      appointmentDate: result.data.appointmentDate,
+      appointmentTime: result.data.appointmentTime,
+      durationMinutes: result.data.appointmentDurationMinutes,
+      leadId: id,
+      capturedByUid: existingLead.capturedByUid
+    }));
+    writePromise = commitReservationBatch(batch, newBlocks, id);
   } else if (existingLead && reservationChanged && (oldBlocks.length || newBlocks.length)) {
-    const leadReference = doc(db, 'leads', id);
-    const slotReferences = [...new Map([...oldBlocks, ...newBlocks]
-      .map((block) => [block.id, doc(db, 'appointmentSlots', block.id)])).values()];
-    writePromise = runTransaction(db, async (transaction) => {
-      const slotSnapshots = await Promise.all(slotReferences.map((reference) => transaction.get(reference)));
-      const slotsById = new Map(slotSnapshots.map((snapshot) => [snapshot.id, snapshot]));
-      const occupiedByAnotherLead = newBlocks.some((block) => {
-        const snapshot = slotsById.get(block.id);
-        return snapshot?.exists() && snapshot.data().leadId !== id;
-      });
-      if (occupiedByAnotherLead) throw appointmentConflictError();
-
-      transaction.set(leadReference, leadUpdate, { merge: true });
-      oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => transaction.delete(doc(db, 'appointmentSlots', block.id)));
-      newBlocks.forEach((block) => setReservationBlock(transaction, block, {
-        storeId: existingLead.storeId,
-        appointmentDate: result.data.appointmentDate,
-        appointmentTime: result.data.appointmentTime,
-        durationMinutes: result.data.appointmentDurationMinutes,
-        leadId: id,
-        capturedByUid: existingLead.capturedByUid
-      }));
-    });
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
+    oldBlocks.filter((block) => !newIds.has(block.id)).forEach((block) => batch.delete(doc(db, 'appointmentSlots', block.id)));
+    newBlocks.forEach((block) => setReservationBlock(batch, block, {
+      storeId: existingLead.storeId,
+      appointmentDate: result.data.appointmentDate,
+      appointmentTime: result.data.appointmentTime,
+      durationMinutes: result.data.appointmentDurationMinutes,
+      leadId: id,
+      capturedByUid: existingLead.capturedByUid
+    }));
+    writePromise = commitReservationBatch(batch, newBlocks, id);
   } else {
     writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
   }

@@ -1054,6 +1054,11 @@ describe('appointment slot reservations', () => {
       ...slot,
       leadId: 'offline-lead'
     });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:10'), {
+      ...slot,
+      blockTime: '08:10',
+      leadId: 'offline-lead'
+    });
     await assertSucceeds(batch.commit());
   });
 
@@ -1087,6 +1092,11 @@ describe('appointment slot reservations', () => {
     });
     batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
       ...slot,
+      leadId: 'offline-limited-lead'
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:10'), {
+      ...slot,
+      blockTime: '08:10',
       leadId: 'offline-limited-lead'
     });
     await assertSucceeds(batch.commit());
