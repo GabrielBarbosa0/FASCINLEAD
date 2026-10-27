@@ -211,7 +211,7 @@ export function saveLead(input, profile, demoMode, onRemoteError, options = {}) 
   return { ...result, id, writePromise };
 }
 
-export function updateLead(id, input, demoMode, onRemoteError, existingLead = null) {
+export function updateLead(id, input, demoMode, onRemoteError, existingLead = null, options = {}) {
   const result = createLeadUpdate(input);
   if (!result.isValid) return result;
 
@@ -236,11 +236,21 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     existingLead.appointmentDate !== result.data.appointmentDate
     || existingLead.appointmentTime !== result.data.appointmentTime
   );
-  const leadUpdate = {
-    ...result.data,
+  const appointmentUpdate = {
+    appointmentDate: result.data.appointmentDate,
+    appointmentTime: result.data.appointmentTime,
+    appointmentSchedulingMode: result.data.appointmentSchedulingMode,
+    appointmentDurationMinutes: result.data.appointmentDurationMinutes,
+    ...(result.data.appointmentServiceId ? {
+      appointmentServiceId: result.data.appointmentServiceId,
+      appointmentServiceName: result.data.appointmentServiceName
+    } : {}),
     ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
     updatedAtServer: serverTimestamp()
   };
+  const leadUpdate = options.appointmentOnly
+    ? appointmentUpdate
+    : { ...result.data, ...appointmentUpdate };
   const localOnly = existingLead
     && ['pending', 'error'].includes(existingLead.syncState)
     && !existingLead.createdAtServer;

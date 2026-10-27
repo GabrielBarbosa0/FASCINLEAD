@@ -2937,7 +2937,9 @@ function bindPageEvents() {
           state.dataError = 'A correção não foi aceita pela nuvem. Verifique o acesso e tente novamente.';
           render();
         }
-      }, existingLead);
+      }, existingLead, {
+        appointmentOnly: !hasAccess('leads.edit_own')
+      });
       setFieldErrors(editLeadForm, result.errors || {});
       if (!result.isValid) {
         submitButton.disabled = false;

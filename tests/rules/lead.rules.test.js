@@ -1102,6 +1102,68 @@ describe('appointment slot reservations', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('lets the owner reschedule an existing appointment without general edit permission', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await Promise.all([
+        setDoc(doc(adminDb, 'leads', 'limited-scheduled-lead'), lead),
+        setDoc(doc(adminDb, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+          ...slot,
+          leadId: 'limited-scheduled-lead'
+        }),
+        setDoc(doc(adminDb, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:10'), {
+          ...slot,
+          blockTime: '08:10',
+          leadId: 'limited-scheduled-lead'
+        }),
+        updateDoc(doc(adminDb, 'users', 'captor-uid'), {
+          permissions: ['leads.create', 'leads.view_own']
+        })
+      ]);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'leads', 'limited-scheduled-lead'), {
+      appointmentTime: '08:20',
+      appointmentAttendance: 'pending',
+      updatedAtServer: Timestamp.now()
+    });
+    batch.delete(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'));
+    batch.delete(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:10'));
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:20'), {
+      ...slot,
+      appointmentTime: '08:20',
+      blockTime: '08:20',
+      leadId: 'limited-scheduled-lead'
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:30'), {
+      ...slot,
+      appointmentTime: '08:20',
+      blockTime: '08:30',
+      leadId: 'limited-scheduled-lead'
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('keeps unrelated lead fields protected during an owner reschedule', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await Promise.all([
+        setDoc(doc(adminDb, 'leads', 'protected-scheduled-lead'), lead),
+        updateDoc(doc(adminDb, 'users', 'captor-uid'), {
+          permissions: ['leads.create', 'leads.view_own']
+        })
+      ]);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'protected-scheduled-lead'), {
+      fullName: 'Nome alterado sem permissao',
+      appointmentTime: '08:20',
+      appointmentAttendance: 'pending',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets the captor create and schedule a local-only lead in one batch', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const localLead = {

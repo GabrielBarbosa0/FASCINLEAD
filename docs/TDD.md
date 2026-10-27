@@ -761,7 +761,7 @@ O agendamento nao opera offline:
 3. A tela de detalhes usa a escala controlada da loja e exibe somente horarios disponiveis; nao transforma o primeiro agendamento em horario livre.
 4. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
 5. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.
-6. A sincronizacao grava o UUID aleatorio gerado no aparelho sem fazer uma leitura previa do documento inexistente, pois essa leitura e corretamente negada ao captador pelas regras de privacidade. Depois da escrita, uma leitura direta do servidor confirma a autoria antes de remover a copia local. O primeiro agendamento grava o lead e todos os blocos em um lote atomico, sem tentar ler previamente blocos que ainda nao existem; as regras impedem que um bloco ocupado por outro lead seja sobrescrito.
+6. A sincronizacao grava o UUID aleatorio gerado no aparelho sem fazer uma leitura previa do documento inexistente, pois essa leitura e corretamente negada ao captador pelas regras de privacidade. Depois da escrita, uma leitura direta do servidor confirma a autoria antes de remover a copia local. O agendamento e o reagendamento feitos pelo autor gravam o lead e todos os blocos em um lote atomico, sem tentar ler previamente blocos que ainda nao existem; as regras impedem que um bloco ocupado por outro lead seja sobrescrito. Perfis sem `leads.edit_own` enviam somente os campos da agenda, mantendo os demais dados protegidos e evitando que diferencas de normalizacao bloqueiem a operacao.
 
 ### 8.2 Estados exibidos
 
