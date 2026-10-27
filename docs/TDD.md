@@ -817,7 +817,7 @@ Dados dos clientes permanecerao sob responsabilidade do cache persistente do Fir
 | Recursos externos em tempo de execucao | Sem regra customizada de `runtimeCaching` |
 | Firestore e Authentication | SDK oficial; nao interceptar no Service Worker |
 
-O registro usa o modo `prompt`: ao detectar nova versao, o aplicativo avisa o usuario e somente ativa o novo Service Worker apos confirmacao. `skipWaiting` permanece desativado para evitar recarga silenciosa durante um formulario em edicao.
+O registro usa o modo `autoUpdate` com `skipWaiting` ativado, evitando que uma versao nova permaneca indefinidamente em espera. Quando uma aba ja aberta precisa recarregar, o aplicativo apresenta `Atualizar agora`; fechar e abrir o aplicativo tambem passa a usar a versao ativa mais recente.
 
 ## 10. Autenticacao e autorizacao
 

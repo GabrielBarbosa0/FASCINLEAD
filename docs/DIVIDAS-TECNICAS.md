@@ -228,6 +228,8 @@ Uma divida so pode ser marcada como concluida quando houver evidencia no codigo,
 | Item | Evidencia | Estado |
 | --- | --- | --- |
 | Documento completo excedia 1.000 expressoes das regras e retornava falso erro de permissao | Teste integrado do documento produzido pelo formulario e deploy das regras em 25/10/2026 | Mitigado |
+| Autor nao conseguia reagendar e o erro generico escondia limite de expressoes | Regra exclusiva para campos da agenda, avaliacao antecipada de `affectedKeys()` e 78 testes de regras em 27/10/2026 | Mitigado |
+| Atualizacao do PWA podia permanecer em espera e ZIP Windows podia omitir `assets` na Hostinger | `autoUpdate`, `skipWaiting`, validacao do chunk publicado e ZIP com caminhos portateis em 27/10/2026 | Mitigado |
 | Erro de gravacao limpava o formulario | Formulario preserva os valores e destaca campos invalidos | Mitigado |
 | Testes de regras nao faziam parte do workflow do frontend | `npm run test:rules` incluido no GitHub Actions | Mitigado parcialmente; ainda falta E2E integrado |
 
