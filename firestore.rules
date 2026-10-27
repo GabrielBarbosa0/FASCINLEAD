@@ -360,6 +360,23 @@ service cloud.firestore {
           ));
     }
 
+    function isOwnerFirstAppointmentUpdate() {
+      return resource.data.capturedByUid == request.auth.uid
+        && resource.data.appointmentDate == ''
+        && resource.data.appointmentTime == ''
+        && request.resource.data.appointmentDate != ''
+        && request.resource.data.appointmentTime != ''
+        && request.resource.data.appointmentAttendance == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
+          'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
+          'appointmentAttendance', 'updatedAtServer'
+        ])
+        && activeUser()
+        && hasPermission('leads.create')
+        && userHasStore(resource.data.storeId);
+    }
+
     function validAppointmentReminder(data) {
       return data.keys().hasOnly([
           'leadId', 'storeId', 'appointmentDate', 'appointmentTime',
@@ -553,16 +570,17 @@ service cloud.firestore {
       allow update: if request.resource.data.capturedByUid == resource.data.capturedByUid
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isManagerLeadUpdate() || isCaptorFollowUpContactUpdate());
-
-      allow update: if request.resource.data.capturedByUid == resource.data.capturedByUid
-        && request.resource.data.storeId == resource.data.storeId
-        && request.resource.data.createdAtServer == resource.data.createdAtServer
-        && (isAdminLeadCorrection() || (
-          validCaptorCorrectionData(request.resource.data)
-          && isCaptorLeadCorrection()
-          && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
-        ));
+        && (
+          isOwnerFirstAppointmentUpdate()
+          || isManagerLeadUpdate()
+          || isCaptorFollowUpContactUpdate()
+          || isAdminLeadCorrection()
+          || (
+            validCaptorCorrectionData(request.resource.data)
+            && isCaptorLeadCorrection()
+            && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
+          )
+        );
 
       allow delete: if isPrimaryAdmin()
         || (activeUser()

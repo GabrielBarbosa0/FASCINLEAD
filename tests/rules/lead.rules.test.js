@@ -984,6 +984,41 @@ describe('appointment slot reservations', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('lets the owner complete the first appointment even without general edit permission', async () => {
+    const unscheduledLead = {
+      ...lead,
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentSchedulingMode: 'controlled'
+    };
+    delete unscheduledLead.appointmentAttendance;
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await Promise.all([
+        setDoc(doc(adminDb, 'leads', 'offline-limited-lead'), unscheduledLead),
+        updateDoc(doc(adminDb, 'users', 'captor-uid'), {
+          permissions: ['leads.create', 'leads.view_own']
+        })
+      ]);
+    });
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'leads', 'offline-limited-lead'), {
+      appointmentDate: '2026-10-20',
+      appointmentTime: '08:00',
+      appointmentAttendance: 'pending',
+      appointmentDurationMinutes: 20,
+      appointmentServiceId: 'eye-exam',
+      appointmentServiceName: 'Exame de vista',
+      updatedAtServer: Timestamp.now()
+    });
+    batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
+      ...slot,
+      leadId: 'offline-limited-lead'
+    });
+    await assertSucceeds(batch.commit());
+  });
+
   it('lets the captor create and schedule a local-only lead in one batch', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const localLead = {
