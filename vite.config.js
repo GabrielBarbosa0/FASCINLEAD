@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
     createFascinLeadApi(env),
     createSavwinLocalProxy(env),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png', 'leadflow-logo.png'],
       manifest: {
         name: 'LeadFlow',
@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: false,
+        skipWaiting: true,
         runtimeCaching: []
       },
       devOptions: {

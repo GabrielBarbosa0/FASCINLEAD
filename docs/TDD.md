@@ -800,6 +800,8 @@ Transporte, escala da loja, agenda oftalmologica, limite diario e cotas do MEI s
 
 O Service Worker gerado pelo `vite-plugin-pwa` precacheia os artefatos versionados produzidos no build e usa `index.html` como fallback de navegacao. Isso permite reabrir o app shell ja instalado sem rede.
 
+Novas versoes do Service Worker ativam automaticamente os caches atualizados. Uma aba que ja esteja aberta exibe a acao `Atualizar agora` antes de recarregar, evitando interromper silenciosamente um formulario em preenchimento; ao fechar e abrir o aplicativo, a versao ativa mais recente passa a ser usada.
+
 - HTML principal e chunks versionados de CSS e JavaScript;
 - favicon e demais ativos incluidos no build;
 - manifest da PWA.
