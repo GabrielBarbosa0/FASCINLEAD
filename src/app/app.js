@@ -130,6 +130,21 @@ const appIcons = {
   X
 };
 
+function readableAuthError(error, fallback) {
+  const code = String(error?.code || '');
+  const message = String(error?.message || '');
+  const blockedDomain = code.startsWith('auth/requests-from-referer-')
+    || code === 'auth/unauthorized-domain'
+    || message.includes('requests-from-referer-')
+    || message.includes('auth/unauthorized-domain');
+
+  if (blockedDomain) {
+    return 'O acesso por este endereço ainda está sendo configurado. Avise o administrador e tente novamente mais tarde.';
+  }
+
+  return message || fallback;
+}
+
 const state = {
   route: currentRoute(),
   loading: true,
@@ -599,12 +614,14 @@ function currentPageTitle() {
 function headerView() {
   const online = navigator.onLine;
   const storeSummary = formatAccessStoreSummary(state.profile);
-  const storeCount = profileStoreIds(state.profile).length;
+  const permittedStoreIds = profileStoreIds(state.profile);
+  const permittedStoreLabels = STORES
+    .filter((store) => permittedStoreIds.includes(store.id))
+    .map((store) => store.label);
   const storeIndicator = storeSummary.short === 'TODAS'
     ? 'Todas'
-    : storeCount > 1
-      ? `${storeCount} lojas`
-      : storeSummary.short;
+    : permittedStoreLabels.join(' · ') || storeSummary.short;
+  const multipleStoreIndicator = permittedStoreLabels.length > 1 && storeSummary.short !== 'TODAS';
   return `
     <header class="app-header">
       <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
@@ -617,7 +634,7 @@ function headerView() {
         </div>
         <div class="header-actions">
           ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
-          <span class="store-indicator" title="${escapeHtml(storeSummary.full)}" aria-label="Loja: ${escapeHtml(storeSummary.full)}">
+          <span class="store-indicator ${multipleStoreIndicator ? 'is-multiple' : ''}" title="${escapeHtml(storeSummary.full)}" aria-label="Lojas: ${escapeHtml(storeSummary.full)}">
             <i data-lucide="building-2"></i><span>${escapeHtml(storeIndicator)}</span>
           </span>
           <span class="connectivity ${online ? 'is-online' : 'is-offline'}">
@@ -2956,7 +2973,7 @@ function bindPageEvents() {
     } catch (error) {
       state.authError = ['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password'].includes(error?.code)
         ? 'E-mail ou senha incorretos.'
-        : error.message || 'Não foi possível entrar.';
+        : readableAuthError(error, 'Não foi possível entrar.');
       render();
     }
   });
@@ -4873,7 +4890,7 @@ async function handleAction(action) {
       await signInWithGoogle();
     } catch (error) {
       state.loading = false;
-      state.authError = error.message || 'Não foi possível entrar com o Google.';
+      state.authError = readableAuthError(error, 'Não foi possível entrar com o Google.');
       render();
     }
   }
@@ -4892,10 +4909,10 @@ async function handleAction(action) {
           await requestPasswordReset(values.email);
           state.authMessage = 'Este acesso já estava preparado. Enviamos um link para você definir sua senha.';
         } catch (resetError) {
-          state.authError = resetError.message || 'Não foi possível enviar a definição de senha.';
+          state.authError = readableAuthError(resetError, 'Não foi possível enviar a definição de senha.');
         }
       } else {
-        state.authError = error.message || 'Não foi possível criar o primeiro acesso.';
+        state.authError = readableAuthError(error, 'Não foi possível criar o primeiro acesso.');
       }
     }
     render();
@@ -4909,7 +4926,7 @@ async function handleAction(action) {
       await requestPasswordReset(email);
       state.authMessage = 'Enviamos as instruções de recuperação para o e-mail informado.';
     } catch (error) {
-      state.authError = error.message || 'Não foi possível enviar a recuperação de senha.';
+      state.authError = readableAuthError(error, 'Não foi possível enviar a recuperação de senha.');
     }
     render();
   }
@@ -5832,7 +5849,7 @@ export async function startApp() {
   try {
     await completeRedirectSignIn();
   } catch (error) {
-    state.authError = error.message || 'Não foi possível concluir o acesso.';
+    state.authError = readableAuthError(error, 'Não foi possível concluir o acesso.');
   }
 
   observeAuth(async (firebaseUser) => {

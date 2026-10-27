@@ -431,6 +431,13 @@ svg {
     padding-left: 7px;
   }
 
+  .store-indicator.is-multiple {
+    max-width: 104px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
   .header-brand {
     gap: 7px;
   }
