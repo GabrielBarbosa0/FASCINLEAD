@@ -261,6 +261,58 @@ describe('lead correction rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('lets the captor upload an offline lead without reading a missing document first', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const leadReference = doc(db, 'leads', 'offline-form-generated-lead');
+    const result = createLeadDocument({
+      fullName: 'Cliente cadastrado offline',
+      phone: '(81) 99569-9479',
+      customerRg: '99382738',
+      customerCpf: '12612562478',
+      birthDate: '1960-10-27',
+      sex: 'male',
+      preferredName: '',
+      street: 'Rua José Ferreira Souto Maior',
+      streetNumber: '171',
+      neighborhood: 'Diogo',
+      city: 'Surubim',
+      state: 'PE',
+      interestId: 'complete-glasses',
+      ametropiaIds: [],
+      pathologyIds: ['cataract', 'retinopathy'],
+      eyeSurgeryStatus: 'yes',
+      eyeSurgeryType: 'cataract',
+      eyeSurgeryDetails: '',
+      careRouteOverride: 'ophthalmologist',
+      careRouteReasons: ['pathology', 'surgery', 'manual'],
+      examPaymentType: 'paid',
+      needsTransport: 'true',
+      hasCompanion: 'true',
+      transportEnabled: true,
+      appointmentDate: '',
+      appointmentTime: '',
+      appointmentServiceId: 'eye-exam',
+      appointmentServiceName: 'Exame de Vista - 20 min',
+      appointmentDurationMinutes: 20,
+      schedulingMode: 'controlled',
+      notes: 'Sem obrigado'
+    }, {
+      uid: 'captor-uid',
+      displayName: 'Captador Teste',
+      storeId: 'loja-06'
+    }, 'installation-offline-test', new Date('2026-10-27T14:16:00.000Z'));
+
+    await assertFails(getDoc(leadReference));
+    await assertSucceeds(setDoc(leadReference, {
+      ...result.data,
+      appointmentDate: '',
+      appointmentTime: '',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertSucceeds(getDoc(leadReference));
+  });
+
   it('rejects a new lead without a birth date', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertFails(setDoc(doc(db, 'leads', 'lead-without-birth-date'), {

@@ -761,7 +761,7 @@ O agendamento nao opera offline:
 3. A tela de detalhes usa a escala controlada da loja e exibe somente horarios disponiveis; nao transforma o primeiro agendamento em horario livre.
 4. O horario escolhido e salvo junto com os blocos de 10 minutos exigidos pelo servico.
 5. Se algum bloco estiver ocupado, o lote falha e o usuario deve escolher outro horario.
-6. Sincronizacao e primeiro agendamento consultam o documento remoto em transacao: se o lead ja existir, a sincronizacao nao sobrescreve os dados nem remove um horario escolhido durante a reconexao.
+6. A sincronizacao grava o UUID aleatorio gerado no aparelho sem fazer uma leitura previa do documento inexistente, pois essa leitura e corretamente negada ao captador pelas regras de privacidade. Depois da escrita, uma leitura direta do servidor confirma a autoria antes de remover a copia local. O primeiro agendamento continua usando transacao para proteger a reserva de horario.
 
 ### 8.2 Estados exibidos
 

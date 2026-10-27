@@ -342,26 +342,27 @@ async function synchronizeOfflineLeads(profile) {
     try {
       await updateOfflineLeadState(id, 'syncing');
       const leadReference = doc(db, 'leads', id);
-      await runTransaction(db, async (transaction) => {
-        const remoteLead = await transaction.get(leadReference);
-        if (remoteLead.exists()) {
-          if (remoteLead.data().capturedByUid !== profile.uid) {
-            const error = new Error('O identificador local pertence a outro cadastro.');
-            error.code = 'offline-lead-id-conflict';
-            throw error;
-          }
-          return;
-        }
-        transaction.set(leadReference, {
+      let writeError = null;
+      try {
+        await setDoc(leadReference, {
           ...data,
           appointmentDate: '',
           appointmentTime: '',
           createdAtServer: serverTimestamp(),
           updatedAtServer: serverTimestamp()
         });
-      });
-      const confirmedLead = await getDocFromServer(leadReference);
+      } catch (error) {
+        writeError = error;
+      }
+
+      let confirmedLead;
+      try {
+        confirmedLead = await getDocFromServer(leadReference);
+      } catch (error) {
+        throw writeError || error;
+      }
       if (!confirmedLead.exists() || confirmedLead.data().capturedByUid !== profile.uid) {
+        if (writeError) throw writeError;
         const error = new Error('O cadastro não foi confirmado pelo servidor.');
         error.code = 'offline-lead-not-confirmed';
         throw error;
