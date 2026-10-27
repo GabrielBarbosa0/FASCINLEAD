@@ -37,11 +37,11 @@ export default defineConfig(({ mode }) => {
     createSavwinLocalProxy(env),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon-32.png', 'apple-touch-icon.png', 'leadflow-logo.png'],
       manifest: {
-        name: 'FascinLead',
-        short_name: 'FascinLead',
-        description: 'Pre-cadastro offline das Oticas Fascinante.',
+        name: 'LeadFlow',
+        short_name: 'LeadFlow',
+        description: 'Captacao, relacionamento e agendamento de clientes.',
         theme_color: '#003070',
         background_color: '#f4f6f9',
         display: 'standalone',
@@ -50,9 +50,15 @@ export default defineConfig(({ mode }) => {
         categories: ['business', 'productivity'],
         icons: [
           {
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'pwa-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: 'pwa-512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]

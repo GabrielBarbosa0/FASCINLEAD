@@ -374,7 +374,11 @@ FASCINLEAD/
 |-- functions/
 |   `-- index.js
 |-- public/
-|   |-- favicon.svg
+|   |-- favicon-32.png
+|   |-- apple-touch-icon.png
+|   |-- leadflow-logo.png
+|   |-- pwa-192.png
+|   |-- pwa-512.png
 |   `-- LOGO OTICAS FASCINANTE.png
 |-- scripts/
 |   |-- migrate-appointment-blocks.js

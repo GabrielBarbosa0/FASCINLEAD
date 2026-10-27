@@ -549,9 +549,9 @@ function loginView() {
   return `
     <main class="login-page">
       <section class="login-panel" aria-labelledby="login-title">
-        <div class="brand-mark" aria-hidden="true">F</div>
-        <p class="eyebrow">ÓTICAS FASCINANTE</p>
-        <h1 id="login-title">FascinLead</h1>
+        <img class="brand-logo brand-logo-login" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" />
+        <p class="eyebrow">GESTÃO DE RELACIONAMENTO</p>
+        <h1 id="login-title">LeadFlow</h1>
         <p class="login-copy">Cadastro rápido para quem encontra clientes onde eles estão.</p>
         ${configNotice}
         ${state.authError ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.authError)}</span></div>` : ''}
@@ -608,9 +608,12 @@ function headerView() {
   return `
     <header class="app-header">
       <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
-        <div>
-          <p class="eyebrow">FASCINLEAD</p>
-          <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
+        <div class="header-brand">
+          <img class="brand-logo brand-logo-header" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" />
+          <div>
+            <p class="eyebrow">LEADFLOW</p>
+            <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
+          </div>
         </div>
         <div class="header-actions">
           ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
@@ -2363,7 +2366,7 @@ function accessView() {
     </section>
     ${state.access.editorOpen ? `<dialog id="access-editor-dialog" class="access-editor-dialog" aria-labelledby="access-editor-title">
       <form id="access-form" class="access-form" novalidate>
-        <header><div><span class="eyebrow">ACESSO DA EQUIPE</span><h2 id="access-editor-title">${editingAccess ? 'Editar acesso' : 'Novo acesso'}</h2><p>${editingAccess ? 'Atualize os dados e permissões desta pessoa.' : 'Cadastre os dados usados para entrar no FascinLead.'}</p></div><button class="icon-button" type="button" data-access-editor-close title="Fechar" aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+        <header><div><span class="eyebrow">ACESSO DA EQUIPE</span><h2 id="access-editor-title">${editingAccess ? 'Editar acesso' : 'Novo acesso'}</h2><p>${editingAccess ? 'Atualize os dados e permissões desta pessoa.' : 'Cadastre os dados usados para entrar no LeadFlow.'}</p></div><button class="icon-button" type="button" data-access-editor-close title="Fechar" aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
         <div class="access-form-body">
           <div class="field access-field-wide" data-field="displayName"><label for="access-name">Nome</label><input id="access-name" name="displayName" maxlength="120" autocomplete="name" value="${escapeHtml(editingAccess?.displayName || '')}" required /><small class="field-error"></small></div>
           <div class="field access-field-wide" data-field="email"><label for="access-email">E-mail</label><input id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(editingAccess?.email || '')}" placeholder="nome@exemplo.com" ${editingAccess ? 'readonly' : ''} required /><small class="field-error"></small></div>
@@ -2548,7 +2551,7 @@ function render() {
   }
 
   if (state.loading) {
-    root.innerHTML = '<main class="loading-page"><div class="brand-mark">F</div><span>Preparando o FascinLead...</span></main>';
+    root.innerHTML = `<main class="loading-page"><img class="brand-logo brand-logo-loading" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" /><span>Preparando o LeadFlow...</span></main>`;
   } else {
     root.innerHTML = state.profile ? appView() : loginView();
   }

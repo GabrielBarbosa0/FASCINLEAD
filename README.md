@@ -1,10 +1,10 @@
-# FascinLead
+# LeadFlow
 
 Cadastro offline para as equipes de captacao das **Oticas Fascinante**.
 
 > **Status:** fundacao tecnica e primeiro fluxo de captacao em desenvolvimento.
 
-O FascinLead sera uma Progressive Web App (PWA) para substituir as fichas de papel usadas por colaboradores durante abordagens na rua. O usuario podera registrar um potencial cliente mesmo sem internet, consultar os cadastros no proprio aparelho e sincroniza-los com a nuvem quando a conexao voltar.
+O LeadFlow sera uma Progressive Web App (PWA) para substituir as fichas de papel usadas por colaboradores durante abordagens na rua. O usuario podera registrar um potencial cliente mesmo sem internet, consultar os cadastros no proprio aparelho e sincroniza-los com a nuvem quando a conexao voltar.
 
 O projeto tem um foco deliberadamente pequeno: facilitar a captacao. Ele nao pretende ser um CRM completo.
 
@@ -95,11 +95,13 @@ Celular / navegador
   |-- PWA + Service Worker
   |-- Firestore SDK + IndexedDB
   |
-  `---- HTTPS, quando online ----> Firebase
+  `---- HTTPS, quando online ----> Hostinger (frontend estatico)
+                                      |
+                                      `-------------> Firebase
                                       |-- Authentication
                                       |-- Cloud Firestore
                                       |-- Security Rules
-                                      `-- Hosting
+                                      `-- Cloud Functions
 ```
 
 ### Tecnologias planejadas
@@ -109,7 +111,7 @@ Celular / navegador
 - Web App Manifest e Service Worker;
 - Firebase Authentication com Google e E-mail/Senha;
 - Cloud Firestore com persistencia offline;
-- Firebase Hosting;
+- Hostinger para hospedagem do frontend estatico;
 - Firebase Emulator Suite;
 - Vitest;
 - Playwright;

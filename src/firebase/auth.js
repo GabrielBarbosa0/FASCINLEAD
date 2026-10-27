@@ -53,7 +53,7 @@ export async function signInWithGoogle() {
     }
 
     if (error?.code === 'auth/popup-blocked') {
-      throw new Error('O navegador bloqueou o login do Google. Abra o FascinLead diretamente no Chrome ou Safari e tente novamente.');
+      throw new Error('O navegador bloqueou o login do Google. Abra o LeadFlow diretamente no Chrome ou Safari e tente novamente.');
     }
 
     if (error?.code === 'auth/popup-closed-by-user') {
@@ -151,7 +151,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
   const permissionSnapshot = await getDoc(permissionRef);
 
   if (!permissionSnapshot.exists() || permissionSnapshot.data().active !== true) {
-    throw new Error('Esta conta ainda não foi autorizada no FascinLead.');
+    throw new Error('Esta conta ainda não foi autorizada no LeadFlow.');
   }
 
   const permission = permissionSnapshot.data();

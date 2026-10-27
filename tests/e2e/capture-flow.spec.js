@@ -195,7 +195,7 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
 });
 
 test('captures and lists a lead in development mode', async ({ page }, testInfo) => {
-  await expect(page.getByRole('heading', { name: 'FascinLead' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'LeadFlow' })).toBeVisible();
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
