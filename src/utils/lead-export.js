@@ -1,6 +1,6 @@
 import { formatBrazilianPhone } from './phone.js';
 import { STORES } from './stores.js';
-import { calculateAge, examPricing } from './lead.js';
+import { calculateAge, examPaymentMethodsLabel, examPricing } from './lead.js';
 
 function datePart(value) {
   if (!value) return '';
@@ -57,6 +57,7 @@ const CSV_COLUMNS = [
   ['Data do pré-agendamento', (lead) => inputDatePart(lead.appointmentDate)],
   ['Horário do pré-agendamento', (lead) => lead.appointmentTime],
   ['Tipo do exame', (lead) => lead.examPaymentType === 'courtesy' ? 'Cortesia' : 'Pago'],
+  ['Forma de pagamento do exame', (lead) => lead.examPaymentType === 'courtesy' ? '' : examPaymentMethodsLabel(lead.examPaymentMethods || lead.examPaymentMethod)],
   ['Valor do exame', (lead) => examPricing(lead.careRoute, lead.examPaymentType).examPrice],
   ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
   ['Precisa de transporte?', (lead) => lead.needsTransport ? 'Sim' : 'Não'],
@@ -70,6 +71,7 @@ const CSV_COLUMNS = [
   ['Bairro', (lead) => lead.neighborhood],
   ['Cidade', (lead) => lead.city],
   ['UF', (lead) => lead.state],
+  ['Referência do endereço', (lead) => lead.addressReference],
   ['Origem do lead', (lead) => sourceName(lead.source)],
   ['Observações', (lead) => lead.notes]
 ];

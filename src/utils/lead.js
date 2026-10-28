@@ -56,6 +56,23 @@ export const EXAM_PRICES = Object.freeze({
   ophthalmologist: 200
 });
 
+export const EXAM_PAYMENT_METHODS = Object.freeze([
+  { id: 'cash', label: 'Dinheiro' },
+  { id: 'pix', label: 'Pix' },
+  { id: 'debit-card', label: 'Cartão de débito' },
+  { id: 'credit-card', label: 'Cartão de crédito' },
+  { id: 'bank-slip', label: 'Boleto' },
+  { id: 'other', label: 'Outro' }
+]);
+
+export function examPaymentMethodsLabel(values) {
+  const requested = Array.isArray(values) ? values : [values].filter(Boolean);
+  const labels = requested
+    .map((value) => EXAM_PAYMENT_METHODS.find((method) => method.id === String(value))?.label)
+    .filter(Boolean);
+  return labels.length ? labels.join(' + ') : 'A definir';
+}
+
 export function examPricing(careRoute, paymentType = 'paid') {
   const examPaymentType = paymentType === 'courtesy' ? 'courtesy' : 'paid';
   return {
@@ -210,6 +227,7 @@ export function validateLeadInput(input, options = {}) {
   if (!SEX_OPTIONS.some((option) => option.id === sex)) errors.sex = 'Selecione uma opção válida.';
   if ((input.street?.trim().length || 0) > 120) errors.street = 'Use no máximo 120 caracteres.';
   if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no máximo 12 caracteres.';
+  if ((input.addressReference?.trim().length || 0) > 160) errors.addressReference = 'Use no máximo 160 caracteres.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no máximo 500 caracteres.';
 
   const triage = ophthalmologyTriage(input, {
@@ -219,6 +237,17 @@ export function validateLeadInput(input, options = {}) {
     ophthalmologySurgeryIds: input.ophthalmologySurgeryIds
   });
   const pricing = examPricing(triage.careRoute, input.examPaymentType);
+  const requestedPaymentMethods = Array.isArray(input.examPaymentMethods)
+    ? input.examPaymentMethods.map(String)
+    : [input.examPaymentMethods ?? input.examPaymentMethod].filter(Boolean).map(String);
+  const validPaymentMethodIds = new Set(EXAM_PAYMENT_METHODS.map((method) => method.id));
+  const invalidPaymentMethod = requestedPaymentMethods.some((method) => !validPaymentMethodIds.has(method));
+  const examPaymentMethods = pricing.examPaymentType === 'paid'
+    ? [...new Set(requestedPaymentMethods.filter((method) => validPaymentMethodIds.has(method)))]
+    : [];
+  if (pricing.examPaymentType === 'paid' && invalidPaymentMethod) {
+    errors.examPaymentMethods = 'Selecione somente formas de pagamento válidas.';
+  }
   if (triage.surgeryQuestionRequired && !triage.eyeSurgeryStatus) {
     errors.eyeSurgeryStatus = 'Informe se o cliente já realizou cirurgia nos olhos.';
   }
@@ -283,7 +312,8 @@ export function validateLeadInput(input, options = {}) {
     hasCompanion,
     transportSeats: needsTransport ? (hasCompanion ? 2 : 1) : 0,
     triage,
-    pricing
+    pricing,
+    examPaymentMethods
   };
 }
 
@@ -310,6 +340,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
+      addressReference: input.addressReference?.trim() || '',
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
@@ -321,6 +352,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       careRouteOverride: validation.triage.careRouteOverride,
       careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
       examPaymentType: validation.pricing.examPaymentType,
+      examPaymentMethods: validation.examPaymentMethods,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,
@@ -368,6 +400,7 @@ export function createLeadUpdate(input) {
       neighborhood: input.neighborhood?.trim() || '',
       city: input.city?.trim() || '',
       state: (input.state?.trim() || 'PE').toUpperCase().slice(0, 2),
+      addressReference: input.addressReference?.trim() || '',
       interestId: interest.id,
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
@@ -378,6 +411,7 @@ export function createLeadUpdate(input) {
       careRoute: validation.triage.careRoute,
       careRouteOverride: validation.triage.careRouteOverride,
       examPaymentType: validation.pricing.examPaymentType,
+      examPaymentMethods: validation.examPaymentMethods,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
       transportSeats: validation.transportSeats,

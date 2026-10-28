@@ -21,6 +21,7 @@ describe('createLeadsCsv', () => {
       neighborhood: 'Centro',
       city: 'Recife',
       state: 'PE',
+      addressReference: 'Ao lado da praça',
       storeId: 'loja-06',
       capturedByName: 'Captador Teste',
       capturedByUid: 'captor-001',
@@ -28,6 +29,7 @@ describe('createLeadsCsv', () => {
       appointmentTime: '14:30',
       careRoute: 'ophthalmologist',
       examPaymentType: 'paid',
+      examPaymentMethods: ['pix', 'credit-card'],
       examPrice: 200,
       appointmentAttendance: 'attended',
       source: 'street',
@@ -46,9 +48,9 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"Loja 06"');
     expect(csv).toContain('"02/10/2026";"14:30"');
     expect(csv).toContain('"Compareceu?"');
-    expect(csv).toContain('"Tipo do exame";"Valor do exame"');
-    expect(csv).toContain('"Pago";"200"');
-    expect(csv).toContain('"14:30";"Pago";"200";"Sim"');
+    expect(csv).toContain('"Tipo do exame";"Forma de pagamento do exame";"Valor do exame"');
+    expect(csv).toContain('"Pago";"Pix + Cartão de crédito";"200"');
+    expect(csv).toContain('"14:30";"Pago";"Pix + Cartão de crédito";"200";"Sim"');
     expect(csv).toContain('"Captação em campo"');
     expect(csv).toContain('"Ametropias"');
     expect(csv).toContain('"Miopia, Astigmatismo"');
@@ -58,6 +60,8 @@ describe('createLeadsCsv', () => {
     expect(csv).toContain('"Rua das Flores"');
     expect(csv).toContain('"Número"');
     expect(csv).toContain('"S/N"');
+    expect(csv).toContain('"Referência do endereço"');
+    expect(csv).toContain('"Ao lado da praça"');
     expect(csv).not.toContain('Consentimento');
   });
 

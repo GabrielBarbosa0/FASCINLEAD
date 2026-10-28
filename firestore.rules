@@ -126,11 +126,11 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'customerCpf', 'customerRg', 'birthDate', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'careRouteReasons',
-          'examPaymentType',
+          'examPaymentType', 'examPaymentMethods',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
@@ -155,6 +155,7 @@ service cloud.firestore {
           && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))
         ))
         && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
+        && (!('addressReference' in data) || (data.addressReference is string && data.addressReference.size() <= 160))
         && data.birthDate is string
         && data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && (!('needsTransport' in data) || data.needsTransport is bool)
@@ -193,6 +194,11 @@ service cloud.firestore {
             && data.appointmentServiceName.size() >= 2
             && data.appointmentServiceName.size() <= 80))
         && (!('examPaymentType' in data) || data.examPaymentType in ['paid', 'courtesy'])
+        && (!('examPaymentMethods' in data) || (data.examPaymentMethods is list
+          && data.examPaymentMethods.size() <= 6
+          && data.examPaymentMethods.hasOnly(['cash', 'pix', 'debit-card', 'credit-card', 'bank-slip', 'other'])))
+        && (!('examPaymentMethods' in data) || !('examPaymentType' in data)
+          || data.examPaymentType == 'paid' || data.examPaymentMethods.size() == 0)
         && data.source == 'street'
         && data.schemaVersion == 1;
     }
@@ -273,6 +279,7 @@ service cloud.firestore {
           || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
         && (!('street' in data) || (data.street is string && data.street.size() <= 120))
         && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
+        && (!('addressReference' in data) || (data.addressReference is string && data.addressReference.size() <= 160))
         && data.notes is string
         && data.notes.size() <= 500
         && (!('ametropiaIds' in data) || (data.ametropiaIds is list
@@ -337,10 +344,10 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'customerCpf', 'customerRg', 'birthDate', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType',
+          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
@@ -471,10 +478,10 @@ service cloud.firestore {
       return isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'interestLabel',
+          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType',
+          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods',
           'needsTransport', 'hasCompanion', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
@@ -578,15 +585,20 @@ service cloud.firestore {
         && request.resource.data.storeId == resource.data.storeId
         && request.resource.data.createdAtServer == resource.data.createdAtServer
         && (
-          isOwnerAppointmentUpdate()
-          || isManagerLeadUpdate()
-          || isCaptorFollowUpContactUpdate()
-          || isAdminLeadCorrection()
-          || (
-            validCaptorCorrectionData(request.resource.data)
-            && isCaptorLeadCorrection()
-            && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
+          (
+            resource.data.capturedByUid == request.auth.uid
+            && (
+              isCaptorFollowUpContactUpdate()
+              || isOwnerAppointmentUpdate()
+              || (
+                isCaptorLeadCorrection()
+                && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
+                && validCaptorCorrectionData(request.resource.data)
+              )
+            )
           )
+          || isAdminLeadCorrection()
+          || isManagerLeadUpdate()
         );
 
       allow delete: if isPrimaryAdmin()

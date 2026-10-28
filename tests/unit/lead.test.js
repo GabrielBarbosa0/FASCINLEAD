@@ -14,6 +14,7 @@ const validInput = {
   neighborhood: '',
   city: '',
   state: 'PE',
+  addressReference: 'Em frente à praça',
   interestId: 'complete-glasses',
   ametropiaIds: ['myopia', 'astigmatism'],
   pathologyIds: ['glaucoma', 'diabetes'],
@@ -23,6 +24,7 @@ const validInput = {
   appointmentServiceName: 'Exame de vista',
   appointmentDurationMinutes: 30,
   schedulingMode: 'controlled',
+  examPaymentMethods: ['pix', 'cash'],
   notes: ''
 };
 
@@ -57,6 +59,10 @@ describe('lead validation', () => {
   it('normalizes an optional RG and limits its length', () => {
     expect(createLeadUpdate(validInput).data.customerRg).toBe('12.345.678-X');
     expect(validateLeadInput({ ...validInput, customerRg: '1'.repeat(21) }).errors.customerRg).toBeDefined();
+  });
+
+  it('limits the address reference to 160 characters', () => {
+    expect(validateLeadInput({ ...validInput, addressReference: 'a'.repeat(161) }).errors.addressReference).toBeDefined();
   });
 
   it('requires a valid birth date and rejects a future date', () => {
@@ -110,6 +116,7 @@ describe('lead validation', () => {
       sex: 'female',
       street: 'Rua das Flores',
       streetNumber: 'S/N',
+      addressReference: 'Em frente à praça',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
       appointmentAttendance: 'pending',
@@ -121,6 +128,7 @@ describe('lead validation', () => {
       pathologyIds: ['glaucoma', 'diabetes'],
       pathologyLabels: ['Glaucoma', 'Diabetes'],
       examPaymentType: 'paid',
+      examPaymentMethods: ['pix', 'cash'],
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -279,12 +287,20 @@ describe('lead validation', () => {
     const result = createLeadUpdate({
       ...validInput,
       careRouteOverride: 'ophthalmologist',
-      examPaymentType: 'courtesy'
+      examPaymentType: 'courtesy',
+      examPaymentMethods: ['credit-card', 'cash']
     });
     expect(result.data).toMatchObject({
       careRoute: 'ophthalmologist',
-      examPaymentType: 'courtesy'
+      examPaymentType: 'courtesy',
+      examPaymentMethods: []
     });
+  });
+
+  it('accepts known exam payment methods and rejects unknown values', () => {
+    expect(createLeadUpdate({ ...validInput, examPaymentMethods: ['cash', 'pix'] }).data.examPaymentMethods).toEqual(['cash', 'pix']);
+    expect(createLeadUpdate({ ...validInput, examPaymentMethods: ['pix', 'bank-slip'] }).data.examPaymentMethods).toEqual(['pix', 'bank-slip']);
+    expect(validateLeadInput({ ...validInput, examPaymentMethods: ['pix', 'crypto'] }).errors.examPaymentMethods).toBeDefined();
   });
 
   it('rejects ophthalmology appointments outside configured weekdays', () => {

@@ -64,7 +64,7 @@ import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwi
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { AMETROPIAS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, examPricing, ophthalmologyTriage } from '../utils/lead.js';
+import { AMETROPIAS, EXAM_PAYMENT_METHODS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, examPricing, ophthalmologyTriage } from '../utils/lead.js';
 import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppAppointmentReminderUrl, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isAppointmentReminderDone, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
@@ -913,6 +913,13 @@ function bindTransportFields(form, settings, onChange = () => {}) {
 function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefix = 'eye') {
   const triage = ophthalmologyTriage(values, settings);
   const pricing = examPricing(triage.careRoute, values.examPaymentType);
+  const selectedPaymentMethods = Array.isArray(values.examPaymentMethods)
+    ? values.examPaymentMethods
+    : [values.examPaymentMethod].filter(Boolean);
+  const paymentMethodOptions = EXAM_PAYMENT_METHODS.map((method) => `<label class="ametropia-option checkbox-label">
+    <input type="checkbox" name="examPaymentMethods" value="${method.id}" ${selectedPaymentMethods.includes(method.id) ? 'checked' : ''} ${pricing.examPaymentType === 'courtesy' ? 'disabled' : ''} />
+    <span>${method.label}</span>
+  </label>`).join('');
   const showSurgeryQuestion = triage.surgeryQuestionRequired || Boolean(values.eyeSurgeryStatus);
   const showSurgeryType = values.eyeSurgeryStatus === 'yes';
   return `<section class="eye-triage-section" data-eye-triage>
@@ -938,6 +945,9 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefi
       <div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automático</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>
       <div class="field"><label for="${idPrefix}-exam-payment">Tipo do exame</label><select id="${idPrefix}-exam-payment" name="examPaymentType"><option value="paid" ${values.examPaymentType !== 'courtesy' ? 'selected' : ''}>Exame pago</option><option value="courtesy" ${values.examPaymentType === 'courtesy' ? 'selected' : ''}>Cortesia</option></select></div>
       <div class="field exam-price-field"><span class="exam-price-label">Valor do exame</span><div class="exam-price-display"><strong data-exam-price>${pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><small data-exam-price-detail>${triage.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista'}</small></div></div>
+    </div>
+    <div class="field-row exam-payment-method-row" data-exam-payment-method-row ${pricing.examPaymentType === 'courtesy' ? 'hidden' : ''}>
+      <fieldset class="field ametropia-field exam-payment-method-field" data-field="examPaymentMethods"><legend>Forma de pagamento do exame</legend><small>Marque todas as formas que serão utilizadas.</small><div class="ametropia-options exam-payment-method-options">${paymentMethodOptions}</div><small class="field-error"></small></fieldset>
     </div>
     <div class="eye-route-status ${triage.careRoute === 'ophthalmologist' ? 'is-ophthalmology' : ''}" data-eye-route-status ${triage.careRoute === 'ophthalmologist' ? '' : 'hidden'}><i data-lucide="stethoscope"></i><span>Encaminhamento para oftalmologista. A agenda mostrará somente os dias configurados.</span></div>
   </section>`;
@@ -990,6 +1000,14 @@ function bindEyeTriage(form, settings, onChange = () => {}) {
     routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
     routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
     const pricing = examPricing(triage.careRoute, values.examPaymentType);
+    const paymentMethodRow = section.querySelector('[data-exam-payment-method-row]');
+    const paymentMethodInputs = [...form.querySelectorAll('[name="examPaymentMethods"]')];
+    const isCourtesy = pricing.examPaymentType === 'courtesy';
+    paymentMethodRow.hidden = isCourtesy;
+    paymentMethodInputs.forEach((input) => {
+      input.disabled = isCourtesy;
+      if (isCourtesy) input.checked = false;
+    });
     price.textContent = pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     priceDetail.textContent = pricing.examPaymentType === 'courtesy'
       ? 'Cortesia'
@@ -1010,15 +1028,16 @@ function leadFormValues(form) {
   return {
     ...Object.fromEntries(formData),
     ametropiaIds: formData.getAll('ametropiaIds'),
-    pathologyIds: formData.getAll('pathologyIds')
+    pathologyIds: formData.getAll('pathologyIds'),
+    examPaymentMethods: formData.getAll('examPaymentMethods')
   };
 }
 
 const NEW_LEAD_DRAFT_FIELDS = [
   'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
-  'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId', 'appointmentServiceId',
+  'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'appointmentServiceId',
   'ametropiaIds', 'pathologyIds', 'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-  'careRouteOverride', 'examPaymentType', 'needsTransport', 'hasCompanion', 'notes'
+  'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'needsTransport', 'hasCompanion', 'notes'
 ];
 
 function captureNewLeadDraft(form) {
@@ -1161,6 +1180,7 @@ function newLeadView() {
         <div class="field address-city"><label for="city">Cidade</label><input id="city" name="city" maxlength="80" /></div>
         <div class="field field-state"><label for="state">UF</label><input id="state" name="state" maxlength="2" value="PE" /></div>
       </div>
+      <div class="field address-reference-field" data-field="addressReference"><label for="addressReference">Referência do endereço</label><input id="addressReference" name="addressReference" maxlength="160" autocomplete="off" placeholder="Ex.: próximo à praça, em frente à escola" /><small class="field-error"></small></div>
       <div class="field-row interest-service-fields">
         <div class="field">
           <label for="interestId">Interesse principal</label>
@@ -1437,6 +1457,7 @@ function leadDetailView() {
         <div class="field address-city"><label for="edit-city">Cidade</label><input id="edit-city" name="city" maxlength="80" value="${escapeHtml(lead.city)}" ${locked} /></div>
         <div class="field field-state"><label for="edit-state">UF</label><input id="edit-state" name="state" maxlength="2" value="${escapeHtml(lead.state || 'PE')}" ${locked} /></div>
       </div>
+      <div class="field address-reference-field" data-field="addressReference"><label for="edit-addressReference">Referência do endereço</label><input id="edit-addressReference" name="addressReference" maxlength="160" autocomplete="off" value="${escapeHtml(lead.addressReference || '')}" placeholder="Ex.: próximo à praça, em frente à escola" ${locked} /><small class="field-error"></small></div>
       <div class="field-row interest-service-fields">
         <div class="field"><label for="edit-interestId">Interesse principal</label><select id="edit-interestId" name="interestId" ${locked}>${interests}</select></div>
         <div class="field" data-field="appointmentServiceId"><label for="edit-appointmentServiceId">Serviço do agendamento</label><select id="edit-appointmentServiceId" name="appointmentServiceId" ${locked}><option value="">Selecione o serviço</option>${serviceOptions}</select><small class="field-error"></small></div>
@@ -1984,6 +2005,7 @@ function appointmentCreateDialog(allowedStores) {
         </div>
         <div class="field"><label for="agenda-lead-preferred-name">Como prefere ser chamado</label><input id="agenda-lead-preferred-name" name="preferredName" maxlength="60" placeholder="Apelido ou nome preferido" value="${escapeHtml(draft.preferredName || '')}" /></div>
         <div class="field-row address-fields"><div class="field address-street" data-field="street"><label for="agenda-lead-street">Rua</label><input id="agenda-lead-street" name="street" maxlength="120" autocomplete="address-line1" value="${escapeHtml(draft.street || '')}" /><small class="field-error"></small></div><div class="field address-number" data-field="streetNumber"><label for="agenda-lead-street-number">Número</label><input id="agenda-lead-street-number" name="streetNumber" maxlength="12" autocomplete="address-line2" placeholder="S/N" value="${escapeHtml(draft.streetNumber || '')}" /><small class="field-error"></small></div><div class="field address-neighborhood"><label for="agenda-lead-neighborhood">Bairro</label><input id="agenda-lead-neighborhood" name="neighborhood" maxlength="80" value="${escapeHtml(draft.neighborhood || '')}" /></div><div class="field address-city"><label for="agenda-lead-city">Cidade</label><input id="agenda-lead-city" name="city" maxlength="80" value="${escapeHtml(draft.city || '')}" /></div><div class="field field-state"><label for="agenda-lead-state">UF</label><input id="agenda-lead-state" name="state" maxlength="2" value="${escapeHtml(draft.state || 'PE')}" /></div></div>
+        <div class="field address-reference-field" data-field="addressReference"><label for="agenda-lead-address-reference">Referência do endereço</label><input id="agenda-lead-address-reference" name="addressReference" maxlength="160" autocomplete="off" value="${escapeHtml(draft.addressReference || '')}" placeholder="Ex.: próximo à praça, em frente à escola" /><small class="field-error"></small></div>
         <div class="field" data-field="storeId"><label for="agenda-lead-store">Loja</label><select id="agenda-lead-store" name="storeId" ${loading ? 'disabled' : ''}>${storeOptions}</select><small class="field-error"></small></div>
         <div class="field-row interest-service-fields">
           <div class="field"><label for="agenda-lead-interest">Interesse principal</label><select id="agenda-lead-interest" name="interestId">${interests}</select></div>

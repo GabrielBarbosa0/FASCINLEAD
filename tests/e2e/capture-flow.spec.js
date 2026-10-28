@@ -150,6 +150,7 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await careRoute.selectOption('optometrist');
   await expect(careRoute).toHaveValue('optometrist');
   const examPaymentType = page.getByLabel('Tipo do exame');
+  const examPaymentMethods = page.getByRole('group', { name: 'Forma de pagamento do exame' });
   const examPrice = page.locator('[data-exam-price]');
   if (testInfo.project.name === 'desktop-chrome') {
     const [routeBox, typeBox, priceBox] = await Promise.all([
@@ -180,12 +181,21 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
     expect(billingLayout.priceRight).toBeLessThanOrEqual(billingLayout.containerRight + 1);
   }
   await expect(examPaymentType).toHaveValue('paid');
+  await expect(examPaymentMethods).toBeVisible();
+  await expect(examPaymentMethods.getByRole('checkbox')).toHaveCount(6);
+  await expect(examPaymentMethods.getByLabel('Boleto')).toBeVisible();
+  await examPaymentMethods.getByLabel('Pix').check();
+  await examPaymentMethods.getByLabel('Dinheiro').check();
   await expect(examPrice).toHaveText('R$ 150,00');
   await careRoute.selectOption('ophthalmologist');
   await expect(examPrice).toHaveText('R$ 200,00');
   await examPaymentType.selectOption('courtesy');
   await expect(examPrice).toHaveText('R$ 0,00');
+  await expect(examPaymentMethods).toBeHidden();
   await examPaymentType.selectOption('paid');
+  await expect(examPaymentMethods).toBeVisible();
+  await examPaymentMethods.getByLabel('Pix').check();
+  await examPaymentMethods.getByLabel('Dinheiro').check();
   await careRoute.selectOption('automatic');
   await page.getByLabel('Nome *').fill('Cliente preservado');
   await page.getByLabel('Telefone ou WhatsApp *').fill('81999991234');
@@ -193,6 +203,7 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await page.getByLabel('CPF', { exact: true }).fill('52998224725');
   await page.getByLabel('Data de nascimento *').fill('1960-04-12');
   await page.getByLabel('Como prefere ser chamado').fill('Cliente');
+  await page.getByLabel('Referência do endereço').fill('Ao lado da praça');
   await page.getByLabel('Catarata', { exact: true }).check();
   await page.getByLabel('Já realizou cirurgia nos olhos? *').selectOption('yes');
   await page.getByLabel('Qual cirurgia? *').selectOption('cataract');
@@ -207,8 +218,11 @@ test('requires a destination store for a multi-store MEI capture', async ({ page
   await expect(page.getByLabel('Telefone ou WhatsApp *')).toHaveValue('(81) 99999-1234');
   await expect(page.getByLabel('RG', { exact: true })).toHaveValue('1234567');
   await expect(page.getByLabel('CPF', { exact: true })).toHaveValue('529.982.247-25');
+  await expect(page.getByRole('group', { name: 'Forma de pagamento do exame' }).getByLabel('Pix')).toBeChecked();
+  await expect(page.getByRole('group', { name: 'Forma de pagamento do exame' }).getByLabel('Dinheiro')).toBeChecked();
   await expect(page.getByLabel('Data de nascimento *')).toHaveValue('1960-04-12');
   await expect(page.getByLabel('Como prefere ser chamado')).toHaveValue('Cliente');
+  await expect(page.getByLabel('Referência do endereço')).toHaveValue('Ao lado da praça');
   await expect(page.getByLabel('Catarata', { exact: true })).toBeChecked();
   await expect(page.getByLabel('Já realizou cirurgia nos olhos? *')).toHaveValue('yes');
   await expect(page.getByLabel('Qual cirurgia? *')).toHaveValue('cataract');
@@ -273,6 +287,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByLabel('Sexo').selectOption('female');
   await page.getByLabel('Rua', { exact: true }).fill('Rua das Flores');
   await page.getByLabel('Número', { exact: true }).fill('SN');
+  await page.getByLabel('Referência do endereço').fill('Próximo à praça central');
   await page.getByLabel('Interesse principal').selectOption('complete-glasses');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   for (const removedPathology of ['Olho seco', 'Degeneracao macular', 'Descolamento de retina']) {
@@ -303,6 +318,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await expect(page.getByLabel('Sexo')).toHaveValue('female');
   await expect(page.getByLabel('Rua', { exact: true })).toHaveValue('Rua das Flores');
   await expect(page.getByLabel('Número', { exact: true })).toHaveValue('S/N');
+  await expect(page.getByLabel('Referência do endereço')).toHaveValue('Próximo à praça central');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toHaveCount(0);
   await expect(page.getByLabel('Glaucoma')).toBeChecked();
   await expect(page.getByLabel('Diabetes')).toBeChecked();
@@ -1043,7 +1059,7 @@ test('keeps new registration beside the management return action', async ({ page
   const fieldOrder = await dialog.locator('input, select, textarea').evaluateAll((controls) => {
     const tracked = new Set([
       'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
-      'street', 'streetNumber', 'neighborhood', 'city', 'state', 'interestId',
+      'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId',
       'storeId', 'appointmentServiceId', 'ametropiaIds', 'pathologyIds',
       'appointmentDate', 'appointmentTime', 'notes'
     ]);
@@ -1059,7 +1075,7 @@ test('keeps new registration beside the management return action', async ({ page
   });
   expect(fieldOrder).toEqual([
     'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
-    'street', 'streetNumber', 'neighborhood', 'city', 'state', 'storeId',
+    'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'storeId',
     'interestId', 'appointmentServiceId', 'pathologyIds', 'appointmentDate',
     'appointmentTime', 'notes'
   ]);

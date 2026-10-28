@@ -1216,7 +1216,8 @@ svg {
 
 .eye-surgery-fields[hidden],
 .eye-surgery-fields [hidden],
-.eye-route-status[hidden] {
+.eye-route-status[hidden],
+.exam-payment-method-row[hidden] {
   display: none;
 }
 
@@ -1228,6 +1229,14 @@ svg {
 .exam-billing-fields {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(145px, 0.55fr);
   align-items: stretch;
+}
+
+.exam-payment-method-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.exam-payment-method-options {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .exam-price-field {
@@ -5286,6 +5295,10 @@ svg {
 
   .exam-billing-fields .eye-route-override {
     grid-column: 1 / -1;
+  }
+
+  .exam-payment-method-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .exam-price-display {

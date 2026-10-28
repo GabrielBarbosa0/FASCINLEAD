@@ -446,6 +446,18 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('accepts a concise address reference and rejects values above the limit', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      addressReference: 'Próximo à praça central',
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      addressReference: 'a'.repeat(161),
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets an administrator correct a lead from another store', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
@@ -454,12 +466,13 @@ describe('lead correction rules', () => {
     }));
   });
 
-  it('accepts valid exam pricing and rejects a price inconsistent with the care route', async () => {
+  it('accepts valid exam billing data and rejects invalid payment values', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
       careRoute: 'optometrist',
       careRouteOverride: 'automatic',
       examPaymentType: 'paid',
+      examPaymentMethods: ['pix', 'cash'],
       updatedAtServer: Timestamp.now()
     }));
     const result = createLeadDocument({
@@ -478,6 +491,19 @@ describe('lead correction rules', () => {
     await assertFails(setDoc(doc(db, 'leads', 'invalid-exam-price'), {
       ...result.data,
       examPaymentType: 'discounted',
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(setDoc(doc(db, 'leads', 'invalid-exam-payment-method'), {
+      ...result.data,
+      examPaymentMethods: ['pix', 'crypto'],
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(setDoc(doc(db, 'leads', 'courtesy-with-payment-method'), {
+      ...result.data,
+      examPaymentType: 'courtesy',
+      examPaymentMethods: ['cash'],
       createdAtServer: Timestamp.now(),
       updatedAtServer: Timestamp.now()
     }));
