@@ -3160,13 +3160,12 @@ svg {
   display: none;
 }
 
-.schedule-section-divider:is([data-transport-divider], [data-optometrist-divider]) {
+.schedule-section-divider[data-transport-divider] {
   margin-top: 18px;
 }
 
-.schedule-section-divider[data-ophthalmology-divider] {
-  margin-top: -16px;
-  margin-bottom: 6px;
+.schedule-rule-dialog-body .professional-schedule-toggle {
+  margin-bottom: 22px;
 }
 
 .schedule-section-divider:is([data-limited-days-divider], [data-mei-quota-divider]) {
