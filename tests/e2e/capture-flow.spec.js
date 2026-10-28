@@ -855,8 +855,8 @@ test('groups appointments by day and registers attendance', async ({ page }, tes
 
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const appointmentDate = `${now.getFullYear()}-${month}-18`;
-  const nextDate = `${now.getFullYear()}-${month}-19`;
+  const appointmentDate = `${now.getFullYear()}-${month}-19`;
+  const nextDate = `${now.getFullYear()}-${month}-20`;
 
   async function createAppointment(name, date, time) {
     await page.getByRole('button', { name: 'Novo', exact: true }).click();

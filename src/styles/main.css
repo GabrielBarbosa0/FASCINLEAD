@@ -3160,7 +3160,7 @@ svg {
   display: none;
 }
 
-.schedule-section-divider[data-transport-divider] {
+.schedule-section-divider:is([data-transport-divider], [data-optometrist-divider]) {
   margin-top: 18px;
 }
 

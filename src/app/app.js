@@ -65,7 +65,7 @@ import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { appointmentsByDate, calendarDays, formatMonthLabel, monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
 import { AMETROPIAS, EXAM_PAYMENT_METHODS, EYE_SURGERIES, EYE_SURGERY_STATUS_OPTIONS, INTERESTS, PATHOLOGIES, SEX_OPTIONS, calculateAge, examPricing, ophthalmologyTriage } from '../utils/lead.js';
-import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isStoreDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
+import { appointmentQuotaStatus, buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isOphthalmologyDateAllowed, isOptometristDateAllowed, isTransportAppointmentAllowed, isTransportDateAllowed, ophthalmologyAppointmentSchedule, optometristAppointmentSchedule, transportHoursForDate, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
 import { appointmentFollowUps, buildWhatsAppAppointmentReminderUrl, buildWhatsAppFollowUpUrl, followUpAppointmentKey, followUpAvailableAt, followUpStage, isAppointmentReminderDone, isFollowUpContacted } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
@@ -725,6 +725,18 @@ function homeView() {
     </section>`;
 }
 
+function careRouteAppointmentSchedule(settings, careRoute) {
+  return careRoute === 'ophthalmologist'
+    ? ophthalmologyAppointmentSchedule(settings)
+    : optometristAppointmentSchedule(settings);
+}
+
+function isCareRouteDateAllowed(settings, careRoute, appointmentDate) {
+  return careRoute === 'ophthalmologist'
+    ? isOphthalmologyDateAllowed(settings, appointmentDate)
+    : isOptometristDateAllowed(settings, appointmentDate);
+}
+
 function appointmentTimeField() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
@@ -733,13 +745,11 @@ function appointmentTimeField() {
   const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
     && appointmentDate
     && !isOphthalmologyDateAllowed(settings, appointmentDate);
-  const storeDateBlocked = triage.careRoute !== 'ophthalmologist'
+  const optometristDateBlocked = triage.careRoute !== 'ophthalmologist'
     && appointmentDate
-    && !isStoreDateAllowed(settings, appointmentDate);
+    && !isOptometristDateAllowed(settings, appointmentDate);
   const transportDateBlocked = needsTransport && appointmentDate && !isTransportDateAllowed(settings, appointmentDate);
-  const baseSchedule = triage.careRoute === 'ophthalmologist'
-    ? ophthalmologyAppointmentSchedule(settings)
-    : settings;
+  const baseSchedule = careRouteAppointmentSchedule(settings, triage.careRoute);
   const serviceSchedule = { ...baseSchedule, appointmentDurationMinutes: service.durationMinutes };
   if (!navigator.onLine) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Conecte-se para consultar os horários</option></select><small class="field-error"></small><small class="schedule-availability">Agendamentos exigem conexão com a agenda atualizada.</small></div>`;
@@ -747,8 +757,8 @@ function appointmentTimeField() {
   if (ophthalmologyDateBlocked) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O oftalmologista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados para atendimento oftalmológico.</small></div>`;
   }
-  if (storeDateBlocked) {
-    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">A loja não funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado no horário de funcionamento da loja.</small></div>`;
+  if (optometristDateBlocked) {
+    return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">O optometrista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dos dias configurados na escala do optometrista.</small></div>`;
   }
   if (transportDateBlocked) {
     return `<div class="field" data-field="appointmentTime"><label for="appointmentTime">Horário disponível</label><select id="appointmentTime" name="appointmentTime" disabled><option value="">Transporte indisponível neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha um dia configurado para transporte.</small></div>`;
@@ -1401,13 +1411,11 @@ function leadDetailAppointmentTimeField(lead) {
   }
 
   const triage = ophthalmologyTriage(lead, settings);
-  const routeAllowed = triage.careRoute === 'ophthalmologist'
-    ? isOphthalmologyDateAllowed(settings, appointmentDate)
-    : isStoreDateAllowed(settings, appointmentDate);
+  const routeAllowed = isCareRouteDateAllowed(settings, triage.careRoute, appointmentDate);
   const transportAllowed = !lead.needsTransport || isTransportDateAllowed(settings, appointmentDate);
   const durationMinutes = selectedLeadDetailService(lead).durationMinutes;
   const serviceSchedule = {
-    ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(settings) : settings),
+    ...careRouteAppointmentSchedule(settings, triage.careRoute),
     appointmentDurationMinutes: durationMinutes
   };
   const quota = appointmentQuotaStatus(settings, appointmentDate, appointments, state.profile, lead.id);
@@ -1425,7 +1433,7 @@ function leadDetailAppointmentTimeField(lead) {
   else if (error) placeholder = 'Horários indisponíveis';
   else if (appointmentDate && !routeAllowed) placeholder = triage.careRoute === 'ophthalmologist'
     ? 'O oftalmologista não atende neste dia'
-    : 'A loja não funciona neste dia';
+    : 'O optometrista não atende neste dia';
   else if (appointmentDate && !transportAllowed) placeholder = 'Transporte indisponível neste dia';
   else if (quota.reason === 'mei-day-not-allowed') placeholder = 'MEI sem cota para este dia';
   else if (quota.reason === 'mei-quota' || quota.reason === 'daily-limit') placeholder = 'Limite de agendamentos atingido';
@@ -1969,8 +1977,8 @@ function appointmentCreateTimeField() {
   const needsTransport = state.appointmentCreate.draft?.needsTransport === true || state.appointmentCreate.draft?.needsTransport === 'true';
   const ophthalmologyDateBlocked = triage.careRoute === 'ophthalmologist'
     && !isOphthalmologyDateAllowed(schedule, state.appointments.selectedDate);
-  const storeDateBlocked = triage.careRoute !== 'ophthalmologist'
-    && !isStoreDateAllowed(schedule, state.appointments.selectedDate);
+  const optometristDateBlocked = triage.careRoute !== 'ophthalmologist'
+    && !isOptometristDateAllowed(schedule, state.appointments.selectedDate);
   const transportDateBlocked = needsTransport && !isTransportDateAllowed(schedule, state.appointments.selectedDate);
   if (state.appointmentCreate.loading) {
     return '<div id="appointment-create-time-field" class="field"><label>Horário</label><div class="readonly-field">Carregando horários...</div></div>';
@@ -1978,8 +1986,8 @@ function appointmentCreateTimeField() {
   if (ophthalmologyDateBlocked) {
     return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>O oftalmologista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
-  if (storeDateBlocked) {
-    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>A loja não funciona neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
+  if (optometristDateBlocked) {
+    return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>O optometrista não atende neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
   }
   if (transportDateBlocked) {
     return '<div id="appointment-create-time-field" class="field" data-field="appointmentTime"><label>Horário disponível</label><select name="appointmentTime" disabled><option>Transporte indisponível neste dia</option></select><small class="field-error"></small><small class="schedule-availability">Escolha outro dia na agenda.</small></div>';
@@ -1991,7 +1999,7 @@ function appointmentCreateTimeField() {
     .filter((lead) => lead.storeId === state.appointmentCreate.storeId
       && lead.appointmentDate === state.appointments.selectedDate);
   const available = buildAppointmentSlots(
-    { ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(schedule) : schedule), appointmentDurationMinutes: service.durationMinutes },
+    { ...careRouteAppointmentSchedule(schedule, triage.careRoute), appointmentDurationMinutes: service.durationMinutes },
     records,
     '',
     { appointmentDate: state.appointments.selectedDate, profile: state.profile }
@@ -2157,6 +2165,14 @@ function scheduleSettingsView() {
       <input aria-label="Fim de ${day.label}" name="storeClosingTime-${day.id}" type="time" value="${rule?.closingTime || selected.closingTime}" ${rule ? '' : 'disabled'} />
     </div>`;
   }).join('');
+  const optometristHoursRuleRows = WEEKDAY_OPTIONS.map((day) => {
+    const rule = selected.optometristHoursRules.find((item) => item.weekday === day.id);
+    return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-optometrist-hours-row="${day.id}">
+      <label class="schedule-rule-day checkbox-label"><input type="checkbox" name="optometristWeekday" value="${day.id}" ${rule ? 'checked' : ''} /><span>${day.label}</span></label>
+      <input aria-label="Início do optometrista em ${day.label}" name="optometristOpeningTime-${day.id}" type="time" value="${rule?.openingTime || selected.optometristOpeningTime}" ${rule ? '' : 'disabled'} />
+      <input aria-label="Fim do optometrista em ${day.label}" name="optometristClosingTime-${day.id}" type="time" value="${rule?.closingTime || selected.optometristClosingTime}" ${rule ? '' : 'disabled'} />
+    </div>`;
+  }).join('');
   const ophthalmologyHoursRuleRows = WEEKDAY_OPTIONS.map((day) => {
     const rule = selected.ophthalmologyHoursRules.find((item) => item.weekday === day.id);
     return `<div class="schedule-rule-row schedule-hours-rule-row ${rule ? 'is-active' : ''}" data-ophthalmology-hours-row="${day.id}">
@@ -2279,12 +2295,17 @@ function scheduleSettingsView() {
           <footer><span>As cotas sao individuais para cada MEI.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-mei-quota-close>Cancelar</button><button class="button button-primary" type="button" data-mei-quota-apply><i data-lucide="check"></i><span>Aplicar cotas</span></button></div></footer>
         </dialog>
         <dialog id="ophthalmology-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="ophthalmology-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Triagem e valores de consulta</h2><p>Defina os valores dos novos cadastros e quando encaminhar ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Triagem e valores de consulta</h2><p>Defina valores, escalas e o encaminhamento de cada atendimento.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
             <div class="field-row consultation-price-fields">
               <div class="field" data-field="optometristExamPrice"><label for="settings-optometrist-price">Consulta com optometrista</label><div class="number-with-unit"><input id="settings-optometrist-price" name="optometristExamPrice" type="number" min="0" max="100000" step="0.01" value="${selected.optometristExamPrice}" /><span>R$</span></div><small class="field-help">Aplicado somente aos novos cadastros.</small><small class="field-error"></small></div>
               <div class="field" data-field="ophthalmologistExamPrice"><label for="settings-ophthalmologist-price">Consulta com oftalmologista</label><div class="number-with-unit"><input id="settings-ophthalmologist-price" name="ophthalmologistExamPrice" type="number" min="0" max="100000" step="0.01" value="${selected.ophthalmologistExamPrice}" /><span>R$</span></div><small class="field-help">Aplicado somente aos novos cadastros.</small><small class="field-error"></small></div>
             </div>
+            <input name="optometristEnabled" type="hidden" value="false" />
+            <input name="optometristWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(selected.optometristWeekdays))}" />
+            <input name="optometristHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.optometristHoursRules))}" />
+            <input name="optometristOpeningTime" type="hidden" value="${selected.optometristOpeningTime}" />
+            <input name="optometristClosingTime" type="hidden" value="${selected.optometristClosingTime}" />
             <input name="ophthalmologyRoutingEnabled" type="hidden" value="false" />
             <input name="ophthalmologyWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyWeekdays))}" />
             <input name="ophthalmologyHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyHoursRules))}" />
@@ -2292,6 +2313,8 @@ function scheduleSettingsView() {
             <input name="ophthalmologyClosingTime" type="hidden" value="${selected.ophthalmologyClosingTime}" />
             <input name="ophthalmologyPathologyIds" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyPathologyIds))}" />
             <input name="ophthalmologySurgeryIds" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologySurgeryIds))}" />
+            <label class="setting-toggle checkbox-label" for="settings-optometrist-enabled"><span><strong>Ativar atendimento com optometrista</strong><small>Controla se novos agendamentos podem ser direcionados para esta agenda.</small></span><input id="settings-optometrist-enabled" name="optometristEnabled" type="checkbox" value="true" ${selected.optometristEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
+            <div class="schedule-section-divider ${selected.optometristEnabled ? '' : 'is-hidden'}" data-optometrist-divider aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.optometristEnabled ? '' : 'is-disabled'}" data-field="optometristHoursRules" data-optometrist-fields ${selected.optometristEnabled ? '' : 'disabled'}><legend>Escala do optometrista</legend><small>Ative os dias e defina o horário específico de cada atendimento.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${optometristHoursRuleRows}</div><small class="field-error"></small></fieldset>
             <label class="setting-toggle checkbox-label" for="settings-ophthalmology-enabled"><span><strong>Ativar triagem para oftalmologista</strong><small>Catarata informada na patologia ou na cirurgia direciona para esta agenda.</small></span><input id="settings-ophthalmology-enabled" name="ophthalmologyRoutingEnabled" type="checkbox" value="true" ${selected.ophthalmologyRoutingEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
             <div class="ophthalmology-settings ${selected.ophthalmologyRoutingEnabled ? '' : 'is-disabled'}" data-ophthalmology-fields>
               <div class="field" data-field="ophthalmologyMinimumAge"><label for="settings-ophthalmology-age">Perguntar sobre cirurgia a partir de</label><div class="number-with-unit"><input id="settings-ophthalmology-age" name="ophthalmologyMinimumAge" type="number" min="0" max="120" step="1" value="${selected.ophthalmologyMinimumAge}" /><span>anos</span></div><small class="field-error"></small></div>
@@ -2299,7 +2322,7 @@ function scheduleSettingsView() {
               <div class="notice notice-info ophthalmology-criteria"><i data-lucide="info"></i><span>Critérios iniciais: patologia Catarata ou cirurgia de Catarata. Novos critérios podem ser adicionados depois.</span></div>
             </div>
           </div>
-          <footer><span>A configuração vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar triagem</span></button></div></footer>
+          <footer><span>A configuração vale somente para esta loja.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-ophthalmology-close>Cancelar</button><button class="button button-primary" type="button" data-ophthalmology-apply><i data-lucide="check"></i><span>Aplicar configurações</span></button></div></footer>
         </dialog>
         <dialog id="transport-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="transport-title">
           <header><div><span class="eyebrow">AGENDA</span><h2 id="transport-title">Transporte</h2><p>Defina os dias e horários em que a loja oferece transporte.</p></div><button class="icon-button" type="button" data-transport-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
@@ -2832,9 +2855,7 @@ function bindPageEvents() {
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
         const selectedSlot = buildAppointmentSlots({
-          ...(values.careRoute === 'ophthalmologist'
-            ? ophthalmologyAppointmentSchedule(state.newLeadSchedule.settings)
-            : state.newLeadSchedule.settings),
+          ...careRouteAppointmentSchedule(state.newLeadSchedule.settings, values.careRoute),
           appointmentDurationMinutes: Number(values.appointmentDurationMinutes)
         }, state.newLeadSchedule.appointments, '', {
           appointmentDate: values.appointmentDate,
@@ -3803,8 +3824,20 @@ function bindPageEvents() {
       meiQuotaDialog.close();
     });
     const ophthalmologyDialog = document.querySelector('#ophthalmology-dialog');
+    const optometristEnabledInput = document.querySelector('#settings-optometrist-enabled');
+    const optometristFieldsGroup = ophthalmologyDialog?.querySelector('[data-optometrist-fields]');
     const ophthalmologyEnabledInput = document.querySelector('#settings-ophthalmology-enabled');
     const ophthalmologyFields = ophthalmologyDialog?.querySelector('[data-ophthalmology-fields]');
+    const setOptometristFieldsState = () => {
+      const enabled = optometristEnabledInput.checked;
+      optometristFieldsGroup.disabled = !enabled;
+      optometristFieldsGroup.classList.toggle('is-disabled', !enabled);
+      ophthalmologyDialog.querySelector('[data-optometrist-divider]')?.classList.toggle('is-hidden', !enabled);
+      ophthalmologyDialog.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
+        const checked = row.querySelector('[name="optometristWeekday"]').checked;
+        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
+      });
+    };
     const setOphthalmologyFieldsState = () => {
       const enabled = ophthalmologyEnabledInput.checked;
       ophthalmologyFields.classList.toggle('is-disabled', !enabled);
@@ -3812,9 +3845,25 @@ function bindPageEvents() {
     const syncOphthalmologyDraft = () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       if (!record || !ophthalmologyDialog) return;
+      optometristEnabledInput.checked = record.optometristEnabled;
       ophthalmologyEnabledInput.checked = record.ophthalmologyRoutingEnabled;
       scheduleSettingsForm.elements.optometristExamPrice.value = record.optometristExamPrice;
       scheduleSettingsForm.elements.ophthalmologistExamPrice.value = record.ophthalmologistExamPrice;
+      scheduleSettingsForm.elements.optometristOpeningTime.value = record.optometristOpeningTime;
+      scheduleSettingsForm.elements.optometristClosingTime.value = record.optometristClosingTime;
+      ophthalmologyDialog.querySelector('[name="optometristHoursRules"]').value = JSON.stringify(record.optometristHoursRules);
+      ophthalmologyDialog.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
+        const weekday = Number(row.dataset.optometristHoursRow);
+        const rule = record.optometristHoursRules.find((item) => item.weekday === weekday);
+        const checkbox = row.querySelector('[name="optometristWeekday"]');
+        const openingInput = row.querySelector(`[name="optometristOpeningTime-${weekday}"]`);
+        const closingInput = row.querySelector(`[name="optometristClosingTime-${weekday}"]`);
+        checkbox.checked = Boolean(rule);
+        openingInput.value = rule?.openingTime || record.optometristOpeningTime;
+        closingInput.value = rule?.closingTime || record.optometristClosingTime;
+        row.classList.toggle('is-active', Boolean(rule));
+      });
+      ophthalmologyDialog.querySelector('[name="optometristWeekdays"]').value = JSON.stringify(record.optometristWeekdays);
       scheduleSettingsForm.elements.ophthalmologyMinimumAge.value = record.ophthalmologyMinimumAge;
       scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = record.ophthalmologyOpeningTime;
       scheduleSettingsForm.elements.ophthalmologyClosingTime.value = record.ophthalmologyClosingTime;
@@ -3833,6 +3882,7 @@ function bindPageEvents() {
         row.classList.toggle('is-active', Boolean(rule));
       });
       ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(record.ophthalmologyWeekdays);
+      setOptometristFieldsState();
       setOphthalmologyFieldsState();
       setFieldErrors(ophthalmologyDialog, {});
     };
@@ -3849,7 +3899,16 @@ function bindPageEvents() {
       event.preventDefault();
       discardOphthalmologyDraft();
     });
+    optometristEnabledInput?.addEventListener('change', setOptometristFieldsState);
     ophthalmologyEnabledInput?.addEventListener('change', setOphthalmologyFieldsState);
+    ophthalmologyDialog?.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
+      const checkbox = row.querySelector('[name="optometristWeekday"]');
+      const timeInputs = [...row.querySelectorAll('input[type="time"]')];
+      checkbox.addEventListener('change', () => {
+        row.classList.toggle('is-active', checkbox.checked);
+        timeInputs.forEach((input) => { input.disabled = !optometristEnabledInput.checked || !checkbox.checked; });
+      });
+    });
     ophthalmologyDialog?.querySelectorAll('[data-ophthalmology-hours-row]').forEach((row) => {
       const checkbox = row.querySelector('[name="ophthalmologyWeekday"]');
       const timeInputs = [...row.querySelectorAll('input[type="time"]')];
@@ -3859,7 +3918,16 @@ function bindPageEvents() {
       });
     });
     ophthalmologyDialog?.querySelector('[data-ophthalmology-apply]')?.addEventListener('click', () => {
+      const optometristEnabled = optometristEnabledInput.checked;
       const enabled = ophthalmologyEnabledInput.checked;
+      const optometristHoursRules = [...ophthalmologyDialog.querySelectorAll('[name="optometristWeekday"]:checked')].map((checkbox) => {
+        const weekday = Number(checkbox.value);
+        return {
+          weekday,
+          openingTime: ophthalmologyDialog.querySelector(`[name="optometristOpeningTime-${weekday}"]`).value,
+          closingTime: ophthalmologyDialog.querySelector(`[name="optometristClosingTime-${weekday}"]`).value
+        };
+      });
       const ophthalmologyHoursRules = [...ophthalmologyDialog.querySelectorAll('[name="ophthalmologyWeekday"]:checked')].map((checkbox) => {
         const weekday = Number(checkbox.value);
         return {
@@ -3872,7 +3940,16 @@ function bindPageEvents() {
         openingTime: scheduleSettingsForm.elements.ophthalmologyOpeningTime.value,
         closingTime: scheduleSettingsForm.elements.ophthalmologyClosingTime.value
       };
+      const primaryOptometristHours = optometristHoursRules[0] || {
+        openingTime: scheduleSettingsForm.elements.optometristOpeningTime.value,
+        closingTime: scheduleSettingsForm.elements.optometristClosingTime.value
+      };
       const candidate = {
+        optometristEnabled,
+        optometristWeekdays: optometristHoursRules.map((rule) => rule.weekday),
+        optometristOpeningTime: primaryOptometristHours.openingTime,
+        optometristClosingTime: primaryOptometristHours.closingTime,
+        optometristHoursRules,
         ophthalmologyRoutingEnabled: enabled,
         optometristExamPrice: Number(scheduleSettingsForm.elements.optometristExamPrice.value),
         ophthalmologistExamPrice: Number(scheduleSettingsForm.elements.ophthalmologistExamPrice.value),
@@ -3892,6 +3969,10 @@ function bindPageEvents() {
       setFieldErrors(ophthalmologyDialog, errors);
       if (Object.keys(errors).length) return;
       Object.assign(record, candidate);
+      ophthalmologyDialog.querySelector('[name="optometristWeekdays"]').value = JSON.stringify(candidate.optometristWeekdays);
+      ophthalmologyDialog.querySelector('[name="optometristHoursRules"]').value = JSON.stringify(optometristHoursRules);
+      scheduleSettingsForm.elements.optometristOpeningTime.value = primaryOptometristHours.openingTime;
+      scheduleSettingsForm.elements.optometristClosingTime.value = primaryOptometristHours.closingTime;
       ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(candidate.ophthalmologyWeekdays);
       ophthalmologyDialog.querySelector('[name="ophthalmologyHoursRules"]').value = JSON.stringify(ophthalmologyHoursRules);
       scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = primaryHours.openingTime;
@@ -4021,6 +4102,7 @@ function bindPageEvents() {
       values.showAmetropiaFields = values.showAmetropiaFields === 'true';
       values.limitedDaysEnabled = values.limitedDaysEnabled === 'true';
       values.meiQuotaEnabled = values.meiQuotaEnabled === 'true';
+      values.optometristEnabled = values.optometristEnabled === 'true';
       values.ophthalmologyRoutingEnabled = values.ophthalmologyRoutingEnabled === 'true';
       values.transportEnabled = values.transportEnabled === 'true';
       values.offlineCaptureEnabled = values.offlineCaptureEnabled === 'true';
@@ -4040,6 +4122,11 @@ function bindPageEvents() {
       values.meiMorningQuota = values.meiQuotaRules[0]?.morningQuota ?? current.meiMorningQuota;
       values.meiAfternoonQuota = values.meiQuotaRules[0]?.afternoonQuota ?? current.meiAfternoonQuota;
       values.meiDailyQuota = values.meiMorningQuota + values.meiAfternoonQuota;
+      values.optometristWeekdays = JSON.parse(values.optometristWeekdays || '[]');
+      values.optometristHoursRules = JSON.parse(values.optometristHoursRules || '[]');
+      values.optometristWeekdays = values.optometristHoursRules.map((rule) => rule.weekday);
+      values.optometristOpeningTime = values.optometristHoursRules[0]?.openingTime || current.optometristOpeningTime;
+      values.optometristClosingTime = values.optometristHoursRules[0]?.closingTime || current.optometristClosingTime;
       values.ophthalmologyMinimumAge = Number(values.ophthalmologyMinimumAge);
       values.ophthalmologyWeekdays = JSON.parse(values.ophthalmologyWeekdays || '[]');
       values.ophthalmologyHoursRules = JSON.parse(values.ophthalmologyHoursRules || '[]');
@@ -4076,6 +4163,11 @@ function bindPageEvents() {
             meiQuotaWeekdays: values.meiQuotaWeekdays,
             meiMorningQuota: values.meiMorningQuota,
             meiAfternoonQuota: values.meiAfternoonQuota,
+            optometristEnabled: values.optometristEnabled,
+            optometristWeekdays: values.optometristWeekdays,
+            optometristOpeningTime: values.optometristOpeningTime,
+            optometristClosingTime: values.optometristClosingTime,
+            optometristHoursRules: values.optometristHoursRules,
             ophthalmologyRoutingEnabled: values.ophthalmologyRoutingEnabled,
             ophthalmologyMinimumAge: values.ophthalmologyMinimumAge,
             ophthalmologyWeekdays: values.ophthalmologyWeekdays,
@@ -4692,16 +4784,14 @@ function refreshAppointmentTimeControl() {
   const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
   const service = selectedNewLeadService();
   const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
-  const routeDateAllowed = triage.careRoute === 'ophthalmologist'
-    ? isOphthalmologyDateAllowed(settings, appointmentDate)
-    : isStoreDateAllowed(settings, appointmentDate);
+  const routeDateAllowed = isCareRouteDateAllowed(settings, triage.careRoute, appointmentDate);
   const needsTransport = state.newLeadSchedule.triage?.needsTransport === true || state.newLeadSchedule.triage?.needsTransport === 'true';
   const transportDateAllowed = !needsTransport || isTransportDateAllowed(settings, appointmentDate);
   const dateAllowed = routeDateAllowed && transportDateAllowed;
   const slots = appointmentDate && settings.schedulingMode === 'controlled'
     ? buildAppointmentSlots(
       {
-        ...(triage.careRoute === 'ophthalmologist' ? ophthalmologyAppointmentSchedule(settings) : settings),
+        ...careRouteAppointmentSchedule(settings, triage.careRoute),
         appointmentDurationMinutes: service.durationMinutes
       },
       appointments,
@@ -4721,7 +4811,7 @@ function refreshAppointmentTimeControl() {
   if (dateStatus) dateStatus.textContent = !transportDateAllowed
     ? 'Não há transporte disponível neste dia.'
     : !routeDateAllowed
-      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista não atende neste dia.' : 'A loja não funciona neste dia.'
+      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista não atende neste dia.' : 'O optometrista não atende neste dia.'
     : fullyBooked ? 'Dia sem horários disponíveis.' : '';
 }
 

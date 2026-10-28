@@ -8,6 +8,18 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   automaticPendingFollowUp: false,
   showAmetropiaFields: false,
   offlineCaptureEnabled: false,
+  optometristEnabled: true,
+  optometristWeekdays: Object.freeze([1, 2, 3, 4, 5, 6]),
+  optometristOpeningTime: '08:00',
+  optometristClosingTime: '16:30',
+  optometristHoursRules: Object.freeze([
+    Object.freeze({ weekday: 1, openingTime: '08:00', closingTime: '16:30' }),
+    Object.freeze({ weekday: 2, openingTime: '08:00', closingTime: '16:30' }),
+    Object.freeze({ weekday: 3, openingTime: '08:00', closingTime: '16:30' }),
+    Object.freeze({ weekday: 4, openingTime: '08:00', closingTime: '16:30' }),
+    Object.freeze({ weekday: 5, openingTime: '08:00', closingTime: '16:30' }),
+    Object.freeze({ weekday: 6, openingTime: '08:00', closingTime: '12:00' })
+  ]),
   ophthalmologyRoutingEnabled: true,
   ophthalmologyMinimumAge: 55,
   ophthalmologyWeekdays: Object.freeze([6]),
@@ -192,6 +204,15 @@ export function normalizeStoreSchedule(value = {}) {
   const primaryMeiRule = meiQuotaRules[0];
   const opening = TIME_PATTERN.test(value.openingTime || '') ? value.openingTime : DEFAULT_STORE_SCHEDULE.openingTime;
   const closing = TIME_PATTERN.test(value.closingTime || '') ? value.closingTime : DEFAULT_STORE_SCHEDULE.closingTime;
+  const optometristWeekdays = Array.isArray(value.optometristWeekdays)
+    ? [...new Set(value.optometristWeekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+    : [...DEFAULT_STORE_SCHEDULE.optometristWeekdays];
+  const optometristOpeningTime = TIME_PATTERN.test(value.optometristOpeningTime || '')
+    ? value.optometristOpeningTime
+    : DEFAULT_STORE_SCHEDULE.optometristOpeningTime;
+  const optometristClosingTime = TIME_PATTERN.test(value.optometristClosingTime || '')
+    ? value.optometristClosingTime
+    : DEFAULT_STORE_SCHEDULE.optometristClosingTime;
   const ophthalmologyWeekdays = Array.isArray(value.ophthalmologyWeekdays)
     ? [...new Set(value.ophthalmologyWeekdays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
     : [...DEFAULT_STORE_SCHEDULE.ophthalmologyWeekdays];
@@ -208,6 +229,18 @@ export function normalizeStoreSchedule(value = {}) {
     opening,
     closing
   );
+  const optometristHoursRules = normalizeHoursRules(
+    value.optometristHoursRules ?? (
+      value.optometristWeekdays === undefined
+      && value.optometristOpeningTime === undefined
+      && value.optometristClosingTime === undefined
+        ? DEFAULT_STORE_SCHEDULE.optometristHoursRules
+        : undefined
+    ),
+    optometristWeekdays,
+    optometristOpeningTime,
+    optometristClosingTime
+  );
   const ophthalmologyHoursRules = normalizeHoursRules(
     value.ophthalmologyHoursRules,
     ophthalmologyWeekdays,
@@ -216,6 +249,7 @@ export function normalizeStoreSchedule(value = {}) {
   );
   const transportHoursRules = normalizeHoursRules(value.transportHoursRules, [], '', '');
   const primaryStoreHours = storeHoursRules[0];
+  const primaryOptometristHours = optometristHoursRules[0];
   const primaryOphthalmologyHours = ophthalmologyHoursRules[0];
   return {
     schedulingMode: value.schedulingMode === 'free' ? 'free' : 'controlled',
@@ -227,6 +261,13 @@ export function normalizeStoreSchedule(value = {}) {
     automaticPendingFollowUp: value.automaticPendingFollowUp === true || value.automaticPendingFollowUp === 'true',
     showAmetropiaFields: value.showAmetropiaFields === true || value.showAmetropiaFields === 'true',
     offlineCaptureEnabled: value.offlineCaptureEnabled === true || value.offlineCaptureEnabled === 'true',
+    optometristEnabled: value.optometristEnabled === undefined
+      ? DEFAULT_STORE_SCHEDULE.optometristEnabled
+      : value.optometristEnabled === true || value.optometristEnabled === 'true',
+    optometristWeekdays: optometristHoursRules.map((rule) => rule.weekday),
+    optometristOpeningTime: primaryOptometristHours?.openingTime || optometristOpeningTime,
+    optometristClosingTime: primaryOptometristHours?.closingTime || optometristClosingTime,
+    optometristHoursRules,
     ophthalmologyRoutingEnabled: value.ophthalmologyRoutingEnabled === undefined
       ? DEFAULT_STORE_SCHEDULE.ophthalmologyRoutingEnabled
       : value.ophthalmologyRoutingEnabled === true || value.ophthalmologyRoutingEnabled === 'true',
@@ -299,6 +340,12 @@ export function validateStoreSchedule(value) {
     );
   const opening = timeToMinutes(value.openingTime);
   const closing = timeToMinutes(value.closingTime);
+  const optometristEnabled = value.optometristEnabled === undefined
+    ? DEFAULT_STORE_SCHEDULE.optometristEnabled
+    : value.optometristEnabled === true || value.optometristEnabled === 'true';
+  const optometristWeekdays = Array.isArray(value.optometristWeekdays)
+    ? value.optometristWeekdays.map(Number)
+    : [...DEFAULT_STORE_SCHEDULE.optometristWeekdays];
   const ophthalmologyEnabled = value.ophthalmologyRoutingEnabled === true || value.ophthalmologyRoutingEnabled === 'true';
   const ophthalmologyMinimumAge = Number(value.ophthalmologyMinimumAge);
   const ophthalmologyOpening = timeToMinutes(value.ophthalmologyOpeningTime);
@@ -309,6 +356,13 @@ export function validateStoreSchedule(value) {
   const rawStoreHoursRules = Array.isArray(value.storeHoursRules)
     ? value.storeHoursRules
     : WEEKDAY_OPTIONS.map((day) => ({ weekday: day.id, openingTime: value.openingTime, closingTime: value.closingTime }));
+  const rawOptometristHoursRules = Array.isArray(value.optometristHoursRules)
+    ? value.optometristHoursRules
+    : optometristWeekdays.map((weekday) => ({
+      weekday,
+      openingTime: value.optometristOpeningTime || DEFAULT_STORE_SCHEDULE.optometristOpeningTime,
+      closingTime: value.optometristClosingTime || (weekday === 6 ? '12:00' : DEFAULT_STORE_SCHEDULE.optometristClosingTime)
+    }));
   const rawOphthalmologyHoursRules = Array.isArray(value.ophthalmologyHoursRules)
     ? value.ophthalmologyHoursRules
     : ophthalmologyWeekdays.map((weekday) => ({
@@ -322,6 +376,7 @@ export function validateStoreSchedule(value) {
   const maxCompanions = Number(value.maxCompanions ?? DEFAULT_STORE_SCHEDULE.maxCompanions);
   const rawTransportHoursRules = Array.isArray(value.transportHoursRules) ? value.transportHoursRules : [];
   const validStoreHoursRules = normalizeHoursRules(rawStoreHoursRules, [], '', '');
+  const validOptometristHoursRules = normalizeHoursRules(rawOptometristHoursRules, [], '', '');
   const validOphthalmologyHoursRules = normalizeHoursRules(rawOphthalmologyHoursRules, [], '', '');
   const validTransportHoursRules = normalizeHoursRules(rawTransportHoursRules, [], '', '');
 
@@ -353,6 +408,15 @@ export function validateStoreSchedule(value) {
     timeToMinutes(rule.closingTime) - timeToMinutes(rule.openingTime) < schedule.appointmentDurationMinutes
   ))) {
     errors.storeHoursRules = 'Cada expediente deve comportar pelo menos um atendimento.';
+  }
+  if (optometristEnabled
+    && (!rawOptometristHoursRules.length || validOptometristHoursRules.length !== rawOptometristHoursRules.length)) {
+    errors.optometristHoursRules = 'Configure ao menos um dia com horários válidos para o optometrista.';
+  }
+  if (optometristEnabled && validOptometristHoursRules.some((rule) => (
+    timeToMinutes(rule.closingTime) - timeToMinutes(rule.openingTime) < schedule.appointmentDurationMinutes
+  ))) {
+    errors.optometristHoursRules = 'Cada período do optometrista deve comportar pelo menos um atendimento.';
   }
   const validLimitedRules = normalizeLimitedDayRules(limitedDayRules, [], 0);
   const validMeiRules = normalizeMeiQuotaRules(meiQuotaRules, [], 0, 0);
@@ -399,6 +463,14 @@ export function isOphthalmologyDateAllowed(settings, appointmentDate) {
     || (weekday !== null && schedule.ophthalmologyHoursRules.some((rule) => rule.weekday === weekday));
 }
 
+export function isOptometristDateAllowed(settings, appointmentDate) {
+  const schedule = normalizeStoreSchedule(settings);
+  const weekday = weekdayFromDate(appointmentDate);
+  return schedule.optometristEnabled
+    && weekday !== null
+    && schedule.optometristHoursRules.some((rule) => rule.weekday === weekday);
+}
+
 export function isStoreDateAllowed(settings, appointmentDate) {
   const schedule = normalizeStoreSchedule(settings);
   const weekday = weekdayFromDate(appointmentDate);
@@ -441,6 +513,16 @@ export function ophthalmologyAppointmentSchedule(settings) {
     openingTime: schedule.ophthalmologyOpeningTime,
     closingTime: schedule.ophthalmologyClosingTime,
     storeHoursRules: schedule.ophthalmologyHoursRules
+  };
+}
+
+export function optometristAppointmentSchedule(settings) {
+  const schedule = normalizeStoreSchedule(settings);
+  return {
+    ...schedule,
+    openingTime: schedule.optometristOpeningTime,
+    closingTime: schedule.optometristClosingTime,
+    storeHoursRules: schedule.optometristHoursRules
   };
 }
 

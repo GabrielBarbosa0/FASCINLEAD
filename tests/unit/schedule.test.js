@@ -5,11 +5,13 @@ import {
   appointmentSlotId,
   buildAppointmentSlots,
   isOphthalmologyDateAllowed,
+  isOptometristDateAllowed,
   isStoreDateAllowed,
   isTransportAppointmentAllowed,
   isTransportDateAllowed,
   normalizeStoreSchedule,
   ophthalmologyAppointmentSchedule,
+  optometristAppointmentSchedule,
   transportHoursForDate,
   validateStoreSchedule
 } from '../../src/utils/schedule.js';
@@ -24,6 +26,18 @@ describe('store schedule helpers', () => {
       automaticPendingFollowUp: false,
       showAmetropiaFields: false,
       offlineCaptureEnabled: false,
+      optometristEnabled: true,
+      optometristWeekdays: [1, 2, 3, 4, 5, 6],
+      optometristOpeningTime: '08:00',
+      optometristClosingTime: '16:30',
+      optometristHoursRules: [
+        { weekday: 1, openingTime: '08:00', closingTime: '16:30' },
+        { weekday: 2, openingTime: '08:00', closingTime: '16:30' },
+        { weekday: 3, openingTime: '08:00', closingTime: '16:30' },
+        { weekday: 4, openingTime: '08:00', closingTime: '16:30' },
+        { weekday: 5, openingTime: '08:00', closingTime: '16:30' },
+        { weekday: 6, openingTime: '08:00', closingTime: '12:00' }
+      ],
       ophthalmologyRoutingEnabled: true,
       ophthalmologyMinimumAge: 55,
       ophthalmologyWeekdays: [6],
@@ -208,6 +222,30 @@ describe('store schedule helpers', () => {
     const ophthalmologySchedule = ophthalmologyAppointmentSchedule(settings);
     expect(buildAppointmentSlots(ophthalmologySchedule, [], '', { appointmentDate: '2026-10-22' }).at(-1).time).toBe('17:40');
     expect(buildAppointmentSlots(ophthalmologySchedule, [], '', { appointmentDate: '2026-10-24' }).at(-1).time).toBe('11:40');
+  });
+
+  it('uses the optometrist default weekday and Saturday schedule', () => {
+    const settings = normalizeStoreSchedule({});
+
+    expect(isOptometristDateAllowed(settings, '2026-10-23')).toBe(true);
+    expect(isOptometristDateAllowed(settings, '2026-10-24')).toBe(true);
+    expect(isOptometristDateAllowed(settings, '2026-10-25')).toBe(false);
+
+    const optometristSchedule = optometristAppointmentSchedule(settings);
+    expect(buildAppointmentSlots(optometristSchedule, [], '', { appointmentDate: '2026-10-23' }).at(-1).endTime).toBe('16:20');
+    expect(buildAppointmentSlots(optometristSchedule, [], '', { appointmentDate: '2026-10-24' }).at(-1).endTime).toBe('12:00');
+  });
+
+  it('blocks optometrist dates when the service is disabled and validates its scale', () => {
+    expect(isOptometristDateAllowed({ optometristEnabled: false }, '2026-10-23')).toBe(false);
+    expect(validateStoreSchedule({
+      ...normalizeStoreSchedule({}),
+      optometristEnabled: true,
+      optometristHoursRules: []
+    })).toMatchObject({
+      isValid: false,
+      errors: { optometristHoursRules: expect.any(String) }
+    });
   });
 
   it('uses the operating hours configured for each store weekday', () => {
