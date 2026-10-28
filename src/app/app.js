@@ -2369,7 +2369,7 @@ function roleProfilesSettingsView() {
     <span class="service-catalog-icon"><i data-lucide="shield-check"></i></span>
     <button class="role-catalog-name" type="button" data-role-details="${escapeHtml(profile.id)}" aria-label="Visualizar permissões do perfil ${escapeHtml(profile.name)}"><strong>${escapeHtml(profile.name)}</strong><span>${profile.scope === 'admin' ? 'Acesso completo' : profile.scope === 'stores' ? 'Unidades permitidas' : 'Dados próprios'}</span></button>
     <div class="service-catalog-duration role-catalog-permissions"><span>Permissões</span><strong>${profile.permissions.length} ativa(s)</strong></div>
-    <span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Padrão ajustado' : 'Padrão' : 'Personalizado'}</span>
+    <span class="status-badge status-${profile.system ? 'neutral' : 'success'}">${profile.system ? profile.customized ? 'Ajustado' : 'Padrão' : 'Personalizado'}</span>
     <div class="service-catalog-actions role-catalog-actions">
       ${profile.system
         ? `<button class="icon-button" type="button" data-role-details="${escapeHtml(profile.id)}" title="${profile.baseRole === 'admin' ? 'Visualizar permissões' : 'Configurar permissões'}" ${saving ? 'disabled' : ''}><i data-lucide="${profile.baseRole === 'admin' ? 'eye' : 'pencil'}"></i></button>`
