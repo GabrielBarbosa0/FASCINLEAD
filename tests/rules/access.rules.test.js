@@ -79,7 +79,7 @@ describe('access administration rules', () => {
       name: 'Gestor regional',
       scope: 'stores',
       baseRole: 'manager',
-      permissions: ['management.view', 'reports.view'],
+      permissions: ['management.view', 'dashboard.view'],
       active: true
     }));
     await assertSucceeds(getDocs(collection(db, 'roleProfiles')));

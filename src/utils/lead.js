@@ -4,7 +4,7 @@ import { isTransportAppointmentAllowed } from './schedule.js';
 
 export const INTERESTS = [
   { id: '', label: 'Não informado' },
-  { id: 'complete-glasses', label: 'Oculos completo' },
+  { id: 'complete-glasses', label: 'Óculos completo' },
   { id: 'frames', label: 'Armação' },
   { id: 'lenses', label: 'Lentes' },
   { id: 'eye-exam', label: 'Exame de vista' },

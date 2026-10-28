@@ -34,7 +34,7 @@ service cloud.firestore {
       return permission in ['leads.create', 'leads.view_own', 'leads.edit_own', 'followups.own', 'goals.view_own']
         || (userProfile().role == 'manager' && permission in [
           'management.view', 'appointments.view', 'appointments.attendance',
-          'followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'
+          'followups.team', 'goals.manage', 'dashboard.view', 'leads.export'
         ]);
     }
 

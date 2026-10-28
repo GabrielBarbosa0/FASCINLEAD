@@ -8,6 +8,29 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('keeps the header width fixed while page content follows its own layout', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'manager'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+
+  const homeLayout = await page.evaluate(() => ({
+    headerWidth: document.querySelector('.header-inner').getBoundingClientRect().width,
+    contentWidth: document.querySelector('.app-main').getBoundingClientRect().width
+  }));
+
+  await page.getByRole('button', { name: /Painel de gestão/ }).click();
+  await expect(page.getByRole('heading', { name: 'Painel de leads' })).toBeVisible();
+  const managementLayout = await page.evaluate(() => ({
+    headerWidth: document.querySelector('.header-inner').getBoundingClientRect().width,
+    contentWidth: document.querySelector('.app-main').getBoundingClientRect().width
+  }));
+
+  expect(homeLayout.headerWidth).toBeCloseTo(managementLayout.headerWidth, 0);
+  expect(homeLayout.headerWidth).toBeCloseTo(1180, 0);
+  expect(homeLayout.contentWidth).toBeCloseTo(760, 0);
+  expect(managementLayout.contentWidth).toBeCloseTo(1180, 0);
+});
+
 test('shows only menus allowed for the front desk profile', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'receptionist'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -674,7 +697,7 @@ test('hides disabled ametropias in management details without erasing saved valu
   expect(savedAmetropias).toEqual(['myopia']);
 });
 
-test('shows management reports and dashboard grouped by store and captor', async ({ page }, testInfo) => {
+test('shows the management dashboard grouped by store and captor', async ({ page }, testInfo) => {
   const capturedAtClient = new Date().toISOString();
   let savwinRequest = null;
   await page.route('**/api/savwin/products-by-os', async (route) => {
@@ -699,6 +722,14 @@ test('shows management reports and dashboard grouped by store and captor', async
         appointmentDate: capturedAtClient.slice(0, 10),
         appointmentTime: '08:00',
         appointmentAttendance: 'attended',
+        careRoute: 'ophthalmologist',
+        examPaymentType: 'paid',
+        needsTransport: true,
+        transportSeats: 2,
+        hasCompanion: true,
+        birthDate: '1960-10-20',
+        pathologyIds: ['cataract', 'retinopathy'],
+        interestId: 'complete-glasses',
         syncState: 'demo'
       },
       {
@@ -712,6 +743,12 @@ test('shows management reports and dashboard grouped by store and captor', async
         appointmentDate: capturedAtClient.slice(0, 10),
         appointmentTime: '09:00',
         appointmentAttendance: 'missed',
+        careRoute: 'optometrist',
+        examPaymentType: 'courtesy',
+        needsTransport: false,
+        birthDate: '1980-01-01',
+        pathologyIds: ['glaucoma'],
+        interestId: 'frames',
         syncState: 'demo'
       },
       {
@@ -725,6 +762,13 @@ test('shows management reports and dashboard grouped by store and captor', async
         appointmentDate: '',
         appointmentTime: '',
         appointmentAttendance: 'pending',
+        careRoute: 'ophthalmologist',
+        examPaymentType: 'courtesy',
+        needsTransport: true,
+        hasCompanion: false,
+        birthDate: '2000-01-01',
+        pathologyIds: ['diabetes'],
+        interestId: 'complete-glasses',
         syncState: 'demo'
       }
     ]));
@@ -732,50 +776,38 @@ test('shows management reports and dashboard grouped by store and captor', async
 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
   await page.getByRole('button', { name: /Painel de gestão/ }).click();
-  await expect(page.getByRole('button', { name: 'Relatórios' })).toBeVisible();
-  await page.getByRole('button', { name: 'Relatórios' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Relatórios' })).toBeVisible();
-  await expect(page.getByText('Defina o intervalo do relatório')).toBeVisible();
-  await expect(page.getByLabel('Data inicial')).toBeVisible();
-  await expect(page.getByLabel('Data final')).toBeVisible();
-  const metrics = page.getByRole('region', { name: 'Indicadores do período' });
-  await expect(metrics.locator('div', { hasText: 'Cadastros' }).locator('strong')).toHaveText('3');
-  await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
-  await expect(metrics.locator('div', { hasText: 'Comparecimentos' }).locator('strong')).toHaveText('1');
-  await expect(metrics.locator('div', { hasText: 'Taxa de comparecimento' }).locator('strong')).toHaveText('50%');
-  await expect(page.getByRole('heading', { name: 'Resultados por unidade' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Agendamentos por dia da semana' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Agendamentos por horário' })).toBeVisible();
-  await expect(page.getByText('Quinta', { exact: true })).toBeVisible();
-  await expect(page.getByText('Predominio: Manhã')).toBeVisible();
   const reportDate = capturedAtClient.slice(0, 10);
-  await page.getByLabel('Data inicial').fill(reportDate);
-  await page.getByLabel('Data final').fill(reportDate);
-  await page.getByRole('button', { name: 'Aplicar período' }).click();
-  await expect(metrics.locator('div', { hasText: 'Agendamentos' }).locator('strong')).toHaveText('2');
-  await expect(page.getByText('Loja 02', { exact: true })).toBeVisible();
-  await expect(page.getByText('Loja 06', { exact: true })).toBeVisible();
-  await expect(page.getByText('Captador Loja 06', { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('reports.png'), fullPage: true });
-
-  await page.getByRole('button', { name: 'Voltar para gestão' }).click();
   await page.getByRole('button', { name: 'Dashboard' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   const dashboardMetrics = page.getByRole('region', { name: 'Indicadores do dashboard' });
-  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '67%', '2', '2', '1', '2']);
   await expect(page.getByRole('heading', { name: 'Cadastros por dia' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agendamentos por dia da semana' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agendamentos por horário' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Situação dos agendamentos' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Desempenho por loja' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Optometrista x Oftalmologista' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Principais patologias' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Faixas etárias' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Transporte por dia' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Interesses principais' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pagos x gratuitos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Desempenho por unidade' })).toBeVisible();
+  const unitPerformance = page.locator('article.dashboard-panel', { has: page.getByRole('heading', { name: 'Desempenho por unidade' }) });
+  await expect(unitPerformance.getByRole('columnheader')).toHaveText(['Nome', 'Cadastros', 'Agendados', 'Compareceram', 'Faltaram', 'Taxa']);
+  await expect(unitPerformance.getByText('Loja 02', { exact: true })).toBeVisible();
+  await expect(unitPerformance.getByText('Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
+  const captorPerformance = page.locator('article.dashboard-panel', { has: page.getByRole('heading', { name: 'Resultados por captador' }) });
+  await expect(captorPerformance.getByRole('columnheader')).toHaveText(['Nome', 'Cadastros', 'Agendados', 'Compareceram', 'Faltaram', 'Taxa']);
+  await expect(captorPerformance.getByText('Captador Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
   await page.getByLabel('Data inicial').fill(reportDate);
   await page.getByLabel('Data final').fill(reportDate);
   await page.getByRole('button', { name: 'Aplicar período' }).click();
   await expect(page.getByLabel('Data inicial')).toHaveValue(reportDate);
   await expect(page.getByLabel('Data final')).toHaveValue(reportDate);
-  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '2']);
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '67%', '2', '2', '1', '2']);
   await page.getByRole('button', { name: 'Consultar SavWin' }).click();
   await expect(page.getByText('SavWin conectado localmente')).toBeVisible();
   await expect(page.getByText('4 item(ns) encontrados em 2 OS no período.')).toBeVisible();
@@ -1602,9 +1634,9 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
   const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcão' });
   await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
-  await expect(receptionistDialog.getByText('6 de 18 permissões ativadas')).toBeVisible();
+  await expect(receptionistDialog.getByText('6 de 17 permissões ativadas')).toBeVisible();
   await receptionistDialog.getByLabel('Registrar comparecimento e falta').uncheck();
-  await expect(receptionistDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
+  await expect(receptionistDialog.getByText('5 de 17 permissões ativadas')).toBeVisible();
   await receptionistDialog.getByRole('button', { name: 'Salvar permissões' }).click();
   await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
   await expect(receptionistDialog.getByLabel('Registrar comparecimento e falta')).not.toBeChecked();
@@ -1614,32 +1646,32 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await receptionistDialog.getByRole('button', { name: 'Cancelar' }).click();
   await page.getByRole('button', { name: 'Visualizar permissões do perfil Administrador' }).click();
   const administratorDialog = page.getByRole('dialog', { name: 'Administrador' });
-  await expect(administratorDialog.locator('.role-details-permission.is-active')).toHaveCount(18);
+  await expect(administratorDialog.locator('.role-details-permission.is-active')).toHaveCount(17);
   await expect(administratorDialog.locator('[data-system-role-permission]:enabled')).toHaveCount(0);
   await administratorDialog.getByRole('button', { name: 'Concluir' }).click();
   await page.getByRole('button', { name: 'Visualizar permissões do perfil Colaborador' }).click();
   const detailsDialog = page.getByRole('dialog', { name: 'Colaborador' });
   await expect(detailsDialog).toBeVisible();
-  await expect(detailsDialog.locator('.role-details-permission')).toHaveCount(18);
+  await expect(detailsDialog.locator('.role-details-permission')).toHaveCount(17);
   await expect(detailsDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
-  await expect(detailsDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
+  await expect(detailsDialog.getByText('5 de 17 permissões ativadas')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('role-permissions-details.png') });
   await detailsDialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(detailsDialog).not.toBeVisible();
   await page.getByRole('button', { name: 'Adicionar cargo' }).click();
   const editorDialog = page.getByRole('dialog', { name: 'Novo cargo' });
   await expect(editorDialog).toBeVisible();
-  await expect(editorDialog.locator('.role-details-permission')).toHaveCount(18);
-  await expect(editorDialog.locator('.role-details-permission.is-active')).toHaveCount(5);
+  await expect(editorDialog.locator('.role-details-permission')).toHaveCount(17);
+  await expect(editorDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
   await expect(editorDialog.getByLabel('Cadastrar leads')).toBeChecked();
   await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeDisabled();
-  await expect(editorDialog.getByText('5 de 18 permissões ativadas')).toBeVisible();
+  await expect(editorDialog.getByText('6 de 17 permissões ativadas')).toBeVisible();
   await editorDialog.getByLabel('Alcance dos dados').selectOption('stores');
   await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeEnabled();
   await expect(editorDialog.getByLabel('Acessar a gestão de leads')).not.toBeChecked();
-  await editorDialog.getByLabel('Visualizar relatórios').check();
+  await editorDialog.getByLabel('Visualizar dashboard').check();
   await expect(editorDialog.getByLabel('Acessar a gestão de leads')).toBeChecked();
-  await expect(editorDialog.getByText('7 de 18 permissões ativadas')).toBeVisible();
+  await expect(editorDialog.getByText('8 de 17 permissões ativadas')).toBeVisible();
   await editorDialog.getByLabel('Nome do cargo').fill('Supervisor de teste');
   await editorDialog.getByRole('button', { name: 'Criar cargo' }).click();
   const customCard = page.locator('.role-catalog-row').filter({ hasText: 'Supervisor de teste' });
@@ -1648,9 +1680,9 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await customCard.getByTitle('Editar cargo').click();
   const editDialog = page.getByRole('dialog', { name: 'Editar cargo' });
   await expect(editDialog).toBeVisible();
-  await expect(editDialog.locator('.role-details-permission')).toHaveCount(18);
-  await expect(editDialog.locator('.role-details-permission.is-active')).toHaveCount(7);
-  await expect(editDialog.getByLabel('Visualizar relatórios')).toBeChecked();
+  await expect(editDialog.locator('.role-details-permission')).toHaveCount(17);
+  await expect(editDialog.locator('.role-details-permission.is-active')).toHaveCount(8);
+  await expect(editDialog.getByLabel('Visualizar dashboard')).toBeChecked();
   await expect(editDialog.getByLabel('Nome do cargo')).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath('custom-role-editor.png') });
   await editDialog.getByLabel('Nome do cargo').fill('Supervisor atualizado');

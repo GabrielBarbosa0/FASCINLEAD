@@ -57,7 +57,7 @@ import { deleteAccess, loadAccesses, saveAccess, setAccessActive } from '../serv
 import { deleteRoleProfile, loadRoleProfiles, resetSystemRolePermissions, saveRoleProfile, saveSystemRolePermissions } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
 import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
-import { APPOINTMENTS_QUERY_LIMIT, markAppointmentReminderDone, setAppointmentAttendance, subscribeToAppointmentConfirmations, subscribeToAppointments, undoAppointmentReminderDone } from '../services/appointment-service.js';
+import { APPOINTMENTS_QUERY_LIMIT, loadUpcomingAppointments, markAppointmentReminderDone, setAppointmentAttendance, subscribeToAppointmentConfirmations, subscribeToAppointments, undoAppointmentReminderDone } from '../services/appointment-service.js';
 import { backfillAppointmentSlots, loadStoreSchedule, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { deleteAppointmentService, ensureDefaultAppointmentServices, loadAppointmentServices, saveAppointmentService, setAppointmentServiceActive } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
@@ -73,6 +73,7 @@ import { DEFAULT_TEAM_PASSWORD, formatAccessStoreSummary } from '../utils/access
 import { PERMISSION_GROUPS, ROLE_SCOPES, SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission, normalizeRolePermissions, permissionsForScope, systemRoleProfileForId, systemRoleProfileForRole, validateRoleProfile } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
 import { duplicateGoalDraft } from '../utils/goal.js';
+import { dashboardSummary, upcomingDateRange } from '../utils/dashboard.js';
 import { defaultAppointmentService, servicesForStore, validateAppointmentService } from '../utils/service-catalog.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 
@@ -176,6 +177,13 @@ const state = {
     page: 1,
     pageSize: 20,
     filters: createDefaultManagementFilters()
+  },
+  dashboardUpcoming: {
+    loading: false,
+    loaded: false,
+    error: '',
+    records: [],
+    truncated: false
   },
   appointments: {
     loading: false,
@@ -444,7 +452,6 @@ function canAccessRoute(route) {
     management: () => hasAccess('management.view'),
     'management-lead': () => hasAccess('management.view'),
     dashboard: () => hasAccess('dashboard.view'),
-    reports: () => hasAccess('reports.view'),
     appointments: () => hasAccess('appointments.view'),
     confirmations: () => hasAccess('appointments.view'),
     access: () => isAdmin(),
@@ -604,7 +611,6 @@ function currentPageTitle() {
     management: 'Painel de leads',
     'management-lead': 'Detalhes do lead',
     dashboard: 'Dashboard',
-    reports: 'Relatórios',
     appointments: 'Agenda de exames',
     confirmations: 'Confirmações',
     access: 'Acessos da equipe',
@@ -628,7 +634,7 @@ function headerView() {
   const multipleStoreIndicator = permittedStoreLabels.length > 1 && storeSummary.short !== 'TODAS';
   return `
     <header class="app-header">
-      <div class="header-inner ${['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route) ? 'layout-wide' : ''}">
+      <div class="header-inner layout-wide">
         <div class="header-brand">
           <img class="brand-logo brand-logo-header" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" />
           <div>
@@ -1528,7 +1534,6 @@ function managementView() {
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="settings"><i data-lucide="settings"></i><span>Configurações</span></button>' : ''}
         ${isAdmin() ? '<button class="button button-secondary" type="button" data-route="access"><i data-lucide="user-round-cog"></i><span>Gerenciar acessos</span></button>' : ''}
         ${hasAccess('dashboard.view') ? '<button class="button button-secondary" type="button" data-route="dashboard"><i data-lucide="bar-chart-3"></i><span>Dashboard</span></button>' : ''}
-        ${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Relatórios</span></button>' : ''}
         ${hasAccess('leads.export') ? `<button class="button button-secondary" type="button" data-action="export-management" ${filtered.length === 0 ? 'disabled' : ''}><i data-lucide="file-down"></i><span>Exportar CSV</span></button>` : ''}
       </div>
     </section>
@@ -1553,33 +1558,15 @@ function managementView() {
     <section class="management-results" aria-busy="${loading}">${results}</section>`;
 }
 
-function reportGroupRows(records, keyFor, labelFor) {
-  const groups = [...records.reduce((result, lead) => {
-    const key = keyFor(lead) || 'not-informed';
-    if (!result.has(key)) result.set(key, { label: labelFor(lead), records: [] });
-    result.get(key).records.push(lead);
-    return result;
-  }, new Map()).values()].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-
-  return groups.map((group) => {
-    const scheduled = group.records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
-    const attended = group.records.filter((lead) => lead.appointmentAttendance === 'attended').length;
-    const missed = group.records.filter((lead) => lead.appointmentAttendance === 'missed').length;
-    const decided = attended + missed;
-    const rate = decided ? Math.round((attended / decided) * 100) : 0;
-    return `<tr><td><strong>${escapeHtml(group.label)}</strong></td><td>${group.records.length}</td><td>${scheduled}</td><td>${attended}</td><td>${missed}</td><td><strong>${rate}%</strong></td></tr>`;
-  }).join('');
-}
-
 function reportAppointmentDistribution(records) {
   const appointments = records.filter((lead) => lead.appointmentDate && lead.appointmentTime);
   const weekdays = [
     { index: 1, label: 'Segunda' },
-    { index: 2, label: 'Terca' },
+    { index: 2, label: 'Terça' },
     { index: 3, label: 'Quarta' },
     { index: 4, label: 'Quinta' },
     { index: 5, label: 'Sexta' },
-    { index: 6, label: 'Sabado' },
+    { index: 6, label: 'Sábado' },
     { index: 0, label: 'Domingo' }
   ].map((day) => ({
     label: day.label,
@@ -1627,40 +1614,6 @@ function reportDistributionPanel(title, description, icon, items, total, highlig
   </article>`;
 }
 
-function reportsView() {
-  if (!hasAccess('reports.view')) {
-    return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso aos relatórios.</span></div>`;
-  }
-  const records = filteredReportRecords();
-  const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
-  const attended = records.filter((lead) => lead.appointmentAttendance === 'attended').length;
-  const missed = records.filter((lead) => lead.appointmentAttendance === 'missed').length;
-  const decided = attended + missed;
-  const attendanceRate = decided ? Math.round((attended / decided) * 100) : 0;
-  const storeRows = reportGroupRows(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId));
-  const captorRows = reportGroupRows(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Não informado');
-  const appointmentDistribution = reportAppointmentDistribution(records);
-  const periodSummary = appointmentDistribution.predominantPeriod
-    ? `Predominio: ${appointmentDistribution.predominantPeriod}`
-    : (scheduled ? 'Sem predominio no período' : 'Nenhum agendamento no período');
-  const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${scheduled} agendamento(s) distribuídos por dia`, 'calendar-days', appointmentDistribution.weekdays, scheduled)}
-    ${reportDistributionPanel('Agendamentos por horário', periodSummary, 'clock-3', appointmentDistribution.periods, scheduled, appointmentDistribution.predominantPeriod)}`;
-  const { filters, loading, error, truncated } = state.management;
-  const table = (title, icon, rows) => `<section class="report-panel"><div class="report-panel-heading"><i data-lucide="${icon}"></i><div><h2>${title}</h2><span>${records.length} cadastro(s) no período</span></div></div><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
-
-  return `<section class="reports-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></section>
-    <form id="reports-period" class="dashboard-period-filter">
-      <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Período analisado</span><strong>Defina o intervalo do relatório</strong></div></div>
-      <div class="field"><label for="reports-start">Data inicial</label><input id="reports-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
-      <div class="field"><label for="reports-end">Data final</label><input id="reports-end" name="endDate" type="date" value="${escapeHtml(filters.endDate)}" required /></div>
-      <button class="button button-primary" type="submit" ${loading ? 'disabled' : ''}><i data-lucide="search"></i><span>${loading ? 'Aplicando...' : 'Aplicar período'}</span></button>
-    </form>
-    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O relatório atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o período para obter o resultado completo.</span></div>` : ''}
-    <section class="report-metrics" aria-label="Indicadores do período"><div><span>Cadastros</span><strong>${records.length}</strong><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><i data-lucide="circle-check"></i></div><div><span>Taxa de comparecimento</span><strong>${attendanceRate}%</strong><i data-lucide="bar-chart-3"></i></div></section>
-    ${records.length ? `<section class="report-analysis-grid">${appointmentAnalysis}</section><section class="reports-grid">${table('Resultados por unidade', 'building-2', storeRows)}${table('Resultados por captador', 'users', captorRows)}</section>` : `<div class="empty-state report-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado no período</strong><p>Ajuste o período analisado para ampliar a busca.</p></div>`}`;
-}
-
 function dashboardGroupStats(records, keyFor, labelFor) {
   return [...records.reduce((groups, lead) => {
     const key = keyFor(lead) || 'not-informed';
@@ -1682,18 +1635,28 @@ function dashboardGroupStats(records, keyFor, labelFor) {
   });
 }
 
+function dashboardDistributionRows(items, emptyMessage = 'Nenhum dado informado') {
+  if (!items.length) return `<div class="dashboard-panel-empty">${emptyMessage}</div>`;
+  const tones = ['brand', 'success', 'neutral', 'brand', 'success', 'neutral'];
+  return items.map((item, index) => {
+    const tone = tones[index % tones.length];
+    return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${escapeHtml(item.label)}</strong><span>${item.count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${item.percentage}%"></i></div><small>${item.percentage}% dos cadastros</small></div>`;
+  }).join('');
+}
+
 function dashboardView() {
   if (!hasAccess('dashboard.view')) {
     return `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso ao dashboard.</span></div>`;
   }
 
   const records = filteredReportRecords();
-  const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+  const upcomingRecords = state.demoMode ? state.leads : state.dashboardUpcoming.records;
+  const summary = dashboardSummary(records, upcomingRecords);
+  const scheduled = summary.scheduled;
   const attended = records.filter((lead) => lead.appointmentAttendance === 'attended').length;
   const missed = records.filter((lead) => lead.appointmentAttendance === 'missed').length;
   const pending = Math.max(0, scheduled - attended - missed);
   const attendanceRate = attended + missed ? Math.round((attended / (attended + missed)) * 100) : 0;
-  const appointmentRate = records.length ? Math.round((scheduled / records.length) * 100) : 0;
   const { filters, loading, error, truncated } = state.management;
 
   const dailyData = [...records.reduce((days, lead) => {
@@ -1710,12 +1673,12 @@ function dashboardView() {
 
   const stores = dashboardGroupStats(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId))
     .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'pt-BR'));
-  const storeMax = Math.max(1, ...stores.map((store) => store.total));
-  const storeRows = stores.map((store) => `<div class="dashboard-performance-row"><div><strong>${escapeHtml(store.label)}</strong><span>${store.total} cadastro(s)</span></div><div class="dashboard-progress"><i style="width:${Math.round((store.total / storeMax) * 100)}%"></i></div><strong>${store.attendanceRate}% presença</strong></div>`).join('');
+  const storeTableRows = stores.map((store) => `<tr><td><strong>${escapeHtml(store.label)}</strong></td><td>${store.total}</td><td>${store.scheduled}</td><td>${store.attended}</td><td>${store.missed}</td><td><strong>${store.attendanceRate}%</strong></td></tr>`).join('');
 
   const captors = dashboardGroupStats(records, (lead) => lead.capturedByUid || lead.capturedByName, (lead) => lead.capturedByName || 'Não informado')
     .sort((a, b) => b.total - a.total || b.attendanceRate - a.attendanceRate || a.label.localeCompare(b.label, 'pt-BR'));
   const captorRows = captors.map((captor, index) => `<div class="dashboard-ranking-row"><span>${index + 1}</span><div><strong>${escapeHtml(captor.label)}</strong><small>${captor.scheduled} agendado(s) · ${captor.attended} comparecimento(s)</small></div><strong>${captor.total}</strong></div>`).join('');
+  const captorTableRows = captors.map((captor) => `<tr><td><strong>${escapeHtml(captor.label)}</strong></td><td>${captor.total}</td><td>${captor.scheduled}</td><td>${captor.attended}</td><td>${captor.missed}</td><td><strong>${captor.attendanceRate}%</strong></td></tr>`).join('');
 
   const attendanceItems = [
     ['Compareceram', attended, 'success'],
@@ -1726,7 +1689,37 @@ function dashboardView() {
     return `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos agendamentos</small></div>`;
   }).join('');
 
-  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}${hasAccess('reports.view') ? '<button class="button button-secondary" type="button" data-route="reports"><i data-lucide="clipboard-list"></i><span>Ver relatórios</span></button>' : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
+  const paymentItems = [
+    ['Exames pagos', summary.paidExams, summary.paidExamRate, 'brand'],
+    ['Exames gratuitos', summary.courtesyExams, summary.courtesyExamRate, 'success'],
+    ...(summary.unspecifiedExams ? [['Não informado', summary.unspecifiedExams, summary.unspecifiedExamRate, 'neutral']] : [])
+  ].map(([label, count, percentage, tone]) => `<div class="dashboard-status-row"><div><span class="dashboard-status-dot is-${tone}"></span><strong>${label}</strong><span>${count}</span></div><div class="dashboard-progress is-${tone}"><i style="width:${percentage}%"></i></div><small>${percentage}% dos cadastros</small></div>`).join('');
+  const clinicalRouteItems = dashboardDistributionRows(summary.clinicalRoutes);
+  const pathologyItems = dashboardDistributionRows(summary.pathologies.slice(0, 6), 'Nenhuma patologia informada no período');
+  const ageRangeItems = dashboardDistributionRows(summary.ageRanges);
+  const interestItems = dashboardDistributionRows(summary.interests, 'Nenhum interesse informado no período');
+  const transportDayItems = summary.transportByDay.length
+    ? summary.transportByDay.map((day) => {
+      const label = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+        .format(new Date(`${day.date}T12:00:00`));
+      return `<div class="dashboard-transport-row"><strong>${label}</strong><span><b>${day.clients}</b> cliente(s)</span><span><b>${day.companions}</b> acompanhante(s)</span><span><b>${day.seats}</b> assento(s)</span></div>`;
+    }).join('')
+    : '<div class="dashboard-panel-empty">Nenhum transporte agendado nos próximos 7 dias</div>';
+  const appointmentDistribution = reportAppointmentDistribution(records);
+  const appointmentPeriodSummary = appointmentDistribution.predominantPeriod
+    ? `Predomínio: ${appointmentDistribution.predominantPeriod}`
+    : (scheduled ? 'Sem predomínio no período' : 'Nenhum agendamento no período');
+  const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${scheduled} agendamento(s) distribuído(s) por dia`, 'calendar-days', appointmentDistribution.weekdays, scheduled)}
+    ${reportDistributionPanel('Agendamentos por horário', appointmentPeriodSummary, 'clock-3', appointmentDistribution.periods, scheduled, appointmentDistribution.predominantPeriod)}`;
+
+  const upcomingMetricValue = state.dashboardUpcoming.loading && !state.dashboardUpcoming.loaded
+    ? '...'
+    : summary.upcomingAppointments;
+  const upcomingMetricDetail = state.dashboardUpcoming.error
+    ? 'consulta indisponível'
+    : `${summary.upcomingTransportSeats} assento(s) de transporte`;
+
+  return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><div>${isLocalSavwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${state.savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${state.savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>
     <form id="dashboard-period" class="dashboard-period-filter">
       <div class="dashboard-period-title"><i data-lucide="calendar-days"></i><div><span>Período analisado</span><strong>Defina o intervalo do dashboard</strong></div></div>
       <div class="field"><label for="dashboard-start">Data inicial</label><input id="dashboard-start" name="startDate" type="date" value="${escapeHtml(filters.startDate)}" required /></div>
@@ -1737,8 +1730,10 @@ function dashboardView() {
     ${state.savwin.result ? `<div class="notice notice-success" role="status"><i data-lucide="cloud-check"></i><div><strong>SavWin conectado localmente</strong><span>${state.savwin.result.count} item(ns) encontrados em ${state.savwin.result.osCount} OS no período.</span></div></div>` : ''}
     ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
     ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O dashboard atingiu o limite de ${MANAGEMENT_QUERY_LIMIT} registros. Reduza o período para obter o resultado completo.</span></div>` : ''}
-    <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${records.length}</strong><small>no período</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>${appointmentRate}% dos cadastros</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presença</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
-    ${records.length ? `<section class="dashboard-grid"><article class="dashboard-panel dashboard-trend-panel"><header><div><span>Evolução</span><h2>Cadastros por dia</h2></div><strong>Últimos ${dailyData.length} dia(s) com registros</strong></header><div class="dashboard-chart" aria-label="Gráfico de cadastros por dia">${dailyBars}</div></article><article class="dashboard-panel"><header><div><span>Agenda</span><h2>Situação dos agendamentos</h2></div><strong>${scheduled} total</strong></header><div class="dashboard-status-list">${attendanceItems}</div></article><article class="dashboard-panel"><header><div><span>Unidades</span><h2>Desempenho por loja</h2></div><strong>${stores.length} analisada(s)</strong></header><div class="dashboard-performance-list">${storeRows}</div></article><article class="dashboard-panel"><header><div><span>Equipe</span><h2>Ranking de captadores</h2></div><strong>Por cadastros</strong></header><div class="dashboard-ranking-list">${captorRows}</div></article></section>` : `<div class="empty-state dashboard-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado para exibir</strong><p>Volte para a gestão e ajuste os filtros do período.</p></div>`}`;
+    ${state.dashboardUpcoming.error ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>Não foi possível atualizar a demanda dos próximos 7 dias. Os demais indicadores continuam disponíveis.</span></div>` : ''}
+    ${state.dashboardUpcoming.truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>A demanda futura atingiu o limite de ${APPOINTMENTS_QUERY_LIMIT} agendamentos.</span></div>` : ''}
+    <section class="dashboard-metrics" aria-label="Indicadores do dashboard"><div><span>Cadastros</span><strong>${summary.total}</strong><small>no período</small><i data-lucide="clipboard-list"></i></div><div><span>Agendamentos</span><strong>${scheduled}</strong><small>no período</small><i data-lucide="calendar-days"></i></div><div><span>Aguardando agendamento</span><strong>${summary.awaitingAppointment}</strong><small>${summary.awaitingAppointmentRate}% dos cadastros</small><i data-lucide="clock-3"></i></div><div><span>Taxa de agendamento</span><strong>${summary.appointmentRate}%</strong><small>${scheduled} de ${summary.total} cadastro(s)</small><i data-lucide="target"></i></div><div><span>Necessitam transporte</span><strong>${summary.transportClients}</strong><small>${summary.transportSeats} assento(s) necessário(s)</small><i data-lucide="bus-front"></i></div><div><span>Próximos 7 dias</span><strong>${upcomingMetricValue}</strong><small>${upcomingMetricDetail}</small><i data-lucide="calendar-days"></i></div><div><span>Comparecimentos</span><strong>${attended}</strong><small>${attendanceRate}% de presença</small><i data-lucide="circle-check"></i></div><div><span>Captadores ativos</span><strong>${captors.length}</strong><small>${stores.length} unidade(s)</small><i data-lucide="users"></i></div></section>
+    ${records.length ? `<section class="report-analysis-grid dashboard-appointment-analysis">${appointmentAnalysis}</section><section class="dashboard-grid"><article class="dashboard-panel dashboard-trend-panel"><header><div><span>Evolução</span><h2>Cadastros por dia</h2></div><strong>Últimos ${dailyData.length} dia(s) com registros</strong></header><div class="dashboard-chart" aria-label="Gráfico de cadastros por dia">${dailyBars}</div></article><article class="dashboard-panel"><header><div><span>Agenda</span><h2>Situação dos agendamentos</h2></div><strong>${scheduled} total</strong></header><div class="dashboard-status-list">${attendanceItems}</div></article><article class="dashboard-panel"><header><div><span>Destino clínico</span><h2>Optometrista x Oftalmologista</h2></div><strong>${summary.total} cadastro(s)</strong></header><div class="dashboard-status-list">${clinicalRouteItems}</div></article><article class="dashboard-panel"><header><div><span>Próximos 7 dias</span><h2>Transporte por dia</h2></div><strong>${summary.upcomingTransportSeats} assento(s)</strong></header><div class="dashboard-transport-list">${transportDayItems}</div></article><article class="dashboard-panel"><header><div><span>Saúde ocular</span><h2>Principais patologias</h2></div><strong>${Math.min(summary.pathologies.length, 6)} condição(ões)</strong></header><div class="dashboard-status-list">${pathologyItems}</div></article><article class="dashboard-panel"><header><div><span>Perfil</span><h2>Faixas etárias</h2></div><strong>${summary.total} cadastro(s)</strong></header><div class="dashboard-status-list">${ageRangeItems}</div></article><article class="dashboard-panel"><header><div><span>Demanda</span><h2>Interesses principais</h2></div><strong>${summary.total} cadastro(s)</strong></header><div class="dashboard-status-list">${interestItems}</div></article><article class="dashboard-panel"><header><div><span>Exames</span><h2>Pagos x gratuitos</h2></div><strong>${summary.total} cadastro(s)</strong></header><div class="dashboard-status-list">${paymentItems}</div></article><article class="dashboard-panel"><header><div><span>Unidades</span><h2>Desempenho por unidade</h2></div><strong>${stores.length} analisada(s)</strong></header><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${storeTableRows}</tbody></table></div></article><article class="dashboard-panel"><header><div><span>Equipe</span><h2>Ranking de captadores</h2></div><strong>Por cadastros</strong></header><div class="dashboard-ranking-list">${captorRows}</div></article><article class="dashboard-panel dashboard-wide-panel"><header><div><span>Equipe</span><h2>Resultados por captador</h2></div><strong>${captors.length} analisado(s)</strong></header><div class="report-table-wrap"><table class="report-table"><thead><tr><th>Nome</th><th>Cadastros</th><th>Agendados</th><th>Compareceram</th><th>Faltaram</th><th>Taxa</th></tr></thead><tbody>${captorTableRows}</tbody></table></div></article></section>` : `<div class="empty-state dashboard-empty"><i data-lucide="bar-chart-3"></i><strong>Nenhum dado para exibir</strong><p>Volte para a gestão e ajuste os filtros do período.</p></div>`}`;
 }
 
 function appointmentsView() {
@@ -2538,15 +2533,15 @@ function bottomNav() {
   if (canManage()) items.push(['management', 'bar-chart-3', 'Gestão']);
   const followUpCount = pendingFollowUps().length;
   return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegação principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'reports', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
+    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
       <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
     </button>`).join('')}</nav>`;
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, reports: reportsView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'dashboard', 'reports', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route);
+  const wideLayout = ['management', 'dashboard', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route);
   return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
 }
 
@@ -3042,17 +3037,19 @@ function bindPageEvents() {
     });
   }
 
-  const dashboardPeriodForm = document.querySelector('#dashboard-period, #reports-period');
+  const dashboardPeriodForm = document.querySelector('#dashboard-period');
   dashboardPeriodForm?.addEventListener('submit', (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(dashboardPeriodForm));
     state.management.filters.startDate = values.startDate;
     state.management.filters.endDate = values.endDate;
     state.management.loaded = false;
+    state.dashboardUpcoming.loaded = false;
     state.management.page = 1;
     state.savwin.error = '';
     state.savwin.result = null;
     loadManagementData();
+    loadDashboardUpcomingData();
   });
 
   const appointmentsStore = document.querySelector('#appointments-store');
@@ -3267,7 +3264,7 @@ function bindPageEvents() {
     roleProfileForm.querySelectorAll('[name="permissions"]').forEach((input) => {
       input.addEventListener('change', () => {
         const permissions = new Set([...roleProfileForm.querySelectorAll('[name="permissions"]:checked')].map((item) => item.value));
-        const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
+        const managementDependents = ['followups.team', 'goals.manage', 'dashboard.view', 'leads.export'];
         if (input.checked && managementDependents.includes(input.value)) permissions.add('management.view');
         if (!input.checked && input.value === 'management.view') managementDependents.forEach((permission) => permissions.delete(permission));
         state.settings.roleDraft.permissions = [...permissions];
@@ -3314,6 +3311,7 @@ function bindPageEvents() {
         state.settings.editingRoleId = '';
         state.settings.roleEditorOpen = false;
         if (!state.demoMode) await loadRoleProfilesData();
+        else render();
         showToast('Cargo salvo com sucesso.');
       } catch (error) {
         state.settings.saving = false;
@@ -3351,7 +3349,7 @@ function bindPageEvents() {
       if (input.checked) permissions.add(input.value);
       else permissions.delete(input.value);
 
-      const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
+      const managementDependents = ['followups.team', 'goals.manage', 'dashboard.view', 'leads.export'];
       if (input.checked && managementDependents.includes(input.value)) permissions.add('management.view');
       if (!input.checked && input.value === 'management.view') managementDependents.forEach((permission) => permissions.delete(permission));
       state.settings.detailsRolePermissions = [...permissions];
@@ -4301,10 +4299,52 @@ async function loadManagementData() {
   }
 }
 
+async function loadDashboardUpcomingData() {
+  if (state.route !== 'dashboard' || !hasAccess('dashboard.view')
+    || state.dashboardUpcoming.loading || state.dashboardUpcoming.loaded) return;
+
+  if (state.demoMode) {
+    state.dashboardUpcoming.records = [...state.leads];
+    state.dashboardUpcoming.loaded = true;
+    state.dashboardUpcoming.error = '';
+    state.dashboardUpcoming.truncated = false;
+    render();
+    return;
+  }
+
+  state.dashboardUpcoming.loading = true;
+  state.dashboardUpcoming.error = '';
+  render();
+
+  try {
+    const { startDate, endDate } = upcomingDateRange();
+    const result = await loadUpcomingAppointments(
+      state.profile,
+      startDate,
+      endDate,
+      state.management.filters.storeId
+    );
+    const capturedByUid = state.management.filters.capturedByUid;
+    state.dashboardUpcoming.records = capturedByUid
+      ? result.records.filter((lead) => lead.capturedByUid === capturedByUid)
+      : result.records;
+    state.dashboardUpcoming.truncated = result.truncated;
+    state.dashboardUpcoming.loaded = true;
+  } catch (error) {
+    state.dashboardUpcoming.error = error?.code === 'permission-denied'
+      ? 'Seu perfil não possui permissão para consultar a demanda futura.'
+      : 'Não foi possível consultar a demanda futura.';
+  } finally {
+    state.dashboardUpcoming.loading = false;
+    render();
+  }
+}
+
 function ensureManagementData() {
-  if (['management', 'management-lead', 'dashboard', 'reports'].includes(state.route) && canManage() && !state.management.loaded) {
+  if (['management', 'management-lead', 'dashboard'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
   }
+  loadDashboardUpcomingData();
 }
 
 function existingLeadForDetail() {
@@ -5107,7 +5147,9 @@ async function handleAction(action) {
 
   if (action === 'reload-reports') {
     state.management.loaded = false;
+    state.dashboardUpcoming.loaded = false;
     await loadManagementData();
+    await loadDashboardUpcomingData();
   }
 
   if (action === 'consult-savwin' && canManage() && isLocalSavwinEnabled) {
@@ -5486,6 +5528,7 @@ export async function startApp() {
           }
           state.settings.pendingDeleteRoleId = '';
           if (!state.demoMode) await loadRoleProfilesData();
+          else render();
           showToast('Cargo excluído.');
         } catch (error) {
           state.settings.saving = false;
@@ -5818,9 +5861,12 @@ export async function startApp() {
   window.addEventListener('hashchange', () => {
     const previousRoute = state.route;
     state.route = currentRoute();
-    const managementRoutes = ['management', 'management-lead', 'dashboard', 'reports'];
+    const managementRoutes = ['management', 'management-lead', 'dashboard'];
     if (managementRoutes.includes(state.route) && !managementRoutes.includes(previousRoute)) {
       state.management.loaded = false;
+    }
+    if (state.route === 'dashboard' && previousRoute !== 'dashboard') {
+      state.dashboardUpcoming.loaded = false;
     }
     if (previousRoute === 'management-lead' && state.route !== 'management-lead') {
       state.management.activeLead = null;
@@ -5906,6 +5952,8 @@ export async function startApp() {
         state.management.loaded = false;
         state.management.records = [];
         state.management.activeLead = null;
+        state.dashboardUpcoming.loaded = false;
+        state.dashboardUpcoming.records = [];
         state.access.loaded = false;
         state.goals.loaded = false;
         state.settings.loaded = false;

@@ -1,0 +1,142 @@
+import { calculateAge, INTERESTS, PATHOLOGIES } from './lead.js';
+
+function percentage(count, total) {
+  return total ? Math.round((count / total) * 100) : 0;
+}
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addLocalDays(date, days) {
+  const result = new Date(date);
+  result.setHours(12, 0, 0, 0);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function transportSeatsFor(lead) {
+  if (!lead?.needsTransport) return 0;
+  const configuredSeats = Number(lead.transportSeats);
+  if (Number.isFinite(configuredSeats) && configuredSeats > 0) return configuredSeats;
+  return lead.hasCompanion ? 2 : 1;
+}
+
+function distributionItem(id, label, count, total) {
+  return { id, label, count, percentage: percentage(count, total) };
+}
+
+function ageRangeFor(birthDate, referenceDate) {
+  const age = calculateAge(birthDate, referenceDate);
+  if (age === null) return 'not-informed';
+  if (age <= 39) return 'up-to-39';
+  if (age <= 54) return '40-to-54';
+  if (age <= 64) return '55-to-64';
+  return '65-plus';
+}
+
+export function upcomingDateRange(today = new Date()) {
+  return {
+    startDate: localDateKey(today),
+    endDate: localDateKey(addLocalDays(today, 6))
+  };
+}
+
+export function dashboardSummary(records = [], upcomingRecords = records, today = new Date()) {
+  const total = records.length;
+  const scheduled = records.filter((lead) => lead.appointmentDate && lead.appointmentTime).length;
+  const ophthalmologist = records.filter((lead) => lead.careRoute === 'ophthalmologist').length;
+  const transportRecords = records.filter((lead) => lead.needsTransport);
+  const paidExams = records.filter((lead) => lead.examPaymentType === 'paid').length;
+  const courtesyExams = records.filter((lead) => lead.examPaymentType === 'courtesy').length;
+  const unspecifiedExams = Math.max(0, total - paidExams - courtesyExams);
+  const { startDate, endDate } = upcomingDateRange(today);
+  const upcoming = upcomingRecords.filter((lead) => (
+    lead.appointmentDate >= startDate
+    && lead.appointmentDate <= endDate
+    && lead.appointmentTime
+  ));
+  const upcomingTransport = upcoming.filter((lead) => lead.needsTransport);
+  const clinicalRoutes = [
+    ['optometrist', 'Optometrista'],
+    ['ophthalmologist', 'Oftalmologista'],
+    ['not-informed', 'Não informado']
+  ].map(([id, label]) => distributionItem(
+    id,
+    label,
+    records.filter((lead) => (lead.careRoute || 'not-informed') === id).length,
+    total
+  ));
+  const pathologyCounts = new Map(PATHOLOGIES
+    .filter((item) => !['none', 'unknown'].includes(item.id))
+    .map((item) => [item.id, 0]));
+  records.forEach((lead) => {
+    [...new Set(Array.isArray(lead.pathologyIds) ? lead.pathologyIds : [])].forEach((id) => {
+      if (pathologyCounts.has(id)) pathologyCounts.set(id, pathologyCounts.get(id) + 1);
+    });
+  });
+  const pathologies = PATHOLOGIES
+    .filter((item) => pathologyCounts.has(item.id))
+    .map((item) => distributionItem(item.id, item.label, pathologyCounts.get(item.id), total))
+    .filter((item) => item.count)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR'));
+  const ageRangeDefinitions = [
+    ['up-to-39', 'Até 39 anos'],
+    ['40-to-54', '40 a 54 anos'],
+    ['55-to-64', '55 a 64 anos'],
+    ['65-plus', '65 anos ou mais'],
+    ['not-informed', 'Não informado']
+  ];
+  const ageRanges = ageRangeDefinitions.map(([id, label]) => distributionItem(
+    id,
+    label,
+    records.filter((lead) => ageRangeFor(lead.birthDate, today) === id).length,
+    total
+  ));
+  const interests = INTERESTS.map((item) => distributionItem(
+    item.id || 'not-informed',
+    item.label,
+    records.filter((lead) => (lead.interestId || 'not-informed') === (item.id || 'not-informed')).length,
+    total
+  )).filter((item) => item.count)
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR'));
+  const transportByDay = [...upcomingTransport.reduce((days, lead) => {
+    const current = days.get(lead.appointmentDate) || { date: lead.appointmentDate, clients: 0, companions: 0, seats: 0 };
+    current.clients += 1;
+    current.companions += lead.hasCompanion ? 1 : 0;
+    current.seats += transportSeatsFor(lead);
+    days.set(lead.appointmentDate, current);
+    return days;
+  }, new Map()).values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    total,
+    scheduled,
+    appointmentRate: percentage(scheduled, total),
+    awaitingAppointment: Math.max(0, total - scheduled),
+    awaitingAppointmentRate: percentage(Math.max(0, total - scheduled), total),
+    ophthalmologist,
+    ophthalmologistRate: percentage(ophthalmologist, total),
+    transportClients: transportRecords.length,
+    transportSeats: transportRecords.reduce((sum, lead) => sum + transportSeatsFor(lead), 0),
+    paidExams,
+    paidExamRate: percentage(paidExams, total),
+    courtesyExams,
+    courtesyExamRate: percentage(courtesyExams, total),
+    unspecifiedExams,
+    unspecifiedExamRate: percentage(unspecifiedExams, total),
+    upcomingAppointments: upcoming.length,
+    upcomingTransportClients: upcomingTransport.length,
+    upcomingTransportSeats: upcomingTransport.reduce((sum, lead) => sum + transportSeatsFor(lead), 0),
+    clinicalRoutes,
+    pathologies,
+    ageRanges,
+    interests,
+    transportByDay,
+    upcomingStartDate: startDate,
+    upcomingEndDate: endDate
+  };
+}

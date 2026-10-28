@@ -40,7 +40,7 @@ describe('role profiles', () => {
       'appointments.attendance'
     ]);
     expect(receptionist.permissions).not.toContain('management.view');
-    expect(receptionist.permissions).not.toContain('reports.view');
+    expect(receptionist.permissions).not.toContain('dashboard.view');
     expect(systemRoleProfileForId('system-receptionist')).toBe(receptionist);
     expect(systemRoleProfileForId('missing-profile')).toBeNull();
   });
@@ -66,17 +66,17 @@ describe('role profiles', () => {
     const result = validateRoleProfile({
       name: 'Analista regional',
       scope: 'stores',
-      permissions: ['reports.view']
+      permissions: ['dashboard.view']
     });
 
     expect(result.isValid).toBe(true);
-    expect(result.data.permissions).toEqual(['reports.view', 'management.view']);
+    expect(result.data.permissions).toEqual(['dashboard.view', 'management.view']);
   });
 
   it('normalizes editable system permissions and permits an empty selection', () => {
     expect(normalizeRolePermissions('stores', [])).toEqual([]);
-    expect(normalizeRolePermissions('stores', ['reports.view'])).toEqual(['reports.view', 'management.view']);
-    expect(normalizeRolePermissions('own', ['leads.create', 'reports.view'])).toEqual(['leads.create']);
+    expect(normalizeRolePermissions('stores', ['dashboard.view'])).toEqual(['dashboard.view', 'management.view']);
+    expect(normalizeRolePermissions('own', ['leads.create', 'unknown.permission'])).toEqual(['leads.create']);
   });
 
   it('requires a name and at least one permission', () => {

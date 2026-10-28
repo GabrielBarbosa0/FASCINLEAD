@@ -1862,85 +1862,6 @@ svg {
   white-space: nowrap;
 }
 
-.reports-toolbar {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.report-period {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.report-period svg {
-  width: 20px;
-  color: var(--brand);
-}
-
-.report-period span,
-.report-period strong {
-  display: block;
-}
-
-.report-period span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.report-period strong {
-  margin-top: 3px;
-  font-size: 0.9rem;
-}
-
-.report-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.report-metrics > div {
-  min-height: 112px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px;
-  align-content: center;
-  gap: 5px 12px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.report-metrics span {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
-.report-metrics strong {
-  grid-column: 1;
-  color: var(--brand);
-  font-size: 1.5rem;
-}
-
-.report-metrics svg {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  width: 22px;
-  align-self: center;
-  color: var(--brand);
-}
-
 .report-analysis-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2112,11 +2033,6 @@ svg {
 
 .report-table tbody tr:last-child td {
   border-bottom: 0;
-}
-
-.report-empty {
-  border: 1px dashed var(--line);
-  background: var(--surface);
 }
 
 .dashboard-toolbar {
@@ -2333,8 +2249,56 @@ svg {
 
 .dashboard-status-list,
 .dashboard-performance-list,
-.dashboard-ranking-list {
+.dashboard-ranking-list,
+.dashboard-transport-list {
   padding: 6px 18px 12px;
+}
+
+.dashboard-appointment-analysis {
+  margin-bottom: 18px;
+}
+
+.dashboard-wide-panel {
+  grid-column: 1 / -1;
+}
+
+.dashboard-panel-empty {
+  padding: 24px 18px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.dashboard-transport-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-transport-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-transport-row > strong {
+  grid-column: 1 / -1;
+  color: var(--brand);
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.dashboard-transport-row > span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.67rem;
+}
+
+.dashboard-transport-row b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .dashboard-status-row,
@@ -2378,6 +2342,10 @@ svg {
   background: #83909f;
 }
 
+.dashboard-status-dot.is-brand {
+  background: var(--brand);
+}
+
 .dashboard-status-dot.is-success {
   background: #07856e;
 }
@@ -2415,9 +2383,9 @@ svg {
 
 .dashboard-performance-row {
   display: grid;
-  grid-template-columns: minmax(125px, 0.8fr) minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
 }
 
 .dashboard-performance-row > div:first-child strong,
@@ -2426,7 +2394,15 @@ svg {
 }
 
 .dashboard-performance-row .dashboard-progress {
+  grid-column: 1 / -1;
+  grid-row: 2;
   margin: 0;
+}
+
+.dashboard-performance-row > strong {
+  max-width: 100%;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .dashboard-ranking-row {
@@ -5426,8 +5402,7 @@ svg {
     width: 100%;
   }
 
-  .dashboard-metrics,
-  .report-metrics {
+  .dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5441,10 +5416,6 @@ svg {
 
   .dashboard-trend-panel {
     grid-column: auto;
-  }
-
-  .reports-toolbar .button {
-    flex: 1;
   }
 
   .appointment-create-dialog {
@@ -5994,18 +5965,6 @@ svg {
   .dashboard-performance-row .dashboard-progress {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-
-  .reports-toolbar {
-    flex-direction: column;
-  }
-
-  .reports-toolbar .button {
-    width: 100%;
-  }
-
-  .report-metrics {
-    grid-template-columns: 1fr;
   }
 
   .management-filters {

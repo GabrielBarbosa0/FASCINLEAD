@@ -22,7 +22,6 @@ export const PERMISSION_GROUPS = [
       { id: 'appointments.attendance', label: 'Registrar comparecimento e falta', scopes: ['stores'] },
       { id: 'followups.team', label: 'Acompanhar retornos da equipe', scopes: ['stores'] },
       { id: 'goals.manage', label: 'Criar e editar metas da equipe', scopes: ['stores'] },
-      { id: 'reports.view', label: 'Visualizar relatórios', scopes: ['stores'] },
       { id: 'dashboard.view', label: 'Visualizar dashboard', scopes: ['stores'] },
       { id: 'leads.export', label: 'Exportar leads em CSV', scopes: ['stores'] }
     ]
@@ -56,7 +55,6 @@ const MANAGER_PERMISSIONS = [
   'appointments.attendance',
   'followups.team',
   'goals.manage',
-  'reports.view',
   'dashboard.view',
   'leads.export'
 ];
@@ -107,7 +105,7 @@ export function normalizeRolePermissions(scope, values = []) {
   const allowed = new Set(permissionsForScope(scope));
   const requested = Array.isArray(values) ? values.map(String) : [];
   const permissions = [...new Set(requested.filter((permission) => allowed.has(permission)))];
-  const managementDependents = ['followups.team', 'goals.manage', 'reports.view', 'dashboard.view', 'leads.export'];
+  const managementDependents = ['followups.team', 'goals.manage', 'dashboard.view', 'leads.export'];
   if (permissions.some((permission) => managementDependents.includes(permission)) && allowed.has('management.view') && !permissions.includes('management.view')) {
     permissions.push('management.view');
   }

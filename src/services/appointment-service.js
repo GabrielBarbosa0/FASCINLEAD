@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, limit, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { monthRange } from '../utils/calendar.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
@@ -44,6 +44,36 @@ export function subscribeToAppointments(profile, monthKey, selectedStoreId, onDa
         || String(a.fullName || '').localeCompare(String(b.fullName || ''), 'pt-BR'));
     onData({ records, truncated: snapshot.size > APPOINTMENTS_QUERY_LIMIT });
   }, onError);
+}
+
+export async function loadUpcomingAppointments(profile, startDate, endDate, selectedStoreId = '') {
+  if (!isFirebaseConfigured || !['manager', 'admin'].includes(profile?.role)) {
+    const error = new Error('Demanda futura indisponivel para este perfil.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+  if (selectedStoreId && !canAccessStore(profile, selectedStoreId)) {
+    const error = new Error('Unidade nao autorizada.');
+    error.code = 'permission-denied';
+    throw error;
+  }
+
+  const constraints = [
+    where('appointmentDate', '>=', startDate),
+    where('appointmentDate', '<=', endDate),
+    limit(APPOINTMENTS_QUERY_LIMIT + 1)
+  ];
+  if (selectedStoreId) constraints.unshift(where('storeId', '==', selectedStoreId));
+  else if (profile.role === 'manager') {
+    const storeIds = profileStoreIds(profile);
+    constraints.unshift(where('storeId', storeIds.length === 1 ? '==' : 'in', storeIds.length === 1 ? storeIds[0] : storeIds));
+  }
+
+  const snapshot = await getDocs(query(collection(db, 'leads'), ...constraints));
+  return {
+    records: snapshot.docs.slice(0, APPOINTMENTS_QUERY_LIMIT).map((item) => ({ id: item.id, ...item.data() })),
+    truncated: snapshot.size > APPOINTMENTS_QUERY_LIMIT
+  };
 }
 
 export function subscribeToAppointmentConfirmations(profile, startDate, endDate, onData, onError) {
