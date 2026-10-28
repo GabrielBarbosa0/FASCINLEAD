@@ -3834,6 +3834,7 @@ function bindPageEvents() {
       const enabled = optometristEnabledInput.checked;
       optometristFieldsGroup.disabled = !enabled;
       optometristFieldsGroup.classList.toggle('is-disabled', !enabled);
+      ophthalmologyDialog.scrollTop = 0;
       ophthalmologyDialog.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
         const checked = row.querySelector('[name="optometristWeekday"]').checked;
         row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
@@ -3842,6 +3843,7 @@ function bindPageEvents() {
     const setOphthalmologyFieldsState = () => {
       const enabled = ophthalmologyEnabledInput.checked;
       ophthalmologyFields.classList.toggle('is-disabled', !enabled);
+      ophthalmologyDialog.scrollTop = 0;
     };
     const syncOphthalmologyDraft = () => {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);

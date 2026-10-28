@@ -3125,8 +3125,23 @@ svg {
   width: min(calc(100% - 32px), 760px);
 }
 
+.schedule-rule-dialog {
+  overflow: clip;
+}
+
+.schedule-rule-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-rule-dialog > header,
+.schedule-rule-dialog > footer {
+  flex: 0 0 auto;
+}
+
 .schedule-rule-dialog-body {
   min-height: 0;
+  flex: 0 1 auto;
   padding: 20px;
   overflow-y: auto;
 }
