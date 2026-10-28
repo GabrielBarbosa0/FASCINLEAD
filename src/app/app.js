@@ -2104,7 +2104,7 @@ function serviceCatalogSettingsView() {
     <span class="status-badge status-${service.active ? 'success' : 'neutral'}">${service.active ? 'Ativo' : 'Inativo'}</span>
     <div class="service-catalog-actions">
       <button class="icon-button" type="button" data-service-edit="${escapeHtml(service.id)}" title="Editar serviço" ${saving ? 'disabled' : ''}><i data-lucide="pencil"></i></button>
-      <button class="button button-secondary" type="button" data-service-toggle="${escapeHtml(service.id)}" ${saving ? 'disabled' : ''}><i data-lucide="${service.active ? 'circle-x' : 'circle-check'}"></i><span>${service.active ? 'Desativar' : 'Ativar'}</span></button>
+      <button class="button button-secondary service-toggle-button" type="button" data-service-toggle="${escapeHtml(service.id)}" ${saving ? 'disabled' : ''}><i data-lucide="${service.active ? 'circle-x' : 'circle-check'}"></i><span>${service.active ? 'Desativar' : 'Ativar'}</span></button>
       <button class="icon-button role-delete-button" type="button" data-service-delete="${escapeHtml(service.id)}" title="Excluir serviço" ${saving ? 'disabled' : ''}><i data-lucide="trash-2"></i></button>
     </div>
   </article>`).join('');

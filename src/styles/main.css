@@ -3643,6 +3643,12 @@ svg {
   gap: 8px;
 }
 
+.service-catalog-actions .button.service-toggle-button {
+  width: 144px;
+  flex: 0 0 144px;
+  justify-content: center;
+}
+
 .service-editor-dialog {
   width: min(92vw, 600px);
 }
