@@ -849,13 +849,20 @@ function eyeSurgeryOptions(selectedId = '') {
 function triageConfigFields(settings) {
   return `<input name="ophthalmologyRoutingEnabled" type="hidden" value="${settings.ophthalmologyRoutingEnabled}" />
     <input name="ophthalmologyMinimumAge" type="hidden" value="${settings.ophthalmologyMinimumAge}" />
+    <input name="optometristExamPrice" type="hidden" value="${settings.optometristExamPrice}" />
+    <input name="ophthalmologistExamPrice" type="hidden" value="${settings.ophthalmologistExamPrice}" />
     <input name="transportEnabled" type="hidden" value="${settings.transportEnabled}" />
+    <input name="maxCompanions" type="hidden" value="${settings.maxCompanions}" />
     <input name="transportAllowedWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(settings.transportHoursRules.map((rule) => rule.weekday)))}" />`;
 }
 
 function transportFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefix = 'transport', locked = false) {
   const needsTransport = values.needsTransport === true || values.needsTransport === 'true';
-  const hasCompanion = needsTransport && (values.hasCompanion === true || values.hasCompanion === 'true');
+  const legacyCompanionCount = values.hasCompanion === true || values.hasCompanion === 'true' ? 1 : 0;
+  const companionCount = needsTransport ? Math.min(settings.maxCompanions, Number(values.companionCount ?? legacyCompanionCount) || 0) : 0;
+  const companionOptions = Array.from({ length: settings.maxCompanions + 1 }, (_, count) => (
+    `<option value="${count}" ${companionCount === count ? 'selected' : ''}>${count === 0 ? 'Sem acompanhante' : `${count} ${count === 1 ? 'acompanhante' : 'acompanhantes'}`}</option>`
+  )).join('');
   const appointmentDate = values.appointmentDate || '';
   const hours = appointmentDate ? transportHoursForDate(settings, appointmentDate) : null;
   const status = !needsTransport
@@ -868,10 +875,10 @@ function transportFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefi
           ? `Transporte disponível das ${hours.openingTime} às ${hours.closingTime}.`
           : 'Não há transporte disponível nesta data.';
   return `<section class="transport-section" data-transport-section>
-    ${locked ? `<input type="hidden" name="needsTransport" value="${needsTransport}" /><input type="hidden" name="hasCompanion" value="${hasCompanion}" />` : ''}
+    ${locked ? `<input type="hidden" name="needsTransport" value="${needsTransport}" /><input type="hidden" name="companionCount" value="${companionCount}" />` : ''}
     <div class="field-row transport-fields">
       <div class="field" data-field="needsTransport"><label for="${idPrefix}-needed">Transporte</label><select id="${idPrefix}-needed" name="needsTransport" ${locked ? 'disabled' : ''}><option value="false" ${needsTransport ? '' : 'selected'}>Sem transporte</option><option value="true" ${needsTransport ? 'selected' : ''}>Com transporte</option></select><small class="field-error"></small></div>
-      <div class="field ${needsTransport ? '' : 'is-disabled'}" data-transport-companion data-field="hasCompanion"><label for="${idPrefix}-companion">Tem acompanhante?</label><select id="${idPrefix}-companion" name="hasCompanion" ${locked || !needsTransport ? 'disabled' : ''}><option value="false" ${hasCompanion ? '' : 'selected'}>Não</option><option value="true" ${hasCompanion ? 'selected' : ''}>Sim</option></select><small class="field-help">Limite de 1 acompanhante por cliente.</small><small class="field-error"></small></div>
+      <div class="field ${needsTransport ? '' : 'is-disabled'}" data-transport-companion data-field="companionCount"><label for="${idPrefix}-companion">Quantidade de acompanhantes</label><select id="${idPrefix}-companion" name="companionCount" ${locked || !needsTransport ? 'disabled' : ''}>${companionOptions}</select><small class="field-help">Limite desta loja: ${settings.maxCompanions} acompanhante(s).</small><small class="field-error"></small></div>
     </div>
     <div class="transport-status" data-transport-status ${status ? '' : 'hidden'}><i data-lucide="bus-front"></i><span>${escapeHtml(status)}</span></div>
   </section>`;
@@ -881,14 +888,14 @@ function bindTransportFields(form, settings, onChange = () => {}) {
   const section = form.querySelector('[data-transport-section]');
   if (!section) return;
   const transportInput = section.querySelector('select[name="needsTransport"]');
-  const companionInput = section.querySelector('select[name="hasCompanion"]');
+  const companionInput = section.querySelector('select[name="companionCount"]');
   const companionField = section.querySelector('[data-transport-companion]');
   const status = section.querySelector('[data-transport-status]');
   const refresh = () => {
     const needsTransport = transportInput.value === 'true';
     companionInput.disabled = !needsTransport;
     companionField.classList.toggle('is-disabled', !needsTransport);
-    if (!needsTransport) companionInput.value = 'false';
+    if (!needsTransport) companionInput.value = '0';
     const appointmentDate = form.elements.appointmentDate?.value || '';
     const hours = appointmentDate ? transportHoursForDate(settings, appointmentDate) : null;
     const message = !needsTransport
@@ -912,7 +919,16 @@ function bindTransportFields(form, settings, onChange = () => {}) {
 
 function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefix = 'eye') {
   const triage = ophthalmologyTriage(values, settings);
-  const pricing = examPricing(triage.careRoute, values.examPaymentType);
+  const configuredPricing = examPricing(triage.careRoute, values.examPaymentType, settings);
+  const storedExamPrice = Number(values.examPrice);
+  const pricing = {
+    ...configuredPricing,
+    examPrice: configuredPricing.examPaymentType === 'courtesy'
+      ? 0
+      : Number.isFinite(storedExamPrice) && values.examPrice !== ''
+        ? storedExamPrice
+        : values.id ? examPricing(triage.careRoute, values.examPaymentType).examPrice : configuredPricing.examPrice
+  };
   const selectedPaymentMethods = Array.isArray(values.examPaymentMethods)
     ? values.examPaymentMethods
     : [values.examPaymentMethod].filter(Boolean);
@@ -922,7 +938,8 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefi
   </label>`).join('');
   const showSurgeryQuestion = triage.surgeryQuestionRequired || Boolean(values.eyeSurgeryStatus);
   const showSurgeryType = values.eyeSurgeryStatus === 'yes';
-  return `<section class="eye-triage-section" data-eye-triage>
+  return `<section class="eye-triage-section" data-eye-triage data-initial-care-route="${triage.careRoute}" data-initial-payment-type="${pricing.examPaymentType}" data-initial-exam-price="${pricing.examPrice}" data-preserve-exam-price="${Boolean(values.id)}">
+    <input type="hidden" name="examPrice" value="${pricing.examPrice}" data-exam-price-value />
     <div class="field-row eye-surgery-fields" data-eye-surgery-question ${showSurgeryQuestion ? '' : 'hidden'}>
       <div class="field" data-field="eyeSurgeryStatus">
         <label for="${idPrefix}-surgery-status">Já realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
@@ -955,7 +972,14 @@ function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, idPrefi
 
 function enrichLeadTriage(values, settings) {
   const triage = ophthalmologyTriage(values, settings);
-  const pricing = examPricing(triage.careRoute, values.examPaymentType);
+  const configuredPricing = examPricing(triage.careRoute, values.examPaymentType, settings);
+  const storedExamPrice = Number(values.examPrice);
+  const pricing = {
+    ...configuredPricing,
+    examPrice: configuredPricing.examPaymentType === 'courtesy'
+      ? 0
+      : Number.isFinite(storedExamPrice) && storedExamPrice >= 0 ? storedExamPrice : configuredPricing.examPrice
+  };
   return {
     ...values,
     ophthalmologyRoutingEnabled: settings.ophthalmologyRoutingEnabled,
@@ -964,6 +988,7 @@ function enrichLeadTriage(values, settings) {
     ophthalmologySurgeryIds: settings.ophthalmologySurgeryIds,
     ophthalmologyAllowedWeekdays: settings.ophthalmologyWeekdays,
     transportEnabled: settings.transportEnabled,
+    maxCompanions: settings.maxCompanions,
     transportAllowedWeekdays: settings.transportHoursRules.map((rule) => rule.weekday),
     transportHoursRules: settings.transportHoursRules,
     eyeSurgeryStatus: triage.eyeSurgeryStatus,
@@ -999,7 +1024,14 @@ function bindEyeTriage(form, settings, onChange = () => {}) {
     form.elements.eyeSurgeryDetails.required = values.eyeSurgeryStatus === 'yes' && values.eyeSurgeryType === 'other';
     routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
     routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
-    const pricing = examPricing(triage.careRoute, values.examPaymentType);
+    const configuredPricing = examPricing(triage.careRoute, values.examPaymentType, settings);
+    const preservePrice = section.dataset.preserveExamPrice === 'true'
+      && triage.careRoute === section.dataset.initialCareRoute
+      && configuredPricing.examPaymentType === section.dataset.initialPaymentType;
+    const pricing = {
+      ...configuredPricing,
+      examPrice: preservePrice ? Number(section.dataset.initialExamPrice) : configuredPricing.examPrice
+    };
     const paymentMethodRow = section.querySelector('[data-exam-payment-method-row]');
     const paymentMethodInputs = [...form.querySelectorAll('[name="examPaymentMethods"]')];
     const isCourtesy = pricing.examPaymentType === 'courtesy';
@@ -1009,6 +1041,7 @@ function bindEyeTriage(form, settings, onChange = () => {}) {
       if (isCourtesy) input.checked = false;
     });
     price.textContent = pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    section.querySelector('[data-exam-price-value]').value = String(pricing.examPrice);
     priceDetail.textContent = pricing.examPaymentType === 'courtesy'
       ? 'Cortesia'
       : triage.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista';
@@ -1037,7 +1070,7 @@ const NEW_LEAD_DRAFT_FIELDS = [
   'fullName', 'phone', 'customerRg', 'customerCpf', 'birthDate', 'sex', 'preferredName',
   'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'appointmentServiceId',
   'ametropiaIds', 'pathologyIds', 'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-  'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'needsTransport', 'hasCompanion', 'notes'
+  'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'needsTransport', 'companionCount', 'notes'
 ];
 
 function captureNewLeadDraft(form) {
@@ -1799,7 +1832,7 @@ function appointmentsView() {
       return `<article class="appointment-item">
         <div class="appointment-time"><i data-lucide="clock-3"></i><strong>${escapeHtml(lead.appointmentTime)}</strong></div>
         <div class="appointment-person"><strong>${escapeHtml(lead.fullName)}</strong><span>${escapeHtml(formatBrazilianPhone(lead.phoneSearch))}</span><small>${escapeHtml(lead.appointmentServiceName || 'Exame de vista')} · ${Number(lead.appointmentDurationMinutes) || 20} min</small><small>${escapeHtml(storeLabel(lead.storeId))} · ${escapeHtml(lead.capturedByName || 'Captador não informado')}</small></div>
-        ${lead.needsTransport ? `<div class="appointment-transport"><i data-lucide="bus-front"></i><span>${lead.hasCompanion ? '<strong>Transporte + acompanhante</strong>' : '<strong>Transporte individual</strong>'}</span></div>` : ''}
+        ${lead.needsTransport ? `<div class="appointment-transport"><i data-lucide="bus-front"></i><span><strong>${Number(lead.companionCount ?? (lead.hasCompanion ? 1 : 0)) === 1 ? 'Transporte + acompanhante' : Number(lead.companionCount ?? 0) > 1 ? `Transporte + ${Number(lead.companionCount)} acompanhantes` : 'Transporte individual'}</strong></span></div>` : ''}
         ${hasAccess('appointments.attendance') ? `<div class="appointment-attendance" role="group" aria-label="Comparecimento de ${escapeHtml(lead.fullName)}">
           <button class="attendance-button is-attended ${attendance === 'attended' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="attended" aria-pressed="${attendance === 'attended'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-check"></i><span>Compareceu</span></button>
           <button class="attendance-button is-missed ${attendance === 'missed' ? 'is-active' : ''}" type="button" data-attendance-lead="${escapeHtml(lead.id)}" data-attendance-status="missed" aria-pressed="${attendance === 'missed'}" ${updating ? 'disabled' : ''}><i data-lucide="circle-x"></i><span>Não compareceu</span></button>
@@ -2163,8 +2196,8 @@ function scheduleSettingsView() {
           </div>
           <div class="schedule-config-launch">
             <span class="schedule-config-launch-icon"><i data-lucide="stethoscope"></i></span>
-            <span><strong>Atendimento oftalmológico</strong><small data-ophthalmology-summary>${selected.ophthalmologyRoutingEnabled ? `${selected.ophthalmologyWeekdays.length} ${selected.ophthalmologyWeekdays.length === 1 ? 'dia configurado' : 'dias configurados'}` : 'Desativado'}</small></span>
-            <button class="button button-secondary" type="button" data-ophthalmology-open><i data-lucide="wrench"></i><span>Configurar triagem</span></button>
+            <span><strong>Triagem e valores de consulta</strong><small data-ophthalmology-summary>Optometrista ${selected.optometristExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Oftalmologista ${selected.ophthalmologistExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</small></span>
+            <button class="button button-secondary" type="button" data-ophthalmology-open><i data-lucide="wrench"></i><span>Configurar</span></button>
           </div>
           <div class="schedule-config-launch">
             <span class="schedule-config-launch-icon"><i data-lucide="bus-front"></i></span>
@@ -2185,7 +2218,7 @@ function scheduleSettingsView() {
               <input name="openingTime" type="hidden" value="${selected.openingTime}" />
               <input name="closingTime" type="hidden" value="${selected.closingTime}" />
               <input name="storeHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.storeHoursRules))}" />
-              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="storeHoursRules"><legend>Funcionamento da loja</legend><small>Ative os dias de funcionamento e defina o expediente de cada um.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${storeHoursRuleRows}</div><small class="field-error"></small></fieldset>
+              <div class="schedule-section-divider" aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="storeHoursRules"><legend>Funcionamento da loja</legend><small>Ative os dias de funcionamento e defina o expediente de cada um.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${storeHoursRuleRows}</div><small class="field-error"></small></fieldset>
             </div>
             <div class="schedule-follow-up-times">
               <div class="field schedule-grace-field" data-field="noShowGraceMinutes"><label for="settings-no-show-grace">Alertar atraso após</label><small id="settings-no-show-help" class="field-help">Libera o retorno para perguntar se o cliente está a caminho.</small><div class="number-with-unit"><input id="settings-no-show-grace" name="noShowGraceMinutes" type="number" min="0" max="240" step="5" value="${selected.noShowGraceMinutes}" aria-describedby="settings-no-show-help" /><span>min</span></div><small class="field-error"></small></div>
@@ -2216,7 +2249,7 @@ function scheduleSettingsView() {
               <input id="settings-limited-days" name="limitedDaysEnabled" type="checkbox" value="true" ${selected.limitedDaysEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <fieldset class="field schedule-limit-fields ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedDayRules" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
+            <div class="schedule-section-divider ${selected.limitedDaysEnabled ? '' : 'is-hidden'}" data-limited-days-divider aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-separated-rules ${selected.limitedDaysEnabled ? '' : 'is-disabled'}" data-field="limitedDayRules" ${selected.limitedDaysEnabled ? '' : 'disabled'}>
               <legend>Limite por dia da semana</legend>
               <small>Selecione os dias e informe a capacidade de cada um.</small>
               <div class="schedule-rule-list">${limitedDayRuleRows}</div>
@@ -2235,7 +2268,7 @@ function scheduleSettingsView() {
               <input id="settings-mei-quota-enabled" name="meiQuotaEnabled" type="checkbox" value="true" ${selected.meiQuotaEnabled ? 'checked' : ''} />
               <span class="setting-toggle-control" aria-hidden="true"></span>
             </label>
-            <fieldset class="field schedule-limit-fields ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaRules" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
+            <div class="schedule-section-divider ${selected.meiQuotaEnabled ? '' : 'is-hidden'}" data-mei-quota-divider aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-separated-rules ${selected.meiQuotaEnabled ? '' : 'is-disabled'}" data-field="meiQuotaRules" ${selected.meiQuotaEnabled ? '' : 'disabled'}>
               <legend>Cotas por dia da semana</legend>
               <small>O período e definido pelo horário agendado para o cliente.</small>
               <div class="schedule-rule-list">${meiQuotaRuleRows}</div>
@@ -2246,8 +2279,12 @@ function scheduleSettingsView() {
           <footer><span>As cotas sao individuais para cada MEI.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-mei-quota-close>Cancelar</button><button class="button button-primary" type="button" data-mei-quota-apply><i data-lucide="check"></i><span>Aplicar cotas</span></button></div></footer>
         </dialog>
         <dialog id="ophthalmology-dialog" class="role-details-dialog schedule-rule-dialog" aria-labelledby="ophthalmology-title">
-          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Atendimento oftalmológico</h2><p>Defina quando a triagem deve encaminhar o cliente ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
+          <header><div><span class="eyebrow">AGENDA</span><h2 id="ophthalmology-title">Triagem e valores de consulta</h2><p>Defina os valores dos novos cadastros e quando encaminhar ao oftalmologista.</p></div><button class="icon-button" type="button" data-ophthalmology-close aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
           <div class="schedule-rule-dialog-body">
+            <div class="field-row consultation-price-fields">
+              <div class="field" data-field="optometristExamPrice"><label for="settings-optometrist-price">Consulta com optometrista</label><div class="number-with-unit"><input id="settings-optometrist-price" name="optometristExamPrice" type="number" min="0" max="100000" step="0.01" value="${selected.optometristExamPrice}" /><span>R$</span></div><small class="field-help">Aplicado somente aos novos cadastros.</small><small class="field-error"></small></div>
+              <div class="field" data-field="ophthalmologistExamPrice"><label for="settings-ophthalmologist-price">Consulta com oftalmologista</label><div class="number-with-unit"><input id="settings-ophthalmologist-price" name="ophthalmologistExamPrice" type="number" min="0" max="100000" step="0.01" value="${selected.ophthalmologistExamPrice}" /><span>R$</span></div><small class="field-help">Aplicado somente aos novos cadastros.</small><small class="field-error"></small></div>
+            </div>
             <input name="ophthalmologyRoutingEnabled" type="hidden" value="false" />
             <input name="ophthalmologyWeekdays" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyWeekdays))}" />
             <input name="ophthalmologyHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.ophthalmologyHoursRules))}" />
@@ -2258,7 +2295,7 @@ function scheduleSettingsView() {
             <label class="setting-toggle checkbox-label" for="settings-ophthalmology-enabled"><span><strong>Ativar triagem para oftalmologista</strong><small>Catarata informada na patologia ou na cirurgia direciona para esta agenda.</small></span><input id="settings-ophthalmology-enabled" name="ophthalmologyRoutingEnabled" type="checkbox" value="true" ${selected.ophthalmologyRoutingEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
             <div class="ophthalmology-settings ${selected.ophthalmologyRoutingEnabled ? '' : 'is-disabled'}" data-ophthalmology-fields>
               <div class="field" data-field="ophthalmologyMinimumAge"><label for="settings-ophthalmology-age">Perguntar sobre cirurgia a partir de</label><div class="number-with-unit"><input id="settings-ophthalmology-age" name="ophthalmologyMinimumAge" type="number" min="0" max="120" step="1" value="${selected.ophthalmologyMinimumAge}" /><span>anos</span></div><small class="field-error"></small></div>
-              <fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="ophthalmologyHoursRules"><legend>Escala do oftalmologista</legend><small>Ative os dias e defina o horário específico de cada atendimento.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${ophthalmologyHoursRuleRows}</div><small class="field-error"></small></fieldset>
+              <div class="schedule-section-divider" data-ophthalmology-divider aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-hours-rules" data-field="ophthalmologyHoursRules"><legend>Escala do oftalmologista</legend><small>Ative os dias e defina o horário específico de cada atendimento.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${ophthalmologyHoursRuleRows}</div><small class="field-error"></small></fieldset>
               <div class="notice notice-info ophthalmology-criteria"><i data-lucide="info"></i><span>Critérios iniciais: patologia Catarata ou cirurgia de Catarata. Novos critérios podem ser adicionados depois.</span></div>
             </div>
           </div>
@@ -2269,8 +2306,9 @@ function scheduleSettingsView() {
           <div class="schedule-rule-dialog-body">
             <input name="transportEnabled" type="hidden" value="false" />
             <input name="transportHoursRules" type="hidden" value="${escapeHtml(JSON.stringify(selected.transportHoursRules))}" />
+            <div class="field" data-field="maxCompanions"><label for="settings-max-companions">Máximo de acompanhantes por cliente</label><input id="settings-max-companions" name="maxCompanions" type="number" min="0" max="5" step="1" value="${selected.maxCompanions}" /><small class="field-help">O cadastro permitirá escolher de zero até este limite.</small><small class="field-error"></small></div>
             <label class="setting-toggle checkbox-label" for="settings-transport-enabled"><span><strong>Disponibilizar transporte</strong><small>Permite registrar clientes e acompanhantes que precisam do veículo.</small></span><input id="settings-transport-enabled" name="transportEnabled" type="checkbox" value="true" ${selected.transportEnabled ? 'checked' : ''} /><span class="setting-toggle-control" aria-hidden="true"></span></label>
-            <fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte está disponível.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
+            <div class="schedule-section-divider ${selected.transportEnabled ? '' : 'is-hidden'}" data-transport-divider aria-hidden="true"></div><fieldset class="field schedule-limit-fields schedule-hours-rules ${selected.transportEnabled ? '' : 'is-disabled'}" data-field="transportHoursRules" data-transport-fields ${selected.transportEnabled ? '' : 'disabled'}><legend>Disponibilidade semanal</legend><small>Ative os dias e informe a faixa em que o transporte está disponível.</small><div class="schedule-hours-rule-header" aria-hidden="true"><span>Dia</span><span>Início</span><span>Fim</span></div><div class="schedule-rule-list">${transportHoursRuleRows}</div><small class="field-error"></small></fieldset>
           </div>
           <footer><span>Não define viagens nem fechamento do veículo.</span><div class="role-details-actions"><button class="button button-secondary" type="button" data-transport-close>Cancelar</button><button class="button button-primary" type="button" data-transport-apply><i data-lucide="check"></i><span>Aplicar transporte</span></button></div></footer>
         </dialog>
@@ -3591,6 +3629,7 @@ function bindPageEvents() {
       });
       limitedDaysFields.disabled = !record.limitedDaysEnabled;
       limitedDaysFields.classList.toggle('is-disabled', !record.limitedDaysEnabled);
+      limitedDaysDialog.querySelector('[data-limited-days-divider]')?.classList.toggle('is-hidden', !record.limitedDaysEnabled);
       setFieldErrors(limitedDaysDialog, {});
     };
     const discardLimitedDaysDraft = () => {
@@ -3612,6 +3651,7 @@ function bindPageEvents() {
     limitedDaysEnabledInput?.addEventListener('change', () => {
       limitedDaysFields.disabled = !limitedDaysEnabledInput.checked;
       limitedDaysFields.classList.toggle('is-disabled', !limitedDaysEnabledInput.checked);
+      limitedDaysDialog.querySelector('[data-limited-days-divider]')?.classList.toggle('is-hidden', !limitedDaysEnabledInput.checked);
       limitedDaysDialog.querySelectorAll('[data-limited-day-row]').forEach((row) => {
         const checked = row.querySelector('[name="limitedDayWeekday"]').checked;
         row.querySelector('input[type="number"]').disabled = !limitedDaysEnabledInput.checked || !checked;
@@ -3682,6 +3722,7 @@ function bindPageEvents() {
       });
       meiQuotaFields.disabled = !record.meiQuotaEnabled;
       meiQuotaFields.classList.toggle('is-disabled', !record.meiQuotaEnabled);
+      meiQuotaDialog.querySelector('[data-mei-quota-divider]')?.classList.toggle('is-hidden', !record.meiQuotaEnabled);
       setFieldErrors(meiQuotaDialog, {});
     };
     const discardMeiQuotaDraft = () => {
@@ -3703,6 +3744,7 @@ function bindPageEvents() {
     meiQuotaEnabledInput?.addEventListener('change', () => {
       meiQuotaFields.disabled = !meiQuotaEnabledInput.checked;
       meiQuotaFields.classList.toggle('is-disabled', !meiQuotaEnabledInput.checked);
+      meiQuotaDialog.querySelector('[data-mei-quota-divider]')?.classList.toggle('is-hidden', !meiQuotaEnabledInput.checked);
       meiQuotaDialog.querySelectorAll('[data-mei-day-row]').forEach((row) => {
         const checked = row.querySelector('[name="meiQuotaWeekday"]').checked;
         row.querySelectorAll('input[type="number"]').forEach((input) => {
@@ -3771,6 +3813,8 @@ function bindPageEvents() {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       if (!record || !ophthalmologyDialog) return;
       ophthalmologyEnabledInput.checked = record.ophthalmologyRoutingEnabled;
+      scheduleSettingsForm.elements.optometristExamPrice.value = record.optometristExamPrice;
+      scheduleSettingsForm.elements.ophthalmologistExamPrice.value = record.ophthalmologistExamPrice;
       scheduleSettingsForm.elements.ophthalmologyMinimumAge.value = record.ophthalmologyMinimumAge;
       scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = record.ophthalmologyOpeningTime;
       scheduleSettingsForm.elements.ophthalmologyClosingTime.value = record.ophthalmologyClosingTime;
@@ -3830,6 +3874,8 @@ function bindPageEvents() {
       };
       const candidate = {
         ophthalmologyRoutingEnabled: enabled,
+        optometristExamPrice: Number(scheduleSettingsForm.elements.optometristExamPrice.value),
+        ophthalmologistExamPrice: Number(scheduleSettingsForm.elements.ophthalmologistExamPrice.value),
         ophthalmologyMinimumAge: Number(scheduleSettingsForm.elements.ophthalmologyMinimumAge.value),
         ophthalmologyWeekdays: ophthalmologyHoursRules.map((rule) => rule.weekday),
         ophthalmologyOpeningTime: primaryHours.openingTime,
@@ -3840,7 +3886,9 @@ function bindPageEvents() {
       };
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       const validation = validateStoreSchedule({ ...record, ...candidate });
-      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => name.startsWith('ophthalmology')));
+      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => (
+        name.startsWith('ophthalmology') || ['optometristExamPrice', 'ophthalmologistExamPrice'].includes(name)
+      )));
       setFieldErrors(ophthalmologyDialog, errors);
       if (Object.keys(errors).length) return;
       Object.assign(record, candidate);
@@ -3848,9 +3896,7 @@ function bindPageEvents() {
       ophthalmologyDialog.querySelector('[name="ophthalmologyHoursRules"]').value = JSON.stringify(ophthalmologyHoursRules);
       scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = primaryHours.openingTime;
       scheduleSettingsForm.elements.ophthalmologyClosingTime.value = primaryHours.closingTime;
-      document.querySelector('[data-ophthalmology-summary]').textContent = enabled
-        ? `${ophthalmologyHoursRules.length} ${ophthalmologyHoursRules.length === 1 ? 'dia configurado' : 'dias configurados'}`
-        : 'Desativado';
+      document.querySelector('[data-ophthalmology-summary]').textContent = `Optometrista ${candidate.optometristExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Oftalmologista ${candidate.ophthalmologistExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
       ophthalmologyDialog.close();
     });
     const transportDialog = document.querySelector('#transport-dialog');
@@ -3860,6 +3906,7 @@ function bindPageEvents() {
       const enabled = transportEnabledInput.checked;
       transportFieldsGroup.disabled = !enabled;
       transportFieldsGroup.classList.toggle('is-disabled', !enabled);
+      transportDialog.querySelector('[data-transport-divider]')?.classList.toggle('is-hidden', !enabled);
       transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
         const checked = row.querySelector('[name="transportWeekday"]').checked;
         row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
@@ -3869,6 +3916,7 @@ function bindPageEvents() {
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       if (!record || !transportDialog) return;
       transportEnabledInput.checked = record.transportEnabled;
+      scheduleSettingsForm.elements.maxCompanions.value = record.maxCompanions;
       transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(record.transportHoursRules);
       transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
         const weekday = Number(row.dataset.transportHoursRow);
@@ -3916,12 +3964,18 @@ function bindPageEvents() {
         };
       });
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      const candidate = { ...record, transportEnabled: enabled, transportHoursRules: rules };
+      const candidate = {
+        ...record,
+        transportEnabled: enabled,
+        transportHoursRules: rules,
+        maxCompanions: Number(scheduleSettingsForm.elements.maxCompanions.value)
+      };
       const validation = validateStoreSchedule(candidate);
       const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => name.startsWith('transport')));
       setFieldErrors(transportDialog, errors);
       if (Object.keys(errors).length) return;
       record.transportEnabled = enabled;
+      record.maxCompanions = candidate.maxCompanions;
       if (enabled) record.transportHoursRules = rules;
       transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(enabled ? rules : record.transportHoursRules);
       document.querySelector('[data-transport-summary]').textContent = enabled
@@ -3970,6 +4024,9 @@ function bindPageEvents() {
       values.ophthalmologyRoutingEnabled = values.ophthalmologyRoutingEnabled === 'true';
       values.transportEnabled = values.transportEnabled === 'true';
       values.offlineCaptureEnabled = values.offlineCaptureEnabled === 'true';
+      values.optometristExamPrice = Number(values.optometristExamPrice);
+      values.ophthalmologistExamPrice = Number(values.ophthalmologistExamPrice);
+      values.maxCompanions = Number(values.maxCompanions);
       const current = state.settings.records.find((item) => item.id === values.storeId) || DEFAULT_STORE_SCHEDULE;
       values.appointmentDurationMinutes = current.appointmentDurationMinutes;
       values.storeHoursRules = JSON.parse(values.storeHoursRules || '[]');
@@ -4027,7 +4084,10 @@ function bindPageEvents() {
             ophthalmologyHoursRules: values.ophthalmologyHoursRules,
             ophthalmologyPathologyIds: values.ophthalmologyPathologyIds,
             ophthalmologySurgeryIds: values.ophthalmologySurgeryIds,
+            optometristExamPrice: values.optometristExamPrice,
+            ophthalmologistExamPrice: values.ophthalmologistExamPrice,
             transportEnabled: values.transportEnabled,
+            maxCompanions: values.maxCompanions,
             transportHoursRules: values.transportHoursRules,
             offlineCaptureEnabled: values.offlineCaptureEnabled
           });
@@ -4046,6 +4106,8 @@ function bindPageEvents() {
           const record = state.settings.records.find((item) => item.id === values.storeId);
           Object.assign(record, result.data);
           if (values.storeId === state.profile.storeId) {
+            state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...result.data };
+            state.followUps.settings = { ...state.followUps.settings, ...result.data };
             state.offlineCapture = { loaded: true, enabled: result.data.offlineCaptureEnabled };
           }
         }

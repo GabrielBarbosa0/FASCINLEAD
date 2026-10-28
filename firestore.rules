@@ -130,8 +130,8 @@ service cloud.firestore {
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'careRouteReasons',
-          'examPaymentType', 'examPaymentMethods',
-          'needsTransport', 'hasCompanion', 'transportSeats',
+          'examPaymentType', 'examPaymentMethods', 'examPrice',
+          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
@@ -156,15 +156,22 @@ service cloud.firestore {
         ))
         && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
         && (!('addressReference' in data) || (data.addressReference is string && data.addressReference.size() <= 160))
+        && (!('examPrice' in data) || (data.examPrice is number && data.examPrice >= 0 && data.examPrice <= 100000))
         && data.birthDate is string
         && data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
         && (!('needsTransport' in data) || data.needsTransport is bool)
         && (!('hasCompanion' in data) || data.hasCompanion is bool)
+        && (!('companionCount' in data) || (data.companionCount is int
+          && data.companionCount >= 0 && data.companionCount <= 5))
         && (!('transportSeats' in data) || (data.transportSeats is int
-          && data.transportSeats >= 0 && data.transportSeats <= 2))
+          && data.transportSeats >= 0 && data.transportSeats <= 6))
         && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
-        && (!('needsTransport' in data) || !('transportSeats' in data)
-          || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
+        && (!('needsTransport' in data) || !('transportSeats' in data) || !('hasCompanion' in data)
+          || data.transportSeats == (data.needsTransport
+            ? (('companionCount' in data) ? data.companionCount + 1 : (data.hasCompanion ? 2 : 1))
+            : 0))
+        && (!('companionCount' in data) || !('hasCompanion' in data)
+          || data.hasCompanion == (data.companionCount > 0))
         && data.notes is string
         && data.notes.size() <= 500
         && (!('appointmentDate' in data) || (
@@ -270,13 +277,20 @@ service cloud.firestore {
         && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
         && (!('careRouteReasons' in data) || (data.careRouteReasons is list
           && data.careRouteReasons.hasOnly(['pathology', 'surgery', 'manual'])))
+        && (!('examPrice' in data) || (data.examPrice is number && data.examPrice >= 0 && data.examPrice <= 100000))
         && (!('needsTransport' in data) || data.needsTransport is bool)
         && (!('hasCompanion' in data) || data.hasCompanion is bool)
+        && (!('companionCount' in data) || (data.companionCount is int
+          && data.companionCount >= 0 && data.companionCount <= 5))
         && (!('transportSeats' in data) || (data.transportSeats is int
-          && data.transportSeats >= 0 && data.transportSeats <= 2))
+          && data.transportSeats >= 0 && data.transportSeats <= 6))
         && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
         && (!('needsTransport' in data) || !('hasCompanion' in data) || !('transportSeats' in data)
-          || data.transportSeats == (data.needsTransport ? (data.hasCompanion ? 2 : 1) : 0))
+          || data.transportSeats == (data.needsTransport
+            ? (('companionCount' in data) ? data.companionCount + 1 : (data.hasCompanion ? 2 : 1))
+            : 0))
+        && (!('companionCount' in data) || !('hasCompanion' in data)
+          || data.hasCompanion == (data.companionCount > 0))
         && (!('street' in data) || (data.street is string && data.street.size() <= 120))
         && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
         && (!('addressReference' in data) || (data.addressReference is string && data.addressReference.size() <= 160))
@@ -347,8 +361,8 @@ service cloud.firestore {
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods',
-          'needsTransport', 'hasCompanion', 'transportSeats',
+          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
+          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
           'appointmentAttendance', 'notes', 'updatedAtServer'
@@ -481,8 +495,8 @@ service cloud.firestore {
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods',
-          'needsTransport', 'hasCompanion', 'transportSeats',
+          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
+          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
           'appointmentAttendance', 'notes', 'updatedAtServer'

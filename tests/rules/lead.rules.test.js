@@ -473,6 +473,7 @@ describe('lead correction rules', () => {
       careRouteOverride: 'automatic',
       examPaymentType: 'paid',
       examPaymentMethods: ['pix', 'cash'],
+      examPrice: 275,
       updatedAtServer: Timestamp.now()
     }));
     const result = createLeadDocument({
@@ -505,6 +506,22 @@ describe('lead correction rules', () => {
       examPaymentType: 'courtesy',
       examPaymentMethods: ['cash'],
       createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('accepts companion quantities and rejects inconsistent seat totals', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      needsTransport: true,
+      hasCompanion: true,
+      companionCount: 2,
+      transportSeats: 3,
+      updatedAtServer: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      companionCount: 2,
+      transportSeats: 2,
       updatedAtServer: Timestamp.now()
     }));
   });

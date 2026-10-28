@@ -129,6 +129,7 @@ describe('lead validation', () => {
       pathologyLabels: ['Glaucoma', 'Diabetes'],
       examPaymentType: 'paid',
       examPaymentMethods: ['pix', 'cash'],
+      examPrice: 150,
       source: 'street',
       capturedAtClient: '2026-09-28T12:00:00.000Z',
       capturedByUid: 'user-test',
@@ -153,8 +154,35 @@ describe('lead validation', () => {
     expect(result.data).toMatchObject({
       needsTransport: true,
       hasCompanion: true,
+      companionCount: 1,
       transportSeats: 2
     });
+  });
+
+  it('stores the configured consultation price as a lead snapshot', () => {
+    const result = createLeadDocument({
+      ...validInput,
+      pathologyIds: [],
+      optometristExamPrice: 300,
+      examPrice: 300
+    }, profile, 'installation-test');
+
+    expect(result.data.examPrice).toBe(300);
+    expect(createLeadUpdate({ ...validInput, pathologyIds: [], examPrice: 200 }).data.examPrice).toBe(200);
+  });
+
+  it('supports more than one companion within the store limit', () => {
+    const result = createLeadDocument({
+      ...validInput,
+      needsTransport: 'true',
+      companionCount: '2',
+      maxCompanions: 2,
+      transportEnabled: true,
+      transportAllowedWeekdays: [5]
+    }, profile, 'installation-test');
+
+    expect(result.data).toMatchObject({ companionCount: 2, hasCompanion: true, transportSeats: 3 });
+    expect(validateLeadInput({ ...validInput, needsTransport: true, companionCount: 2, maxCompanions: 1 }).errors.companionCount).toBeDefined();
   });
 
   it('blocks transport on dates without configured availability', () => {

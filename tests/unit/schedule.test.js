@@ -34,7 +34,10 @@ describe('store schedule helpers', () => {
       ],
       ophthalmologyPathologyIds: ['cataract'],
       ophthalmologySurgeryIds: ['cataract'],
+      optometristExamPrice: 150,
+      ophthalmologistExamPrice: 200,
       transportEnabled: false,
+      maxCompanions: 1,
       transportHoursRules: [],
       limitedDaysEnabled: false,
       limitedWeekdays: [3, 6],
@@ -422,5 +425,26 @@ describe('store schedule helpers', () => {
       limitedDayRules: expect.any(String),
       meiQuotaRules: expect.any(String)
     }));
+  });
+
+  it('normalizes and validates store-specific prices and companion limits', () => {
+    expect(normalizeStoreSchedule({
+      optometristExamPrice: 225.5,
+      ophthalmologistExamPrice: 310,
+      maxCompanions: 3
+    })).toMatchObject({
+      optometristExamPrice: 225.5,
+      ophthalmologistExamPrice: 310,
+      maxCompanions: 3
+    });
+    expect(validateStoreSchedule({
+      optometristExamPrice: -1,
+      ophthalmologistExamPrice: 100001,
+      maxCompanions: 6
+    }).errors).toMatchObject({
+      optometristExamPrice: expect.any(String),
+      ophthalmologistExamPrice: expect.any(String),
+      maxCompanions: expect.any(String)
+    });
   });
 });

@@ -73,11 +73,17 @@ export function examPaymentMethodsLabel(values) {
   return labels.length ? labels.join(' + ') : 'A definir';
 }
 
-export function examPricing(careRoute, paymentType = 'paid') {
+export function examPricing(careRoute, paymentType = 'paid', settings = {}) {
   const examPaymentType = paymentType === 'courtesy' ? 'courtesy' : 'paid';
+  const configuredPrice = Number(careRoute === 'ophthalmologist'
+    ? settings.ophthalmologistExamPrice
+    : settings.optometristExamPrice);
+  const defaultPrice = EXAM_PRICES[careRoute] || EXAM_PRICES.optometrist;
   return {
     examPaymentType,
-    examPrice: examPaymentType === 'courtesy' ? 0 : EXAM_PRICES[careRoute] || EXAM_PRICES.optometrist
+    examPrice: examPaymentType === 'courtesy'
+      ? 0
+      : Number.isFinite(configuredPrice) && configuredPrice >= 0 ? configuredPrice : defaultPrice
   };
 }
 
@@ -212,7 +218,14 @@ export function validateLeadInput(input, options = {}) {
   const birthDate = String(input.birthDate || '').trim();
   const sex = String(input.sex || '').trim();
   const needsTransport = booleanValue(input.needsTransport);
-  const hasCompanion = needsTransport && booleanValue(input.hasCompanion);
+  const maxCompanions = Number(input.maxCompanions ?? 1);
+  const requestedCompanionCount = input.companionCount === undefined || input.companionCount === ''
+    ? (booleanValue(input.hasCompanion) ? 1 : 0)
+    : Number(input.companionCount);
+  const companionCount = needsTransport && Number.isInteger(requestedCompanionCount)
+    ? requestedCompanionCount
+    : 0;
+  const hasCompanion = companionCount > 0;
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
   if (fullName.length > 120) errors.fullName = 'Use no máximo 120 caracteres.';
@@ -229,6 +242,11 @@ export function validateLeadInput(input, options = {}) {
   if (normalizeStreetNumber(input.streetNumber).length > 12) errors.streetNumber = 'Use no máximo 12 caracteres.';
   if ((input.addressReference?.trim().length || 0) > 160) errors.addressReference = 'Use no máximo 160 caracteres.';
   if ((input.notes?.trim().length || 0) > 500) errors.notes = 'Use no máximo 500 caracteres.';
+  if (!Number.isInteger(requestedCompanionCount) || requestedCompanionCount < 0 || requestedCompanionCount > 5) {
+    errors.companionCount = 'Informe uma quantidade válida de acompanhantes.';
+  } else if (needsTransport && Number.isInteger(maxCompanions) && requestedCompanionCount > maxCompanions) {
+    errors.companionCount = `Esta loja permite no máximo ${maxCompanions} acompanhante(s).`;
+  }
 
   const triage = ophthalmologyTriage(input, {
     ophthalmologyRoutingEnabled: input.ophthalmologyRoutingEnabled,
@@ -236,7 +254,16 @@ export function validateLeadInput(input, options = {}) {
     ophthalmologyPathologyIds: input.ophthalmologyPathologyIds,
     ophthalmologySurgeryIds: input.ophthalmologySurgeryIds
   });
-  const pricing = examPricing(triage.careRoute, input.examPaymentType);
+  const configuredPricing = examPricing(triage.careRoute, input.examPaymentType, input);
+  const requestedExamPrice = Number(input.examPrice);
+  const pricing = {
+    ...configuredPricing,
+    examPrice: configuredPricing.examPaymentType === 'courtesy'
+      ? 0
+      : Number.isFinite(requestedExamPrice) && requestedExamPrice >= 0 && requestedExamPrice <= 100000
+        ? requestedExamPrice
+        : configuredPricing.examPrice
+  };
   const requestedPaymentMethods = Array.isArray(input.examPaymentMethods)
     ? input.examPaymentMethods.map(String)
     : [input.examPaymentMethods ?? input.examPaymentMethod].filter(Boolean).map(String);
@@ -310,7 +337,8 @@ export function validateLeadInput(input, options = {}) {
     sex,
     needsTransport,
     hasCompanion,
-    transportSeats: needsTransport ? (hasCompanion ? 2 : 1) : 0,
+    companionCount,
+    transportSeats: needsTransport ? companionCount + 1 : 0,
     triage,
     pricing,
     examPaymentMethods
@@ -353,8 +381,10 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       careRouteReasons: Array.isArray(input.careRouteReasons) ? input.careRouteReasons : [],
       examPaymentType: validation.pricing.examPaymentType,
       examPaymentMethods: validation.examPaymentMethods,
+      examPrice: validation.pricing.examPrice,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
+      companionCount: validation.companionCount,
       transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',
@@ -412,8 +442,10 @@ export function createLeadUpdate(input) {
       careRouteOverride: validation.triage.careRouteOverride,
       examPaymentType: validation.pricing.examPaymentType,
       examPaymentMethods: validation.examPaymentMethods,
+      examPrice: validation.pricing.examPrice,
       needsTransport: validation.needsTransport,
       hasCompanion: validation.hasCompanion,
+      companionCount: validation.companionCount,
       transportSeats: validation.transportSeats,
       appointmentDate: input.appointmentDate?.trim() || '',
       appointmentTime: input.appointmentTime?.trim() || '',

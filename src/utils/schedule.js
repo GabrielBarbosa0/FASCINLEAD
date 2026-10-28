@@ -18,7 +18,10 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
   ]),
   ophthalmologyPathologyIds: Object.freeze(['cataract']),
   ophthalmologySurgeryIds: Object.freeze(['cataract']),
+  optometristExamPrice: 150,
+  ophthalmologistExamPrice: 200,
   transportEnabled: false,
+  maxCompanions: 1,
   transportHoursRules: Object.freeze([]),
   limitedDaysEnabled: false,
   limitedWeekdays: Object.freeze([3, 6]),
@@ -142,6 +145,9 @@ function normalizeMeiQuotaRules(value, legacyWeekdays, morningQuota, afternoonQu
 
 export function normalizeStoreSchedule(value = {}) {
   const duration = Number(value.appointmentDurationMinutes);
+  const optometristExamPrice = Number(value.optometristExamPrice ?? DEFAULT_STORE_SCHEDULE.optometristExamPrice);
+  const ophthalmologistExamPrice = Number(value.ophthalmologistExamPrice ?? DEFAULT_STORE_SCHEDULE.ophthalmologistExamPrice);
+  const maxCompanions = Number(value.maxCompanions ?? DEFAULT_STORE_SCHEDULE.maxCompanions);
   const noShowGrace = Number(value.noShowGraceMinutes);
   const normalizedNoShowGrace = Number.isInteger(noShowGrace) && noShowGrace >= 0 && noShowGrace <= 240
     ? noShowGrace
@@ -237,7 +243,16 @@ export function normalizeStoreSchedule(value = {}) {
     ophthalmologySurgeryIds: Array.isArray(value.ophthalmologySurgeryIds)
       ? [...new Set(value.ophthalmologySurgeryIds.map(String).filter(Boolean))]
       : [...DEFAULT_STORE_SCHEDULE.ophthalmologySurgeryIds],
+    optometristExamPrice: Number.isFinite(optometristExamPrice) && optometristExamPrice >= 0 && optometristExamPrice <= 100000
+      ? optometristExamPrice
+      : DEFAULT_STORE_SCHEDULE.optometristExamPrice,
+    ophthalmologistExamPrice: Number.isFinite(ophthalmologistExamPrice) && ophthalmologistExamPrice >= 0 && ophthalmologistExamPrice <= 100000
+      ? ophthalmologistExamPrice
+      : DEFAULT_STORE_SCHEDULE.ophthalmologistExamPrice,
     transportEnabled: value.transportEnabled === true || value.transportEnabled === 'true',
+    maxCompanions: Number.isInteger(maxCompanions) && maxCompanions >= 0 && maxCompanions <= 5
+      ? maxCompanions
+      : DEFAULT_STORE_SCHEDULE.maxCompanions,
     transportHoursRules,
     limitedDaysEnabled: value.limitedDaysEnabled === true || value.limitedDaysEnabled === 'true',
     limitedDayRules,
@@ -302,6 +317,9 @@ export function validateStoreSchedule(value) {
       closingTime: value.ophthalmologyClosingTime
     }));
   const transportEnabled = value.transportEnabled === true || value.transportEnabled === 'true';
+  const optometristExamPrice = Number(value.optometristExamPrice ?? DEFAULT_STORE_SCHEDULE.optometristExamPrice);
+  const ophthalmologistExamPrice = Number(value.ophthalmologistExamPrice ?? DEFAULT_STORE_SCHEDULE.ophthalmologistExamPrice);
+  const maxCompanions = Number(value.maxCompanions ?? DEFAULT_STORE_SCHEDULE.maxCompanions);
   const rawTransportHoursRules = Array.isArray(value.transportHoursRules) ? value.transportHoursRules : [];
   const validStoreHoursRules = normalizeHoursRules(rawStoreHoursRules, [], '', '');
   const validOphthalmologyHoursRules = normalizeHoursRules(rawOphthalmologyHoursRules, [], '', '');
@@ -359,6 +377,16 @@ export function validateStoreSchedule(value) {
   }
   if (transportEnabled && (!rawTransportHoursRules.length || validTransportHoursRules.length !== rawTransportHoursRules.length)) {
     errors.transportHoursRules = 'Configure ao menos um dia com horários válidos para o transporte.';
+  }
+
+  if (!Number.isFinite(optometristExamPrice) || optometristExamPrice < 0 || optometristExamPrice > 100000) {
+    errors.optometristExamPrice = 'Informe um valor entre R$ 0,00 e R$ 100.000,00.';
+  }
+  if (!Number.isFinite(ophthalmologistExamPrice) || ophthalmologistExamPrice < 0 || ophthalmologistExamPrice > 100000) {
+    errors.ophthalmologistExamPrice = 'Informe um valor entre R$ 0,00 e R$ 100.000,00.';
+  }
+  if (!Number.isInteger(maxCompanions) || maxCompanions < 0 || maxCompanions > 5) {
+    errors.maxCompanions = 'Informe um limite entre 0 e 5 acompanhantes.';
   }
 
   return { data: schedule, errors, isValid: Object.keys(errors).length === 0 };

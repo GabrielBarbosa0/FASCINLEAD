@@ -1516,10 +1516,10 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByRole('button', { name: 'Novo', exact: true }).click();
   await page.getByLabel('Loja de destino').selectOption('loja-06');
   await expect(page.getByRole('group', { name: 'Ametropias' })).toBeVisible();
-  await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
+  await expect(page.getByLabel('Quantidade de acompanhantes')).toBeDisabled();
   await page.getByLabel('Transporte', { exact: true }).selectOption('true');
-  await expect(page.getByLabel('Tem acompanhante?')).toBeEnabled();
-  await page.getByLabel('Tem acompanhante?').selectOption('true');
+  await expect(page.getByLabel('Quantidade de acompanhantes')).toBeEnabled();
+  await page.getByLabel('Quantidade de acompanhantes').selectOption('1');
   await page.getByLabel('Data do pré-agendamento').fill('2026-10-24');
   await expect(page.getByText('Transporte disponível das 08:00 às 12:00.')).toBeVisible();
   await expect(page.getByLabel('Horário disponível').locator('option[value="08:00"]')).toHaveCount(1);
@@ -1527,7 +1527,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await expect(page.getByLabel('Horário disponível').locator('option[value="12:00"]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('transport-lead-fields.png'), fullPage: true });
   await page.getByLabel('Transporte', { exact: true }).selectOption('false');
-  await expect(page.getByLabel('Tem acompanhante?')).toBeDisabled();
+  await expect(page.getByLabel('Quantidade de acompanhantes')).toBeDisabled();
   const date = new Date();
   date.setDate(date.getDate() + 1);
   const appointmentDate = date.toISOString().slice(0, 10);

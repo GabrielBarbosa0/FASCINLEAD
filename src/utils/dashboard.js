@@ -25,6 +25,12 @@ function transportSeatsFor(lead) {
   return lead.hasCompanion ? 2 : 1;
 }
 
+function companionCountFor(lead) {
+  const count = Number(lead?.companionCount);
+  if (Number.isInteger(count) && count >= 0) return count;
+  return lead?.hasCompanion ? 1 : 0;
+}
+
 function distributionItem(id, label, count, total) {
   return { id, label, count, percentage: percentage(count, total) };
 }
@@ -106,7 +112,7 @@ export function dashboardSummary(records = [], upcomingRecords = records, today 
   const transportByDay = [...upcomingTransport.reduce((days, lead) => {
     const current = days.get(lead.appointmentDate) || { date: lead.appointmentDate, clients: 0, companions: 0, seats: 0 };
     current.clients += 1;
-    current.companions += lead.hasCompanion ? 1 : 0;
+    current.companions += companionCountFor(lead);
     current.seats += transportSeatsFor(lead);
     days.set(lead.appointmentDate, current);
     return days;

@@ -2970,6 +2970,10 @@ svg {
   gap: 16px;
 }
 
+.consultation-price-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .ophthalmology-settings.is-disabled {
   display: none;
 }
@@ -3138,6 +3142,77 @@ svg {
 
 .schedule-rule-dialog-body .schedule-limit-fields > legend {
   padding-top: 4px;
+}
+
+.schedule-rule-dialog-body .schedule-hours-rules {
+  row-gap: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.schedule-section-divider {
+  height: 1px;
+  margin-bottom: 22px;
+  background: var(--line);
+}
+
+.schedule-section-divider.is-hidden {
+  display: none;
+}
+
+.schedule-section-divider[data-transport-divider] {
+  margin-top: 18px;
+}
+
+.schedule-section-divider[data-ophthalmology-divider] {
+  margin-top: -16px;
+  margin-bottom: 6px;
+}
+
+.schedule-section-divider:is([data-limited-days-divider], [data-mei-quota-divider]) {
+  margin-top: 18px;
+}
+
+.schedule-rule-dialog-body .schedule-separated-rules {
+  row-gap: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.schedule-rule-dialog-body .schedule-separated-rules > legend {
+  width: 100%;
+  padding-top: 0;
+  margin-bottom: 7px;
+}
+
+.schedule-rule-dialog-body .schedule-separated-rules > small:not(.field-error) {
+  margin: 0 0 9px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.schedule-rule-dialog-body .schedule-separated-rules > .field-error {
+  margin-top: 8px;
+}
+
+.schedule-rule-dialog-body .schedule-hours-rules > legend {
+  width: 100%;
+  padding-top: 0;
+  margin-bottom: 7px;
+}
+
+.schedule-rule-dialog-body .schedule-hours-rules > small:not(.field-error) {
+  margin: 0 0 9px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.schedule-rule-dialog-body .schedule-hours-rules > .schedule-hours-rule-header {
+  margin-bottom: 8px;
+}
+
+.schedule-rule-dialog-body .schedule-hours-rules > .field-error {
+  margin-top: 8px;
 }
 
 .general-schedule-dialog-body {

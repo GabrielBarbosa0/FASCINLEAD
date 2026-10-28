@@ -58,10 +58,13 @@ const CSV_COLUMNS = [
   ['Horário do pré-agendamento', (lead) => lead.appointmentTime],
   ['Tipo do exame', (lead) => lead.examPaymentType === 'courtesy' ? 'Cortesia' : 'Pago'],
   ['Forma de pagamento do exame', (lead) => lead.examPaymentType === 'courtesy' ? '' : examPaymentMethodsLabel(lead.examPaymentMethods || lead.examPaymentMethod)],
-  ['Valor do exame', (lead) => examPricing(lead.careRoute, lead.examPaymentType).examPrice],
+  ['Valor do exame', (lead) => Number.isFinite(Number(lead.examPrice))
+    ? Number(lead.examPrice)
+    : examPricing(lead.careRoute, lead.examPaymentType).examPrice],
   ['Compareceu?', (lead) => lead.appointmentDate ? attendanceLabel(lead.appointmentAttendance) : ''],
   ['Precisa de transporte?', (lead) => lead.needsTransport ? 'Sim' : 'Não'],
   ['Levara acompanhante?', (lead) => lead.needsTransport && lead.hasCompanion ? 'Sim' : 'Não'],
+  ['Quantidade de acompanhantes', (lead) => lead.needsTransport ? Number(lead.companionCount ?? (lead.hasCompanion ? 1 : 0)) : 0],
   ['Assentos do transporte', (lead) => Number(lead.transportSeats) || 0],
   ['Interesse principal', (lead) => lead.interestLabel],
   ['Ametropias', (lead) => Array.isArray(lead.ametropiaLabels) ? lead.ametropiaLabels.join(', ') : ''],
