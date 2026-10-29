@@ -46,6 +46,7 @@ import { captureView } from './features/capture/capture-view.js';
 import { initializeLeadDetailForm, leadDetailSubmissionValues } from './features/leads/lead-detail-events.js';
 import { leadDetailAppointmentTimeField as renderLeadDetailAppointmentTimeField, selectedLeadDetailService as resolveLeadDetailService } from './features/leads/lead-appointment.js';
 import { leadDetailView as renderLeadDetailView } from './features/leads/lead-detail-view.js';
+import { ensureLeadHistory, stopLeadHistorySubscription } from './features/funnel/lead-history-subscriptions.js';
 import { leadsView as renderLeadsView } from './features/leads/leads-view.js';
 import { handleFollowUpsClick } from './features/follow-ups/follow-ups-events.js';
 import { initialFollowUpsState, startFollowUpsSubscriptions } from './features/follow-ups/follow-ups-subscriptions.js';
@@ -292,7 +293,8 @@ function leadDetailView() {
     profileRole: state.profile?.role,
     scheduleState: state.leadDetailSchedule,
     appointmentTimeMarkup: lead ? leadDetailAppointmentTimeField(lead) : '',
-    canDelete: hasAccess('leads.delete')
+    canDelete: hasAccess('leads.delete'),
+    history: state.leadHistory
   });
 }
 
@@ -951,6 +953,7 @@ async function loadManagementData() {
   state.management.loading = false;
   render();
   ensureLeadDetailSchedule();
+  ensureLeadDetailHistory();
 }
 
 async function loadDashboardUpcomingData() {
@@ -1000,6 +1003,15 @@ function startLeadDetailDayAppointmentsSubscription(lead) {
 
 function ensureLeadDetailSchedule() {
   return ensureLeadDetailScheduleData({ state, routeParam: currentRouteParam, findLead: existingLeadForDetail, render, renderTimeField: leadDetailAppointmentTimeField });
+}
+
+function ensureLeadDetailHistory() {
+  if (!['lead', 'management-lead'].includes(state.route)) {
+    stopLeadHistorySubscription(state);
+    state.leadHistory = { leadId: '', loading: false, error: '', records: [], stage: '' };
+    return;
+  }
+  ensureLeadHistory({ state, lead: existingLeadForDetail(), render });
 }
 
 function stopAppointmentsSubscription() {
@@ -1107,6 +1119,7 @@ function refreshAuthorizedData() {
   ensureConfirmationsData();
   ensureNewLeadSchedule();
   ensureLeadDetailSchedule();
+  ensureLeadDetailHistory();
   ensureAccessData(state, { render });
   ensureGoalsData();
   ensureSettingsData();
@@ -1135,6 +1148,7 @@ function authControllerDependencies() {
     stopAppointmentsSubscription,
     stopConfirmationsSubscription,
     stopNewLeadScheduleSubscriptions,
+    stopLeadHistorySubscription: () => stopLeadHistorySubscription(state),
     synchronizePendingRegistrations,
     refreshAuthorizedData,
     hasAccess,
@@ -1425,6 +1439,7 @@ export async function startApp() {
     stopAppointmentsSubscription,
     stopConfirmationsSubscription,
     stopNewLeadScheduleSubscriptions,
+    stopLeadHistorySubscription: () => stopLeadHistorySubscription(state),
     handleConnectivity: handleConnectivityChange,
     syncAgendaHeight: syncAgendaSidebarHeight,
     synchronize: synchronizePendingRegistrations,

@@ -119,6 +119,8 @@ describe('lead validation', () => {
       addressReference: 'Em frente à praça',
       appointmentDate: '2026-10-02',
       appointmentTime: '14:30',
+      funnelStage: 'scheduled',
+      appointmentCycle: 1,
       appointmentAttendance: 'pending',
       appointmentServiceId: 'service-eye-exam',
       appointmentServiceName: 'Exame de vista',

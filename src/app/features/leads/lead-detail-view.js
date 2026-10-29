@@ -13,6 +13,7 @@ import { birthAgeText } from '../../shared/form-helpers.js';
 import { ametropiaOptions, eyeTriageFields, pathologyOptions, sexOptions, triageConfigFields } from '../capture/capture-triage.js';
 import { transportFields } from '../capture/capture-transport.js';
 import { selectedLeadDetailService } from './lead-appointment.js';
+import { leadHistoryView } from '../funnel/lead-history-view.js';
 
 export function leadDetailView({
   lead,
@@ -21,7 +22,8 @@ export function leadDetailView({
   profileRole,
   scheduleState,
   appointmentTimeMarkup,
-  canDelete
+  canDelete,
+  history = { loading: false, error: '', records: [], stage: '' }
 }) {
   if (managementMode && !canManage) {
     return '<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não pode alterar leads da equipe.</span></div>';
@@ -53,6 +55,7 @@ export function leadDetailView({
       <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
       <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
     </section>
+    ${leadHistoryView({ ...history, stage: lead.funnelStage || history.stage })}
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alterações e agendamento exigem internet.</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(scheduleState.settings.schedulingMode || lead.appointmentSchedulingMode || 'controlled')}" />

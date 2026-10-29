@@ -261,6 +261,52 @@ describe('lead correction rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  it('creates an immutable history event together with the lead', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    const result = createLeadDocument({
+      fullName: 'Cliente com historico',
+      phone: '(81) 99999-5678',
+      birthDate: '1985-04-12',
+      sex: '',
+      careRouteOverride: 'automatic',
+      appointmentDate: '',
+      appointmentTime: '',
+      notes: ''
+    }, {
+      uid: 'captor-uid',
+      displayName: 'Captador Teste',
+      storeId: 'loja-06'
+    }, 'installation-test', new Date('2026-10-25T12:00:00.000Z'));
+    const leadId = 'lead-with-history';
+    const historyReference = doc(db, 'leads', leadId, 'history', 'created');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', leadId), {
+      ...result.data,
+      createdAtServer: Timestamp.now(),
+      updatedAtServer: Timestamp.now(),
+      funnelUpdatedAtServer: Timestamp.now()
+    });
+    batch.set(historyReference, {
+      leadId,
+      storeId: 'loja-06',
+      eventType: 'lead_created',
+      funnelStage: 'captured',
+      reasonCode: '',
+      actorUid: 'captor-uid',
+      actorName: 'Captador Teste',
+      actorRole: 'captor',
+      occurredAtClient: '2026-10-25T12:00:00.000Z',
+      occurredAtServer: Timestamp.now(),
+      schemaVersion: 1
+    });
+
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(getDoc(historyReference));
+    await assertFails(updateDoc(historyReference, { reasonCode: 'forged' }));
+    const otherCaptorDb = authenticatedDb('outro-uid', 'outro@example.com');
+    await assertFails(getDoc(doc(otherCaptorDb, 'leads', leadId, 'history', 'created')));
+  });
+
   it('lets the captor upload an offline lead without reading a missing document first', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     const leadReference = doc(db, 'leads', 'offline-form-generated-lead');

@@ -25,6 +25,7 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
     unsubscribeFollowUpSchedule: null,
     unsubscribeFollowUpLeads: null,
     unsubscribeDayAppointments: null,
+    unsubscribeLeadHistory: null,
     updateAction: null,
     management: {
       loading: false,
@@ -100,6 +101,13 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
       serviceId: '',
       error: '',
       settings: { ...DEFAULT_STORE_SCHEDULE }
+    },
+    leadHistory: {
+      leadId: '',
+      loading: false,
+      error: '',
+      records: [],
+      stage: ''
     },
     offlineCapture: {
       loaded: false,

@@ -133,6 +133,7 @@ service cloud.firestore {
           'examPaymentType', 'examPaymentMethods', 'examPrice',
           'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentAttendance',
+          'funnelStage', 'funnelReasonCode', 'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
           'appointmentSchedulingMode', 'appointmentDurationMinutes',
           'appointmentServiceId', 'appointmentServiceName',
           'notes',
@@ -208,6 +209,52 @@ service cloud.firestore {
           || data.examPaymentType == 'paid' || data.examPaymentMethods.size() == 0)
         && data.source == 'street'
         && data.schemaVersion == 1;
+    }
+
+    function validLeadHistory(data) {
+      return data.keys().hasOnly([
+          'leadId', 'storeId', 'eventType', 'funnelStage', 'reasonCode',
+          'actorUid', 'actorName', 'actorRole', 'occurredAtClient',
+          'occurredAtServer', 'schemaVersion'
+        ])
+        && data.leadId is string
+        && data.storeId is string
+        && data.eventType in [
+          'lead_created', 'appointment_scheduled', 'appointment_rescheduled',
+          'appointment_cancelled', 'appointment_reminder_sent',
+          'appointment_attended', 'appointment_missed', 'follow_up_contacted'
+        ]
+        && data.funnelStage in [
+          'captured', 'awaiting_appointment', 'scheduled', 'confirmation',
+          'confirmed', 'attended', 'missed', 'awaiting_reschedule',
+          'cancelled', 'closed'
+        ]
+        && data.reasonCode is string
+        && data.reasonCode.size() <= 64
+        && data.actorUid is string
+        && data.actorName is string
+        && data.actorName.size() >= 2
+        && data.actorName.size() <= 120
+        && data.actorRole is string
+        && data.actorRole.size() <= 40
+        && data.occurredAtClient is string
+        && data.occurredAtClient.size() <= 40
+        && data.occurredAtServer is timestamp
+        && data.schemaVersion == 1;
+    }
+
+    function canReadLeadHistory(leadId) {
+      return activeUser()
+        && exists(/databases/$(database)/documents/leads/$(leadId))
+        && (
+          (get(/databases/$(database)/documents/leads/$(leadId)).data.capturedByUid == request.auth.uid
+            && hasPermission('leads.view_own'))
+          || (managerHasStore(get(/databases/$(database)/documents/leads/$(leadId)).data.storeId)
+            && hasPermission('management.view'))
+          || (managerHasStore(get(/databases/$(database)/documents/leads/$(leadId)).data.storeId)
+            && hasPermission('appointments.view'))
+          || isAdmin()
+        );
     }
 
     function validAppointmentService(data) {
@@ -621,6 +668,24 @@ service cloud.firestore {
           && (isAdmin()
             || resource.data.capturedByUid == request.auth.uid
             || managerHasStore(resource.data.storeId)));
+
+      match /history/{historyId} {
+        allow get, list: if canReadLeadHistory(leadId);
+        allow create: if activeUser()
+          && validLeadHistory(request.resource.data)
+          && request.resource.data.leadId == leadId
+          && request.resource.data.actorUid == request.auth.uid
+          && existsAfter(/databases/$(database)/documents/leads/$(leadId))
+          && getAfter(/databases/$(database)/documents/leads/$(leadId)).data.storeId == request.resource.data.storeId
+          && (
+            isAdmin()
+            || (getAfter(/databases/$(database)/documents/leads/$(leadId)).data.capturedByUid == request.auth.uid
+              && hasPermission('leads.create'))
+            || (managerHasStore(getAfter(/databases/$(database)/documents/leads/$(leadId)).data.storeId)
+              && hasPermission('management.view'))
+          );
+        allow update, delete: if false;
+      }
     }
 
     match /leadSales/{leadId} {

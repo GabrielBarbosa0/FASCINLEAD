@@ -893,7 +893,7 @@ svg {
   margin-top: 4px;
   color: var(--ink);
   font-size: 0.86rem;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .follow-up-actions {
@@ -1661,6 +1661,97 @@ svg {
   width: fit-content;
   max-width: 100%;
   justify-self: start;
+}
+
+.lead-history {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.lead-history > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.lead-history header span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.lead-history h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.lead-history > header > strong {
+  color: var(--primary);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.lead-history-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lead-history-list li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lead-history-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.lead-history-list i {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.lead-history-list strong,
+.lead-history-list span,
+.lead-history-list small {
+  display: block;
+}
+
+.lead-history-list strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.lead-history-list span,
+.lead-history-list small,
+.lead-history-empty {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.lead-history-list small {
+  margin-top: 3px;
+}
+
+.lead-history-empty {
+  padding-top: 12px;
 }
 
 .confirmation-dialog {

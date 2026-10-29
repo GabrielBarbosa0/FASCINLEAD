@@ -19,6 +19,8 @@ import { getInstallationId } from '../utils/installation.js';
 import { createId } from '../utils/id.js';
 import { canAccessStore } from '../utils/permissions.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
+import { leadCreationEvents } from '../app/features/funnel/funnel-model.js';
+import { addLeadHistoryEvents } from './lead-history-service.js';
 import {
   listOfflineLeads,
   removeOfflineLead,
@@ -186,14 +188,17 @@ export function saveLead(input, profile, demoMode, onRemoteError, options = {}) 
   const leadData = {
     ...result.data,
     createdAtServer: serverTimestamp(),
-    updatedAtServer: serverTimestamp()
+    updatedAtServer: serverTimestamp(),
+    funnelUpdatedAtServer: serverTimestamp()
   };
+  const historyEvents = leadCreationEvents({ id, ...result.data }, profile);
   let writePromise;
   if (input.schedulingMode === 'controlled' && result.data.appointmentDate && result.data.appointmentTime) {
     const durationMinutes = Number(input.appointmentDurationMinutes) || 20;
     const blocks = reservationBlocks(profile.storeId, result.data.appointmentDate, result.data.appointmentTime, durationMinutes);
     const batch = writeBatch(db);
     batch.set(doc(db, 'leads', id), leadData);
+    addLeadHistoryEvents(batch, id, historyEvents);
     blocks.forEach((block) => setReservationBlock(batch, block, {
       storeId: profile.storeId,
       appointmentDate: result.data.appointmentDate,
@@ -204,7 +209,10 @@ export function saveLead(input, profile, demoMode, onRemoteError, options = {}) 
     }));
     writePromise = batch.commit();
   } else {
-    writePromise = setDoc(doc(db, 'leads', id), leadData);
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), leadData);
+    addLeadHistoryEvents(batch, id, historyEvents);
+    writePromise = batch.commit();
   }
 
   writePromise.catch(onRemoteError);
@@ -353,13 +361,22 @@ async function synchronizeOfflineLeads(profile) {
       const leadReference = doc(db, 'leads', id);
       let writeError = null;
       try {
-        await setDoc(leadReference, {
+        const synchronizedLead = {
           ...data,
           appointmentDate: '',
           appointmentTime: '',
           createdAtServer: serverTimestamp(),
-          updatedAtServer: serverTimestamp()
-        });
+          updatedAtServer: serverTimestamp(),
+          funnelStage: 'awaiting_appointment',
+          funnelReasonCode: '',
+          funnelUpdatedAtClient: new Date().toISOString(),
+          funnelUpdatedAtServer: serverTimestamp(),
+          appointmentCycle: 0
+        };
+        const batch = writeBatch(db);
+        batch.set(leadReference, synchronizedLead);
+        addLeadHistoryEvents(batch, id, leadCreationEvents({ id, ...synchronizedLead }, profile));
+        await batch.commit();
       } catch (error) {
         writeError = error;
       }
