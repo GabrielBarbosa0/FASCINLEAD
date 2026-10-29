@@ -1,19 +1,14 @@
-import { deleteApp, initializeApp } from 'firebase/app';
 import {
-  connectAuthEmulator,
   createUserWithEmailAndPassword,
-  getAuth,
   GoogleAuthProvider,
   getRedirectResult,
-  inMemoryPersistence,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  signOut,
-  setPersistence
+  signOut
 } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -100,21 +95,10 @@ export async function createTeamPasswordAccount(emailInput, password) {
   const email = normalizeEmail(emailInput);
   assertEmailPassword(email, password);
 
-  const secondaryApp = initializeApp(auth.app.options, `team-access-${crypto.randomUUID()}`);
-  const secondaryAuth = getAuth(secondaryApp);
-  await setPersistence(secondaryAuth, inMemoryPersistence);
-  if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
-    connectAuthEmulator(secondaryAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  }
-
-  try {
-    const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-    await sendEmailVerification(credential.user);
-    await signOut(secondaryAuth);
-    return credential.user.uid;
-  } finally {
-    await deleteApp(secondaryApp);
-  }
+  if (!functions) throw new Error('Funcoes do Firebase ainda nao foram configuradas.');
+  const provisionAccount = httpsCallable(functions, 'provisionTeamMemberAccount');
+  const result = await provisionAccount({ email, password });
+  return result.data?.uid || '';
 }
 
 export async function updateTeamMemberPassword(emailInput, password) {

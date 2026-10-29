@@ -54,7 +54,7 @@ exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, asyn
     throw error;
   }
 
-  await getAuth().updateUser(user.uid, { password });
+  await getAuth().updateUser(user.uid, { password, emailVerified: true });
   await getAuth().revokeRefreshTokens(user.uid);
   await getFirestore().collection('accessAuditEvents').add({
     action: 'password_reset_by_admin',
@@ -66,4 +66,52 @@ exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, asyn
   });
 
   return { updated: true };
+});
+
+exports.provisionTeamMemberAccount = onCall({ region: 'southamerica-east1' }, async (request) => {
+  const callerEmail = await assertAdministrator(request);
+  const email = normalizeEmail(request.data?.email);
+  const password = String(request.data?.password || '');
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Informe um e-mail valido.');
+  }
+  if (password.length < 6 || password.length > 72) {
+    throw new HttpsError('invalid-argument', 'A senha deve ter entre 6 e 72 caracteres.');
+  }
+
+  const access = await getFirestore().doc(`allowedEmails/${email}`).get();
+  if (!access.exists || access.data()?.active !== true) {
+    throw new HttpsError('failed-precondition', 'Autorize o e-mail antes de criar a conta.');
+  }
+
+  let user;
+  let created = false;
+  try {
+    user = await getAuth().getUserByEmail(email);
+  } catch (error) {
+    if (error?.code !== 'auth/user-not-found') throw error;
+    user = await getAuth().createUser({
+      email,
+      password,
+      emailVerified: true,
+      displayName: access.data()?.displayName || 'Colaborador'
+    });
+    created = true;
+  }
+
+  if (!created && user.emailVerified !== true) {
+    await getAuth().updateUser(user.uid, { emailVerified: true });
+  }
+
+  await getFirestore().collection('accessAuditEvents').add({
+    action: created ? 'team_account_provisioned' : 'team_account_already_exists',
+    actorEmail: callerEmail,
+    actorUid: request.auth.uid,
+    targetEmail: email,
+    targetUid: user.uid,
+    createdAt: FieldValue.serverTimestamp()
+  });
+
+  return { uid: user.uid, created };
 });
