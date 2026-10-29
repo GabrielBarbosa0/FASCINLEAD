@@ -3,35 +3,27 @@ import { markDemoAppointmentReminderDone, markDemoFollowUpContact, saveLead, sub
 import { markFollowUpContactStarted, subscribeToTeamFollowUps } from '../services/follow-up-service.js';
 import { loadRoleProfiles } from '../services/role-profile-service.js';
 import { deleteManagementLead, loadManagementLeads, MANAGEMENT_QUERY_LIMIT, updateManagementLead } from '../services/management-service.js';
-import { createGoals, deleteGoalGroup, GOALS_LEAD_LIMIT, loadGoalsDashboard, updateGoalGroup } from '../services/goal-service.js';
 import { APPOINTMENTS_QUERY_LIMIT, loadUpcomingAppointments, markAppointmentReminderDone, setAppointmentAttendance, subscribeToAppointmentConfirmations, subscribeToAppointments, undoAppointmentReminderDone } from '../services/appointment-service.js';
-import { backfillAppointmentSlots, loadStoreSchedule, loadStoreSchedules, saveStoreSchedule, subscribeToDayAppointments, subscribeToStoreSchedule } from '../services/schedule-service.js';
+import { loadStoreSchedules, subscribeToStoreSchedule } from '../services/schedule-service.js';
 import { ensureDefaultAppointmentServices, loadAppointmentServices } from '../services/service-catalog-service.js';
 import { consultLocalSavwinSales, isLocalSavwinEnabled } from '../services/savwin-service.js';
 import { downloadLeadsCsv } from '../utils/lead-export.js';
 import { monthKeyFromDate, monthRange, shiftMonth } from '../utils/calendar.js';
 import { formatBrazilianPhone } from '../utils/phone.js';
-import { examPricing, ophthalmologyTriage } from '../utils/lead.js';
-import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE, isTransportAppointmentAllowed, isTransportDateAllowed, validateStoreSchedule, WEEKDAY_OPTIONS } from '../utils/schedule.js';
+import { examPricing } from '../utils/lead.js';
+import { buildAppointmentSlots, DEFAULT_STORE_SCHEDULE } from '../utils/schedule.js';
 import { followUpAppointmentKey } from '../utils/follow-up.js';
 import { STORES } from '../utils/stores.js';
 import { profileStoreIds } from '../utils/permissions.js';
-import { formatAccessStoreSummary } from '../utils/access.js';
 import { SYSTEM_ROLE_PROFILES, hasPermission as profileHasPermission } from '../utils/role-profile.js';
 import { formatBrazilianCpf } from '../utils/savwin-matching.js';
-import { duplicateGoalDraft } from '../utils/goal.js';
 import { defaultAppointmentService, servicesForStore } from '../utils/service-catalog.js';
 import { currentRoute, currentRouteParam, navigate } from './router.js';
 import {
-  addDaysToDateInput,
-  escapeHtml,
   formatAppointmentDate,
   formatCapturedAt,
   formatDateTimeValue,
-  formatGoalDate,
   offlineSyncDetail,
-  profileInitials,
-  roleLabel,
   storeDisplayLabel,
   storeLabel,
   syncLabel,
@@ -60,7 +52,6 @@ import { initialFollowUpsState, startFollowUpsSubscriptions } from './features/f
 import { followUpsView as renderFollowUpsView, pendingFollowUps as selectPendingFollowUps } from './features/follow-ups/follow-ups-view.js';
 import { appointmentCreateDialog as renderAppointmentCreateDialog, appointmentCreateSchedule as resolveAppointmentCreateSchedule, appointmentCreateService as resolveAppointmentCreateService, appointmentCreateTimeField as renderAppointmentCreateTimeField } from './features/appointments/appointment-dialog.js';
 import { handleAppointmentClick, initializeAppointmentCreateEvents } from './features/appointments/appointment-events.js';
-import { startAppointmentsLiveSubscription, startConfirmationsLiveSubscription } from './features/appointments/appointment-subscriptions.js';
 import { appointmentsView as renderAppointmentsView } from './features/appointments/appointments-view.js';
 import { handleConfirmationClick } from './features/appointments/confirmation-events.js';
 import { confirmationsView as renderConfirmationsView } from './features/appointments/confirmations-view.js';
@@ -71,7 +62,17 @@ import { managementView as renderManagementView } from './features/management/ma
 import { filterDashboardRecords, loadDashboardUpcomingRecords } from './features/dashboard/dashboard-data.js';
 import { dashboardMetrics } from './features/dashboard/dashboard-metrics.js';
 import { dashboardView as renderDashboardView } from './features/dashboard/dashboard-view.js';
-import { bindScheduleStoreSelection, handleSettingsSectionClick, scheduleSettingsValues } from './features/settings/schedule-events.js';
+import { loadGoalsData as loadGoalsFeatureData, ensureGoalsData as ensureGoalsFeatureData } from './features/goals/goals-data.js';
+import { bindGoalDialog } from './features/goals/goal-dialog.js';
+import { handleGoalsClick } from './features/goals/goals-events.js';
+import { goalsView as renderGoalsView } from './features/goals/goals-view.js';
+import { ensureLeadDetailSchedule as ensureLeadDetailScheduleData, refreshLeadDetailAppointmentTime as refreshLeadDetailAppointmentTimeField, startLeadDetailDayAppointmentsSubscription as startLeadDetailDayAppointments } from './features/scheduling/lead-schedule-controller.js';
+import { ensureAppointmentData, openAppointmentCreateDialog as openAppointmentCreate, startAppointmentsSubscription as startAppointmentsLive, startConfirmationsSubscription as startConfirmationsLive, stopAppointmentsSubscription as stopAppointmentsLive, stopConfirmationsSubscription as stopConfirmationsLive } from './features/scheduling/appointment-subscriptions.js';
+import { ensureNewLeadSchedule as ensureNewLeadScheduleData, refreshAppointmentTimeControl as refreshNewLeadAppointmentTime, refreshNewLeadAmetropiaField, startDayAppointmentsSubscription as startNewLeadDayAppointments, stopNewLeadScheduleSubscriptions as stopNewLeadSchedules } from './features/scheduling/new-lead-schedule-controller.js';
+import { appShellView, loginView as renderLoginView } from './shell/app-shell-view.js';
+import { homeView as renderHomeView } from './shell/home-view.js';
+import { handleSettingsSectionClick } from './features/settings/schedule-events.js';
+import { bindScheduleDialogController } from './features/settings/schedule-dialog-controller.js';
 import { scheduleSettingsView as renderScheduleSettingsView } from './features/settings/schedule-settings.js';
 import { settingsView as renderSettingsView } from './features/settings/settings-view.js';
 import { bindServiceEvents, handleServiceClick } from './features/services/service-events.js';
@@ -169,161 +170,17 @@ function filteredReportRecords() {
 }
 
 function loginView() {
-  const configNotice = isFirebaseConfigured
-    ? ''
-    : '<div class="notice notice-warning"><i data-lucide="wrench"></i><div><strong>Firebase ainda não configurado</strong><span>Use o modo de desenvolvimento sem dados reais.</span></div></div>';
-
-  return `
-    <main class="login-page">
-      <section class="login-panel" aria-labelledby="login-title">
-        <img class="brand-logo brand-logo-login" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" />
-        <p class="eyebrow">GESTÃO DE RELACIONAMENTO</p>
-        <h1 id="login-title">LeadFlow</h1>
-        <p class="login-copy">Cadastro rápido para quem encontra clientes onde eles estão.</p>
-        ${configNotice}
-        ${state.authError ? `<div class="notice notice-danger" role="alert"><i data-lucide="circle-alert"></i><span>${escapeHtml(state.authError)}</span></div>` : ''}
-        ${state.authMessage ? `<div class="notice notice-success" role="status"><i data-lucide="circle-check"></i><span>${escapeHtml(state.authMessage)}</span></div>` : ''}
-        <form id="email-login-form" class="email-login-form" novalidate>
-          <div class="field"><label for="login-email">E-mail</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="nome@exemplo.com" required /></div>
-          <div class="field"><label for="login-password">Senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="Sua senha" required /></div>
-          <button class="button button-primary button-block" type="submit" ${!isFirebaseConfigured ? 'disabled' : ''}>
-            <i data-lucide="log-in"></i><span>Entrar</span>
-          </button>
-          <div class="login-secondary-actions">
-            <button type="button" data-action="email-register">Criar primeiro acesso</button>
-            <button type="button" data-action="password-reset">Esqueci minha senha</button>
-          </div>
-        </form>
-        ${import.meta.env.DEV ? `
-          <button class="button button-secondary button-block" type="button" data-action="demo-login">
-            <i data-lucide="flask-conical"></i><span>Abrir modo de desenvolvimento</span>
-          </button>
-        ` : ''}
-      </section>
-    </main>`;
-}
-
-function currentPageTitle() {
-  const titles = {
-    home: 'Início',
-    new: 'Cadastro',
-    leads: 'Meus cadastros',
-    lead: 'Detalhes do cadastro',
-    management: 'Painel de leads',
-    'management-lead': 'Detalhes do lead',
-    dashboard: 'Dashboard',
-    appointments: 'Agenda de exames',
-    confirmations: 'Confirmações',
-    access: 'Acessos da equipe',
-    goals: 'Metas',
-    settings: 'Configurações'
-  };
-  if (state.route === 'follow-ups') return canManage() ? 'Retornos da equipe' : 'Retornos pendentes';
-  return titles[state.route] || 'Início';
-}
-
-function headerView() {
-  const online = navigator.onLine;
-  const storeSummary = formatAccessStoreSummary(state.profile);
-  const permittedStoreIds = profileStoreIds(state.profile);
-  const permittedStoreLabels = STORES
-    .filter((store) => permittedStoreIds.includes(store.id))
-    .map((store) => store.label);
-  const storeIndicator = storeSummary.short === 'TODAS'
-    ? 'Todas'
-    : permittedStoreLabels.join(' · ') || storeSummary.short;
-  const multipleStoreIndicator = permittedStoreLabels.length > 1 && storeSummary.short !== 'TODAS';
-  return `
-    <header class="app-header">
-      <div class="header-inner layout-wide">
-        <div class="header-brand">
-          <img class="brand-logo brand-logo-header" src="${import.meta.env.BASE_URL}leadflow-logo.png" alt="" aria-hidden="true" />
-          <div>
-            <p class="eyebrow">LEADFLOW</p>
-            <h1 class="header-page-title">${escapeHtml(currentPageTitle())}</h1>
-          </div>
-        </div>
-        <div class="header-actions">
-          ${state.demoMode ? '<span class="mode-badge">DEMO</span>' : ''}
-          <span class="store-indicator ${multipleStoreIndicator ? 'is-multiple' : ''}" title="${escapeHtml(storeSummary.full)}" aria-label="Lojas: ${escapeHtml(storeSummary.full)}">
-            <i data-lucide="building-2"></i><span>${escapeHtml(storeIndicator)}</span>
-          </span>
-          <span class="connectivity ${online ? 'is-online' : 'is-offline'}">
-            <i data-lucide="${online ? 'wifi' : 'wifi-off'}"></i>${online ? 'Online' : 'Offline'}
-          </span>
-          <button class="icon-button" type="button" data-action="logout" title="Sair"><i data-lucide="log-out"></i></button>
-        </div>
-      </div>
-    </header>`;
-}
-
-function profileCard() {
-  const initials = profileInitials(state.profile.displayName);
-
-  return `
-    <section class="profile-card">
-      <div class="avatar">${escapeHtml(initials)}</div>
-      <div>
-        <strong>${escapeHtml(state.profile.displayName)}</strong>
-        <span>${escapeHtml(state.profile.roleProfileName || roleLabel(state.profile.role))}</span>
-      </div>
-      <i data-lucide="shield-check" class="profile-status"></i>
-    </section>`;
+  return renderLoginView({ state, firebaseConfigured: isFirebaseConfigured, devMode: import.meta.env.DEV });
 }
 
 function homeView() {
-  const followUps = pendingFollowUps();
+  return renderHomeView({ state, hasAccess, canManage, canManageGoals, isAdmin, pendingFollowUps });
+}
 
-  return `
-    ${profileCard()}
-    ${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Não utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}
-    <section class="action-grid" aria-label="Ações principais">
-      ${hasAccess('leads.create') ? `<button class="action-card action-card-primary" type="button" data-route="new">
-        <span class="action-icon"><i data-lucide="user-plus"></i></span>
-        <span><strong>Nova abordagem</strong><small>Cadastrar novo contato</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${hasAccess('leads.view_own') ? `<button class="action-card" type="button" data-route="leads">
-        <span class="action-icon"><i data-lucide="clipboard-list"></i></span>
-        <span><strong>Meus cadastros</strong><small>${state.leads.length} registro(s) neste acesso</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups">
-        <span class="action-icon"><i data-lucide="bell-ring"></i></span>
-        <span><strong>${hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>
-        ${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendência(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}
-      </button>` : ''}
-      ${canManage() ? `<button class="action-card" type="button" data-route="management">
-        <span class="action-icon"><i data-lucide="bar-chart-3"></i></span>
-        <span><strong>Painel de gestão</strong><small>Consultar e exportar captações</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="appointments">
-        <span class="action-icon"><i data-lucide="calendar-days"></i></span>
-        <span><strong>Agenda de exames</strong><small>Visualizar os pré-agendamentos</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${hasAccess('appointments.view') ? `<button class="action-card" type="button" data-route="confirmations">
-        <span class="action-icon"><i data-lucide="message-circle"></i></span>
-        <span><strong>Confirmações</strong><small>Enviar lembretes aos clientes</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${hasAccess('goals.view_own') || canManageGoals() ? `<button class="action-card" type="button" data-route="goals">
-        <span class="action-icon"><i data-lucide="target"></i></span>
-        <span><strong>Metas</strong><small>${canManageGoals() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'}</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${isAdmin() ? `<button class="action-card" type="button" data-route="access">
-        <span class="action-icon"><i data-lucide="user-round-cog"></i></span>
-        <span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-      ${isAdmin() ? `<button class="action-card" type="button" data-route="settings">
-        <span class="action-icon"><i data-lucide="settings"></i></span>
-        <span><strong>Configurações</strong><small>Agenda e preferências do sistema</small></span>
-        <i data-lucide="chevron-right"></i>
-      </button>` : ''}
-    </section>`;
+function appView() {
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
+  const page = pages[state.route] || homeView;
+  return appShellView({ state, page: page(), canManage, hasAccess, pendingFollowUps });
 }
 
 function appointmentTimeField() {
@@ -560,150 +417,8 @@ function accessView() {
   });
 }
 
-function goalStatus(goal) {
-  const today = toLocalDateInput(new Date());
-  if (goal.completed >= goal.targetCount) return ['Concluida', 'success'];
-  if (today < goal.startDate) return ['Agendada', 'neutral'];
-  if (today > goal.endDate) return ['Encerrada', 'danger'];
-  return ['Em andamento', 'warning'];
-}
-
-function groupGoalRecords(records) {
-  const groups = new Map();
-  records.forEach((goal) => {
-    const groupId = goal.groupId || goal.id;
-    if (!groups.has(groupId)) groups.set(groupId, []);
-    groups.get(groupId).push(goal);
-  });
-  return [...groups.entries()].map(([id, goals]) => {
-    const first = goals[0];
-    const completed = goals.reduce((total, goal) => total + goal.completed, 0);
-    const targetCount = goals.reduce((total, goal) => total + goal.targetCount, 0);
-    return {
-      id,
-      goals: goals.sort((a, b) => a.assigneeName.localeCompare(b.assigneeName, 'pt-BR')),
-      title: first.title,
-      storeId: first.storeId,
-      startDate: first.startDate,
-      endDate: first.endDate,
-      targetPerPerson: first.targetCount,
-      completed,
-      targetCount,
-      remaining: Math.max(0, targetCount - completed),
-      percentage: targetCount ? Math.min(100, Math.round((completed / targetCount) * 100)) : 0
-    };
-  });
-}
-
 function goalsView() {
-  const { records, members, loading, saving, error, truncated, draft, editorOpen, editingGroupId, duplicatingGroupId, pendingDeleteGroupId } = state.goals;
-  const groups = groupGoalRecords(records);
-  const goalManagerView = canManageGoals();
-  const visibleMembers = members.filter((member) => member.storeId === draft.storeId);
-  const selectedCount = draft.assigneeUids.filter((uid) => visibleMembers.some((member) => member.uid === uid)).length;
-  const completedGoals = groups.filter((goal) => goal.completed >= goal.targetCount).length;
-  const totalCaptured = records.reduce((total, goal) => total + goal.completed, 0);
-  const selectedGroup = groups.find((group) => group.id === pendingDeleteGroupId);
-  const goalStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
-  const storeOptions = goalStores.map((store) => `<option value="${store.id}" ${draft.storeId === store.id ? 'selected' : ''}>${store.displayLabel}</option>`).join('');
-  const memberOptions = visibleMembers.length
-    ? visibleMembers.map((member) => `<label class="goal-member-option">
-        <input type="checkbox" name="assigneeUids" value="${escapeHtml(member.uid)}" ${draft.assigneeUids.includes(member.uid) ? 'checked' : ''} />
-        <span class="avatar">${escapeHtml(profileInitials(member.displayName))}</span>
-        <span><strong>${escapeHtml(member.displayName)}</strong><small>${escapeHtml(storeLabel(member.storeId))}</small></span>
-      </label>`).join('')
-    : '<p class="goal-members-empty">Nenhum captador ativo nesta loja.</p>';
-
-  const goalCards = groups.length
-    ? groups.map((group) => {
-        const [status, tone] = goalStatus(group);
-        const people = group.goals.map((goal) => `<div class="goal-person">
-          <span class="avatar">${escapeHtml(profileInitials(goal.assigneeName))}</span>
-          <div><strong>${escapeHtml(goal.assigneeName)}</strong><span>${goal.completed} de ${goal.targetCount} leads</span></div>
-          <strong class="goal-person-percentage">${goal.percentage}%</strong>
-        </div>`).join('');
-        return `<article class="goal-card">
-          <div class="goal-card-heading">
-            <div><span class="status-badge status-${tone}">${status}</span><h2>${escapeHtml(group.title)}</h2></div>
-            ${goalManagerView
-              ? `<div class="goal-card-actions">
-                  <button class="icon-button" type="button" data-edit-goal="${escapeHtml(group.id)}" title="Editar meta" aria-label="Editar meta"><i data-lucide="pencil"></i></button>
-                  <button class="icon-button" type="button" data-duplicate-goal="${escapeHtml(group.id)}" title="Duplicar meta" aria-label="Duplicar meta"><i data-lucide="copy"></i></button>
-                  <button class="icon-button goal-delete" type="button" data-delete-goal="${escapeHtml(group.id)}" title="Excluir meta" aria-label="Excluir meta"><i data-lucide="trash-2"></i></button>
-                </div>`
-              : `<div class="goal-percentage" aria-label="${group.percentage}% da meta atingida"><strong>${group.percentage}%</strong><span>da meta</span></div>`}
-          </div>
-          ${goalManagerView ? `<div class="goal-participants">${people}</div>` : ''}
-          <div class="goal-progress-copy"><strong>${group.completed} de ${group.targetCount} leads</strong><span>${group.percentage}%</span></div>
-          <div class="goal-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${group.percentage}"><span style="width: ${group.percentage}%"></span></div>
-          <div class="goal-card-footer"><span>${formatGoalDate(group.startDate)} a ${formatGoalDate(group.endDate)} · ${escapeHtml(storeLabel(group.storeId))}</span><strong>${group.remaining ? `${group.remaining} restante(s)` : 'Meta alcancada'}</strong></div>
-        </article>`;
-      }).join('')
-    : `<div class="empty-state goals-empty"><i data-lucide="target"></i><strong>Nenhuma meta cadastrada</strong><p>${goalManagerView ? 'Crie a primeira meta de captação para a equipe.' : 'Quando uma meta for atribuida, ela aparecera aqui.'}</p></div>`;
-
-  const creator = goalManagerView && editorOpen ? `<dialog id="goal-editor-dialog" class="access-editor-dialog goal-editor-dialog" aria-labelledby="goal-editor-title">
-    <form id="goal-form" class="goal-form ${duplicatingGroupId ? 'is-duplicating' : ''}" novalidate>
-      <header><div><span class="eyebrow">META DA EQUIPE</span><h2 id="goal-editor-title">${editingGroupId ? 'Editar meta' : duplicatingGroupId ? 'Duplicar meta' : 'Nova meta'}</h2><p>${duplicatingGroupId ? 'Revise os dados da cópia antes de criar.' : 'Defina a quantidade de leads por colaborador no período.'}</p></div><button class="icon-button" type="button" data-cancel-goal-edit aria-label="Fechar"><i data-lucide="circle-x"></i></button></header>
-      <div class="goal-editor-body">
-        <div class="field" data-field="title"><label for="goal-title">Título</label><input id="goal-title" name="title" maxlength="80" value="${escapeHtml(draft.title)}" required /><small class="field-error"></small></div>
-        <div class="goal-form-grid">
-          <div class="field" data-field="targetCount"><label for="goal-target">Quantidade</label><input id="goal-target" name="targetCount" type="number" min="1" max="10000" step="1" value="${draft.targetCount}" required /><small class="field-error"></small></div>
-          <div class="field" data-field="startDate"><label for="goal-start">Início</label><input id="goal-start" name="startDate" type="date" value="${escapeHtml(draft.startDate)}" required /><small class="field-error"></small></div>
-          <div class="field" data-field="endDate"><label for="goal-end">Fim</label><input id="goal-end" name="endDate" type="date" value="${escapeHtml(draft.endDate)}" required /><small class="field-error"></small></div>
-        </div>
-        <div class="field" data-field="storeId"><label for="goal-store">Loja</label>${isAdmin() || goalStores.length > 1
-          ? `<select id="goal-store" name="storeId" required>${storeOptions}</select>`
-          : `<input id="goal-store" name="storeId" value="${escapeHtml(draft.storeId)}" type="hidden" /><div class="readonly-field">${escapeHtml(storeLabel(draft.storeId))}</div>`}<small class="field-error"></small></div>
-        <fieldset class="goal-members field" data-field="assigneeUids"><legend>Colaboradores <span data-goal-selected-count>${selectedCount} selecionado(s)</span></legend><div class="goal-member-list">${memberOptions}</div><small class="field-error"></small></fieldset>
-      </div>
-      <footer><button class="button button-secondary" type="button" data-cancel-goal-edit>Cancelar</button><button class="button button-primary" type="submit" ${saving || !visibleMembers.length ? 'disabled' : ''}><i data-lucide="${editingGroupId ? 'save' : duplicatingGroupId ? 'copy' : 'target'}"></i><span>${saving ? 'Salvando...' : editingGroupId ? 'Salvar alterações' : duplicatingGroupId ? 'Criar cópia' : 'Criar metas'}</span></button></footer>
-    </form>
-  </dialog>` : '';
-  const metrics = `<section class="goal-metrics" aria-label="Resumo das metas">
-      <div><span>Metas</span><strong>${groups.length}</strong></div>
-      <div><span>Concluidas</span><strong>${completedGoals}</strong></div>
-      <div><span>Captações contabilizadas</span><strong>${totalCaptured}</strong></div>
-    </section>`;
-  const results = `<section class="goals-results" aria-busy="${loading}">
-      <div class="access-list-heading"><div><strong>${goalManagerView ? 'Desempenho da equipe' : 'Objetivos atribuídos'}</strong><span>${groups.length} meta(s)</span></div></div>
-      ${loading && !records.length ? '<div class="empty-state"><i data-lucide="refresh-cw"></i><strong>Carregando metas...</strong></div>' : goalCards}
-    </section>`;
-
-  return `
-    ${goalManagerView ? `<section class="service-catalog-heading goals-heading">
-      <div><span class="eyebrow">METAS</span><h2>${goalManagerView ? 'Metas da equipe' : 'Minhas metas'}</h2><p>${goalManagerView ? 'Defina objetivos de captação e acompanhe o desempenho da equipe.' : 'Acompanhe seus objetivos e o progresso das captações.'}</p></div>
-      <div class="goals-heading-actions"><button class="button button-secondary" type="button" data-action="reload-goals" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>Atualizar</span></button>${goalManagerView ? '<button class="button button-primary" type="button" data-goal-new><i data-lucide="circle-plus"></i><span>Nova meta</span></button>' : ''}</div>
-    </section>` : ''}
-    ${error ? `<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>${escapeHtml(error)}</span></div>` : ''}
-    ${truncated ? `<div class="notice notice-warning"><i data-lucide="info"></i><span>O calculo atingiu ${GOALS_LEAD_LIMIT} leads. Reduza os periodos das metas para conferir o resultado completo.</span></div>` : ''}
-    ${goalManagerView
-      ? `${metrics}${results}${creator}`
-      : `<section class="personal-goals">${metrics}${results}</section>`}
-    ${selectedGroup ? `<dialog id="delete-goal-dialog" class="confirmation-dialog" aria-labelledby="delete-goal-title">
-      <div class="confirmation-dialog-icon"><i data-lucide="trash-2"></i></div>
-      <div><p class="eyebrow">EXCLUIR META</p><h2 id="delete-goal-title">Remover esta meta?</h2><p>A meta &ldquo;${escapeHtml(selectedGroup.title)}&rdquo; será removida de ${selectedGroup.goals.length} colaborador(es). As captações permanecem intactas.</p></div>
-      <div class="confirmation-dialog-actions"><button class="button button-secondary" type="button" data-close-goal-dialog>Cancelar</button><button class="button button-danger-solid" type="button" data-confirm-delete-goal="${escapeHtml(selectedGroup.id)}"><i data-lucide="trash-2"></i><span>Excluir meta</span></button></div>
-    </dialog>` : ''}`;
-}
-
-function bottomNav() {
-  const items = [['home', 'house', 'Início']];
-  if (hasAccess('leads.create')) items.push(['new', 'circle-plus', 'Novo']);
-  if (hasAccess('leads.view_own')) items.push(['leads', 'clipboard-list', 'Cadastros']);
-  if (hasAccess('followups.own') && !hasAccess('followups.team')) items.splice(3, 0, ['follow-ups', 'bell-ring', 'Retornos']);
-  if (canManage()) items.push(['management', 'bar-chart-3', 'Gestão']);
-  const followUpCount = pendingFollowUps().length;
-  return `<nav class="bottom-nav ${items.length === 5 ? 'has-five-items' : ''}" aria-label="Navegação principal">${items.map(([route, icon, label]) => `
-    <button type="button" data-route="${route}" class="${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'is-active' : ''}" ${state.route === route || (route === 'leads' && state.route === 'lead') || (route === 'management' && ['management-lead', 'dashboard', 'appointments', 'confirmations', 'settings', 'follow-ups'].includes(state.route)) ? 'aria-current="page"' : ''}>
-      <i data-lucide="${icon}"></i><span>${label}</span>${route === 'follow-ups' && followUpCount ? `<strong class="nav-notification-count">${followUpCount > 99 ? '99+' : followUpCount}</strong>` : ''}
-    </button>`).join('')}</nav>`;
-}
-
-function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
-  const page = pages[state.route] || homeView;
-  const wideLayout = ['management', 'dashboard', 'appointments', 'confirmations', 'access', 'goals', 'settings'].includes(state.route);
-  return `${headerView()}<main class="app-main ${wideLayout ? 'layout-wide' : ''}">${page()}</main>${bottomNav()}`;
+  return renderGoalsView({ state, isAdmin, canManageGoals });
 }
 
 function render() {
@@ -1108,6 +823,14 @@ function bindPageEvents() {
   }
   bindAccessEvents({ state, render, showToast });
   bindRoleProfileEvents({ state, render, showToast });
+  bindGoalDialog({
+    state,
+    render,
+    showToast,
+    createDefaultGoalDraft,
+    loadGoalsData
+  });
+  bindScheduleDialogController({ state, render, showToast });
 
   bindServiceEvents({
     state,
@@ -1115,734 +838,7 @@ function bindPageEvents() {
     showToast,
     refreshServices: loadServiceCatalogData
   });
-  const scheduleSettingsForm = document.querySelector('#schedule-settings-form');
-  if (scheduleSettingsForm) {
-    bindScheduleStoreSelection(scheduleSettingsForm, { settings: state.settings, render });
-    const generalScheduleDialog = document.querySelector('#general-schedule-dialog');
-    const generalScheduleFields = generalScheduleDialog?.querySelector('.schedule-settings-fields');
-    const setGeneralScheduleMode = () => {
-      const isFree = scheduleSettingsForm.elements.schedulingMode.value === 'free';
-      generalScheduleFields?.classList.toggle('is-disabled', isFree);
-    };
-    const syncGeneralScheduleDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !generalScheduleDialog) return;
-      scheduleSettingsForm.elements.schedulingMode.value = record.schedulingMode;
-      scheduleSettingsForm.elements.openingTime.value = record.openingTime;
-      scheduleSettingsForm.elements.closingTime.value = record.closingTime;
-      generalScheduleDialog.querySelector('[name="storeHoursRules"]').value = JSON.stringify(record.storeHoursRules);
-      generalScheduleDialog.querySelectorAll('[data-store-hours-row]').forEach((row) => {
-        const weekday = Number(row.dataset.storeHoursRow);
-        const rule = record.storeHoursRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="storeHoursWeekday"]');
-        const openingInput = row.querySelector(`[name="storeOpeningTime-${weekday}"]`);
-        const closingInput = row.querySelector(`[name="storeClosingTime-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        openingInput.value = rule?.openingTime || record.openingTime;
-        closingInput.value = rule?.closingTime || record.closingTime;
-        openingInput.disabled = !rule;
-        closingInput.disabled = !rule;
-        row.classList.toggle('is-active', Boolean(rule));
-      });
-      scheduleSettingsForm.elements.noShowGraceMinutes.value = record.noShowGraceMinutes;
-      scheduleSettingsForm.elements.rescheduleAfterMinutes.value = record.rescheduleAfterMinutes;
-      document.querySelector('#settings-automatic-follow-up').checked = record.automaticPendingFollowUp;
-      document.querySelector('#settings-show-ametropias').checked = record.showAmetropiaFields;
-      setGeneralScheduleMode();
-      setFieldErrors(generalScheduleDialog, {});
-    };
-    const discardGeneralScheduleDraft = () => {
-      syncGeneralScheduleDraft();
-      generalScheduleDialog.close();
-    };
 
-    document.querySelector('[data-general-schedule-open]')?.addEventListener('click', () => {
-      syncGeneralScheduleDraft();
-      generalScheduleDialog?.showModal();
-    });
-    generalScheduleDialog?.querySelectorAll('[data-general-schedule-close]').forEach((button) => {
-      button.addEventListener('click', discardGeneralScheduleDraft);
-    });
-    generalScheduleDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardGeneralScheduleDraft();
-    });
-    scheduleSettingsForm.elements.schedulingMode.addEventListener('change', () => {
-      setGeneralScheduleMode();
-      setFieldErrors(generalScheduleDialog, {});
-    });
-    generalScheduleDialog?.querySelectorAll('[data-store-hours-row]').forEach((row) => {
-      const checkbox = row.querySelector('[name="storeHoursWeekday"]');
-      const timeInputs = [...row.querySelectorAll('input[type="time"]')];
-      checkbox.addEventListener('change', () => {
-        row.classList.toggle('is-active', checkbox.checked);
-        timeInputs.forEach((input) => { input.disabled = !checkbox.checked; });
-      });
-    });
-    generalScheduleDialog?.querySelector('[data-general-schedule-apply]')?.addEventListener('click', () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record) return;
-      const schedulingMode = scheduleSettingsForm.elements.schedulingMode.value;
-      const storeHoursRules = [...generalScheduleDialog.querySelectorAll('[name="storeHoursWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          openingTime: generalScheduleDialog.querySelector(`[name="storeOpeningTime-${weekday}"]`).value,
-          closingTime: generalScheduleDialog.querySelector(`[name="storeClosingTime-${weekday}"]`).value
-        };
-      });
-      const primaryHours = storeHoursRules[0] || { openingTime: record.openingTime, closingTime: record.closingTime };
-      const candidate = {
-        ...record,
-        schedulingMode,
-        openingTime: primaryHours.openingTime,
-        closingTime: primaryHours.closingTime,
-        storeHoursRules,
-        noShowGraceMinutes: Number(scheduleSettingsForm.elements.noShowGraceMinutes.value),
-        rescheduleAfterMinutes: Number(scheduleSettingsForm.elements.rescheduleAfterMinutes.value),
-        automaticPendingFollowUp: document.querySelector('#settings-automatic-follow-up').checked,
-        showAmetropiaFields: document.querySelector('#settings-show-ametropias').checked
-      };
-      const validation = validateStoreSchedule(candidate);
-      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => (
-        ['storeHoursRules', 'noShowGraceMinutes', 'rescheduleAfterMinutes'].includes(name)
-      )));
-      setFieldErrors(generalScheduleDialog, errors);
-      if (Object.keys(errors).length) return;
-
-      Object.assign(record, candidate);
-      generalScheduleDialog.querySelector('[name="storeHoursRules"]').value = JSON.stringify(storeHoursRules);
-      scheduleSettingsForm.elements.openingTime.value = primaryHours.openingTime;
-      scheduleSettingsForm.elements.closingTime.value = primaryHours.closingTime;
-      document.querySelector('[data-general-schedule-summary]').textContent = schedulingMode === 'free'
-        ? 'Cadastro livre'
-        : `${storeHoursRules.length} ${storeHoursRules.length === 1 ? 'dia aberto' : 'dias abertos'}`;
-      generalScheduleDialog.close();
-    });
-    const limitedDaysDialog = document.querySelector('#limited-days-dialog');
-    const limitedDaysEnabledInput = document.querySelector('#settings-limited-days');
-    const limitedDaysFields = limitedDaysDialog?.querySelector('[data-field="limitedDayRules"]');
-    const syncLimitedDaysDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !limitedDaysDialog) return;
-      limitedDaysEnabledInput.checked = record.limitedDaysEnabled;
-      limitedDaysDialog.querySelector('[name="limitedDayRules"]').value = JSON.stringify(record.limitedDayRules);
-      limitedDaysDialog.querySelectorAll('[data-limited-day-row]').forEach((row) => {
-        const weekday = Number(row.dataset.limitedDayRow);
-        const rule = record.limitedDayRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="limitedDayWeekday"]');
-        const capacityInput = row.querySelector(`[name="limitedDayCapacity-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        capacityInput.value = rule?.capacity || record.limitedDayCapacity;
-        capacityInput.disabled = !rule || !record.limitedDaysEnabled;
-        row.classList.toggle('is-active', Boolean(rule));
-      });
-      limitedDaysFields.disabled = !record.limitedDaysEnabled;
-      limitedDaysFields.classList.toggle('is-disabled', !record.limitedDaysEnabled);
-      limitedDaysDialog.querySelector('[data-limited-days-divider]')?.classList.toggle('is-hidden', !record.limitedDaysEnabled);
-      setFieldErrors(limitedDaysDialog, {});
-    };
-    const discardLimitedDaysDraft = () => {
-      syncLimitedDaysDraft();
-      limitedDaysDialog.close();
-    };
-
-    document.querySelector('[data-limited-days-open]')?.addEventListener('click', () => {
-      syncLimitedDaysDraft();
-      limitedDaysDialog?.showModal();
-    });
-    limitedDaysDialog?.querySelectorAll('[data-limited-days-close]').forEach((button) => {
-      button.addEventListener('click', discardLimitedDaysDraft);
-    });
-    limitedDaysDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardLimitedDaysDraft();
-    });
-    limitedDaysEnabledInput?.addEventListener('change', () => {
-      limitedDaysFields.disabled = !limitedDaysEnabledInput.checked;
-      limitedDaysFields.classList.toggle('is-disabled', !limitedDaysEnabledInput.checked);
-      limitedDaysDialog.querySelector('[data-limited-days-divider]')?.classList.toggle('is-hidden', !limitedDaysEnabledInput.checked);
-      limitedDaysDialog.querySelectorAll('[data-limited-day-row]').forEach((row) => {
-        const checked = row.querySelector('[name="limitedDayWeekday"]').checked;
-        row.querySelector('input[type="number"]').disabled = !limitedDaysEnabledInput.checked || !checked;
-      });
-      setFieldErrors(limitedDaysDialog, {});
-    });
-    limitedDaysDialog?.querySelectorAll('[name="limitedDayWeekday"]').forEach((checkbox) => {
-      checkbox.addEventListener('change', () => {
-        const row = checkbox.closest('[data-limited-day-row]');
-        row.classList.toggle('is-active', checkbox.checked);
-        row.querySelector('input[type="number"]').disabled = !checkbox.checked;
-      });
-    });
-    limitedDaysDialog?.querySelector('[data-limited-days-apply]')?.addEventListener('click', () => {
-      const enabled = limitedDaysEnabledInput.checked;
-      const rules = [...limitedDaysDialog.querySelectorAll('[name="limitedDayWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          capacity: Number(limitedDaysDialog.querySelector(`[name="limitedDayCapacity-${weekday}"]`).value)
-        };
-      });
-      const errors = {};
-
-      if (enabled && !rules.length) errors.limitedDayRules = 'Selecione pelo menos um dia.';
-      if (enabled && rules.some((rule) => !Number.isInteger(rule.capacity) || rule.capacity < 1 || rule.capacity > 100)) {
-        errors.limitedDayRules = 'Informe entre 1 e 100 vagas em cada dia selecionado.';
-      }
-      setFieldErrors(limitedDaysDialog, errors);
-      if (Object.keys(errors).length) return;
-
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) {
-        record.limitedDaysEnabled = enabled;
-        if (enabled) {
-          record.limitedDayRules = rules;
-          record.limitedWeekdays = rules.map((rule) => rule.weekday);
-          record.limitedDayCapacity = rules[0].capacity;
-        }
-      }
-      limitedDaysDialog.querySelector('[name="limitedDayRules"]').value = JSON.stringify(enabled ? rules : record.limitedDayRules);
-      document.querySelector('[data-limited-days-summary]').textContent = enabled
-        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
-        : 'Desativado';
-      limitedDaysDialog.close();
-    });
-    const meiQuotaDialog = document.querySelector('#mei-quota-dialog');
-    const meiQuotaEnabledInput = document.querySelector('#settings-mei-quota-enabled');
-    const meiQuotaFields = meiQuotaDialog?.querySelector('[data-field="meiQuotaRules"]');
-    const syncMeiQuotaDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !meiQuotaDialog) return;
-      meiQuotaEnabledInput.checked = record.meiQuotaEnabled;
-      meiQuotaDialog.querySelector('[name="meiQuotaRules"]').value = JSON.stringify(record.meiQuotaRules);
-      meiQuotaDialog.querySelectorAll('[data-mei-day-row]').forEach((row) => {
-        const weekday = Number(row.dataset.meiDayRow);
-        const rule = record.meiQuotaRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="meiQuotaWeekday"]');
-        const morningInput = row.querySelector(`[name="meiMorningQuota-${weekday}"]`);
-        const afternoonInput = row.querySelector(`[name="meiAfternoonQuota-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        morningInput.value = rule?.morningQuota ?? record.meiMorningQuota;
-        afternoonInput.value = rule?.afternoonQuota ?? record.meiAfternoonQuota;
-        morningInput.disabled = !rule || !record.meiQuotaEnabled;
-        afternoonInput.disabled = !rule || !record.meiQuotaEnabled;
-        row.classList.toggle('is-active', Boolean(rule));
-        row.querySelector('[data-mei-day-total]').textContent = `${Number(morningInput.value) + Number(afternoonInput.value)} total`;
-      });
-      meiQuotaFields.disabled = !record.meiQuotaEnabled;
-      meiQuotaFields.classList.toggle('is-disabled', !record.meiQuotaEnabled);
-      meiQuotaDialog.querySelector('[data-mei-quota-divider]')?.classList.toggle('is-hidden', !record.meiQuotaEnabled);
-      setFieldErrors(meiQuotaDialog, {});
-    };
-    const discardMeiQuotaDraft = () => {
-      syncMeiQuotaDraft();
-      meiQuotaDialog.close();
-    };
-
-    document.querySelector('[data-mei-quota-open]')?.addEventListener('click', () => {
-      syncMeiQuotaDraft();
-      meiQuotaDialog?.showModal();
-    });
-    meiQuotaDialog?.querySelectorAll('[data-mei-quota-close]').forEach((button) => {
-      button.addEventListener('click', discardMeiQuotaDraft);
-    });
-    meiQuotaDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardMeiQuotaDraft();
-    });
-    meiQuotaEnabledInput?.addEventListener('change', () => {
-      meiQuotaFields.disabled = !meiQuotaEnabledInput.checked;
-      meiQuotaFields.classList.toggle('is-disabled', !meiQuotaEnabledInput.checked);
-      meiQuotaDialog.querySelector('[data-mei-quota-divider]')?.classList.toggle('is-hidden', !meiQuotaEnabledInput.checked);
-      meiQuotaDialog.querySelectorAll('[data-mei-day-row]').forEach((row) => {
-        const checked = row.querySelector('[name="meiQuotaWeekday"]').checked;
-        row.querySelectorAll('input[type="number"]').forEach((input) => {
-          input.disabled = !meiQuotaEnabledInput.checked || !checked;
-        });
-      });
-      setFieldErrors(meiQuotaDialog, {});
-    });
-    meiQuotaDialog?.querySelectorAll('[data-mei-day-row]').forEach((row) => {
-      const checkbox = row.querySelector('[name="meiQuotaWeekday"]');
-      const quotaInputs = [...row.querySelectorAll('input[type="number"]')];
-      checkbox.addEventListener('change', () => {
-        row.classList.toggle('is-active', checkbox.checked);
-        quotaInputs.forEach((input) => { input.disabled = !checkbox.checked; });
-      });
-      quotaInputs.forEach((input) => input.addEventListener('input', () => {
-        row.querySelector('[data-mei-day-total]').textContent = `${Number(quotaInputs[0].value) + Number(quotaInputs[1].value)} total`;
-      }));
-    });
-    meiQuotaDialog?.querySelector('[data-mei-quota-apply]')?.addEventListener('click', () => {
-      const enabled = meiQuotaEnabledInput.checked;
-      const rules = [...meiQuotaDialog.querySelectorAll('[name="meiQuotaWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          morningQuota: Number(meiQuotaDialog.querySelector(`[name="meiMorningQuota-${weekday}"]`).value),
-          afternoonQuota: Number(meiQuotaDialog.querySelector(`[name="meiAfternoonQuota-${weekday}"]`).value)
-        };
-      });
-      const errors = {};
-
-      if (enabled && !rules.length) errors.meiQuotaRules = 'Selecione pelo menos um dia.';
-      if (enabled && rules.some((rule) => !Number.isInteger(rule.morningQuota) || rule.morningQuota < 0 || rule.morningQuota > 100
-        || !Number.isInteger(rule.afternoonQuota) || rule.afternoonQuota < 0 || rule.afternoonQuota > 100
-        || rule.morningQuota + rule.afternoonQuota < 1)) {
-        errors.meiQuotaRules = 'Informe cotas válidas em cada dia selecionado.';
-      }
-      setFieldErrors(meiQuotaDialog, errors);
-      if (Object.keys(errors).length) return;
-
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (record) {
-        record.meiQuotaEnabled = enabled;
-        if (enabled) {
-          record.meiQuotaRules = rules;
-          record.meiQuotaWeekdays = rules.map((rule) => rule.weekday);
-          record.meiMorningQuota = rules[0].morningQuota;
-          record.meiAfternoonQuota = rules[0].afternoonQuota;
-          record.meiDailyQuota = rules[0].morningQuota + rules[0].afternoonQuota;
-        }
-      }
-      meiQuotaDialog.querySelector('[name="meiQuotaRules"]').value = JSON.stringify(enabled ? rules : record.meiQuotaRules);
-      document.querySelector('[data-mei-quota-summary]').textContent = enabled
-        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
-        : 'Desativadas';
-      meiQuotaDialog.close();
-    });
-    const ophthalmologyDialog = document.querySelector('#ophthalmology-dialog');
-    const optometristEnabledInput = document.querySelector('#settings-optometrist-enabled');
-    const optometristFieldsGroup = ophthalmologyDialog?.querySelector('[data-optometrist-fields]');
-    const ophthalmologyEnabledInput = document.querySelector('#settings-ophthalmology-enabled');
-    const ophthalmologyFields = ophthalmologyDialog?.querySelector('[data-ophthalmology-fields]');
-    const setOptometristFieldsState = () => {
-      const enabled = optometristEnabledInput.checked;
-      optometristFieldsGroup.disabled = !enabled;
-      optometristFieldsGroup.classList.toggle('is-disabled', !enabled);
-      ophthalmologyDialog.scrollTop = 0;
-      ophthalmologyDialog.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
-        const checked = row.querySelector('[name="optometristWeekday"]').checked;
-        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
-      });
-    };
-    const setOphthalmologyFieldsState = () => {
-      const enabled = ophthalmologyEnabledInput.checked;
-      ophthalmologyFields.classList.toggle('is-disabled', !enabled);
-      ophthalmologyDialog.scrollTop = 0;
-    };
-    const syncOphthalmologyDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !ophthalmologyDialog) return;
-      optometristEnabledInput.checked = record.optometristEnabled;
-      ophthalmologyEnabledInput.checked = record.ophthalmologyRoutingEnabled;
-      scheduleSettingsForm.elements.optometristExamPrice.value = record.optometristExamPrice;
-      scheduleSettingsForm.elements.ophthalmologistExamPrice.value = record.ophthalmologistExamPrice;
-      scheduleSettingsForm.elements.optometristOpeningTime.value = record.optometristOpeningTime;
-      scheduleSettingsForm.elements.optometristClosingTime.value = record.optometristClosingTime;
-      ophthalmologyDialog.querySelector('[name="optometristHoursRules"]').value = JSON.stringify(record.optometristHoursRules);
-      ophthalmologyDialog.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
-        const weekday = Number(row.dataset.optometristHoursRow);
-        const rule = record.optometristHoursRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="optometristWeekday"]');
-        const openingInput = row.querySelector(`[name="optometristOpeningTime-${weekday}"]`);
-        const closingInput = row.querySelector(`[name="optometristClosingTime-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        openingInput.value = rule?.openingTime || record.optometristOpeningTime;
-        closingInput.value = rule?.closingTime || record.optometristClosingTime;
-        row.classList.toggle('is-active', Boolean(rule));
-      });
-      ophthalmologyDialog.querySelector('[name="optometristWeekdays"]').value = JSON.stringify(record.optometristWeekdays);
-      scheduleSettingsForm.elements.ophthalmologyMinimumAge.value = record.ophthalmologyMinimumAge;
-      scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = record.ophthalmologyOpeningTime;
-      scheduleSettingsForm.elements.ophthalmologyClosingTime.value = record.ophthalmologyClosingTime;
-      ophthalmologyDialog.querySelector('[name="ophthalmologyHoursRules"]').value = JSON.stringify(record.ophthalmologyHoursRules);
-      ophthalmologyDialog.querySelectorAll('[data-ophthalmology-hours-row]').forEach((row) => {
-        const weekday = Number(row.dataset.ophthalmologyHoursRow);
-        const rule = record.ophthalmologyHoursRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="ophthalmologyWeekday"]');
-        const openingInput = row.querySelector(`[name="ophthalmologyOpeningTime-${weekday}"]`);
-        const closingInput = row.querySelector(`[name="ophthalmologyClosingTime-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        openingInput.value = rule?.openingTime || record.ophthalmologyOpeningTime;
-        closingInput.value = rule?.closingTime || record.ophthalmologyClosingTime;
-        openingInput.disabled = !rule;
-        closingInput.disabled = !rule;
-        row.classList.toggle('is-active', Boolean(rule));
-      });
-      ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(record.ophthalmologyWeekdays);
-      setOptometristFieldsState();
-      setOphthalmologyFieldsState();
-      setFieldErrors(ophthalmologyDialog, {});
-    };
-    const discardOphthalmologyDraft = () => {
-      syncOphthalmologyDraft();
-      ophthalmologyDialog.close();
-    };
-    document.querySelector('[data-ophthalmology-open]')?.addEventListener('click', () => {
-      syncOphthalmologyDraft();
-      ophthalmologyDialog?.showModal();
-    });
-    ophthalmologyDialog?.querySelectorAll('[data-ophthalmology-close]').forEach((button) => button.addEventListener('click', discardOphthalmologyDraft));
-    ophthalmologyDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardOphthalmologyDraft();
-    });
-    optometristEnabledInput?.addEventListener('change', setOptometristFieldsState);
-    ophthalmologyEnabledInput?.addEventListener('change', setOphthalmologyFieldsState);
-    ophthalmologyDialog?.querySelectorAll('[data-optometrist-hours-row]').forEach((row) => {
-      const checkbox = row.querySelector('[name="optometristWeekday"]');
-      const timeInputs = [...row.querySelectorAll('input[type="time"]')];
-      checkbox.addEventListener('change', () => {
-        row.classList.toggle('is-active', checkbox.checked);
-        timeInputs.forEach((input) => { input.disabled = !optometristEnabledInput.checked || !checkbox.checked; });
-      });
-    });
-    ophthalmologyDialog?.querySelectorAll('[data-ophthalmology-hours-row]').forEach((row) => {
-      const checkbox = row.querySelector('[name="ophthalmologyWeekday"]');
-      const timeInputs = [...row.querySelectorAll('input[type="time"]')];
-      checkbox.addEventListener('change', () => {
-        row.classList.toggle('is-active', checkbox.checked);
-        timeInputs.forEach((input) => { input.disabled = !checkbox.checked; });
-      });
-    });
-    ophthalmologyDialog?.querySelector('[data-ophthalmology-apply]')?.addEventListener('click', () => {
-      const optometristEnabled = optometristEnabledInput.checked;
-      const enabled = ophthalmologyEnabledInput.checked;
-      const optometristHoursRules = [...ophthalmologyDialog.querySelectorAll('[name="optometristWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          openingTime: ophthalmologyDialog.querySelector(`[name="optometristOpeningTime-${weekday}"]`).value,
-          closingTime: ophthalmologyDialog.querySelector(`[name="optometristClosingTime-${weekday}"]`).value
-        };
-      });
-      const ophthalmologyHoursRules = [...ophthalmologyDialog.querySelectorAll('[name="ophthalmologyWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          openingTime: ophthalmologyDialog.querySelector(`[name="ophthalmologyOpeningTime-${weekday}"]`).value,
-          closingTime: ophthalmologyDialog.querySelector(`[name="ophthalmologyClosingTime-${weekday}"]`).value
-        };
-      });
-      const primaryHours = ophthalmologyHoursRules[0] || {
-        openingTime: scheduleSettingsForm.elements.ophthalmologyOpeningTime.value,
-        closingTime: scheduleSettingsForm.elements.ophthalmologyClosingTime.value
-      };
-      const primaryOptometristHours = optometristHoursRules[0] || {
-        openingTime: scheduleSettingsForm.elements.optometristOpeningTime.value,
-        closingTime: scheduleSettingsForm.elements.optometristClosingTime.value
-      };
-      const candidate = {
-        optometristEnabled,
-        optometristWeekdays: optometristHoursRules.map((rule) => rule.weekday),
-        optometristOpeningTime: primaryOptometristHours.openingTime,
-        optometristClosingTime: primaryOptometristHours.closingTime,
-        optometristHoursRules,
-        ophthalmologyRoutingEnabled: enabled,
-        optometristExamPrice: Number(scheduleSettingsForm.elements.optometristExamPrice.value),
-        ophthalmologistExamPrice: Number(scheduleSettingsForm.elements.ophthalmologistExamPrice.value),
-        ophthalmologyMinimumAge: Number(scheduleSettingsForm.elements.ophthalmologyMinimumAge.value),
-        ophthalmologyWeekdays: ophthalmologyHoursRules.map((rule) => rule.weekday),
-        ophthalmologyOpeningTime: primaryHours.openingTime,
-        ophthalmologyClosingTime: primaryHours.closingTime,
-        ophthalmologyHoursRules,
-        ophthalmologyPathologyIds: ['cataract'],
-        ophthalmologySurgeryIds: ['cataract']
-      };
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      const validation = validateStoreSchedule({ ...record, ...candidate });
-      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => (
-        name.startsWith('ophthalmology') || ['optometristExamPrice', 'ophthalmologistExamPrice'].includes(name)
-      )));
-      setFieldErrors(ophthalmologyDialog, errors);
-      if (Object.keys(errors).length) return;
-      Object.assign(record, candidate);
-      ophthalmologyDialog.querySelector('[name="optometristWeekdays"]').value = JSON.stringify(candidate.optometristWeekdays);
-      ophthalmologyDialog.querySelector('[name="optometristHoursRules"]').value = JSON.stringify(optometristHoursRules);
-      scheduleSettingsForm.elements.optometristOpeningTime.value = primaryOptometristHours.openingTime;
-      scheduleSettingsForm.elements.optometristClosingTime.value = primaryOptometristHours.closingTime;
-      ophthalmologyDialog.querySelector('[name="ophthalmologyWeekdays"]').value = JSON.stringify(candidate.ophthalmologyWeekdays);
-      ophthalmologyDialog.querySelector('[name="ophthalmologyHoursRules"]').value = JSON.stringify(ophthalmologyHoursRules);
-      scheduleSettingsForm.elements.ophthalmologyOpeningTime.value = primaryHours.openingTime;
-      scheduleSettingsForm.elements.ophthalmologyClosingTime.value = primaryHours.closingTime;
-      document.querySelector('[data-ophthalmology-summary]').textContent = `Optometrista ${candidate.optometristExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Oftalmologista ${candidate.ophthalmologistExamPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
-      ophthalmologyDialog.close();
-    });
-    const transportDialog = document.querySelector('#transport-dialog');
-    const transportEnabledInput = document.querySelector('#settings-transport-enabled');
-    const transportFieldsGroup = transportDialog?.querySelector('[data-transport-fields]');
-    const setTransportFieldsState = () => {
-      const enabled = transportEnabledInput.checked;
-      transportFieldsGroup.disabled = !enabled;
-      transportFieldsGroup.classList.toggle('is-disabled', !enabled);
-      transportDialog.querySelector('[data-transport-divider]')?.classList.toggle('is-hidden', !enabled);
-      transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
-        const checked = row.querySelector('[name="transportWeekday"]').checked;
-        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !enabled || !checked; });
-      });
-    };
-    const syncTransportDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !transportDialog) return;
-      transportEnabledInput.checked = record.transportEnabled;
-      scheduleSettingsForm.elements.maxCompanions.value = record.maxCompanions;
-      transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(record.transportHoursRules);
-      transportDialog.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
-        const weekday = Number(row.dataset.transportHoursRow);
-        const rule = record.transportHoursRules.find((item) => item.weekday === weekday);
-        const checkbox = row.querySelector('[name="transportWeekday"]');
-        const openingInput = row.querySelector(`[name="transportOpeningTime-${weekday}"]`);
-        const closingInput = row.querySelector(`[name="transportClosingTime-${weekday}"]`);
-        checkbox.checked = Boolean(rule);
-        openingInput.value = rule?.openingTime || '08:00';
-        closingInput.value = rule?.closingTime || '18:00';
-        row.classList.toggle('is-active', Boolean(rule));
-      });
-      setTransportFieldsState();
-      setFieldErrors(transportDialog, {});
-    };
-    const discardTransportDraft = () => {
-      syncTransportDraft();
-      transportDialog.close();
-    };
-    document.querySelector('[data-transport-open]')?.addEventListener('click', () => {
-      syncTransportDraft();
-      transportDialog.showModal();
-    });
-    transportDialog?.querySelectorAll('[data-transport-close]').forEach((button) => button.addEventListener('click', discardTransportDraft));
-    transportDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardTransportDraft();
-    });
-    transportEnabledInput?.addEventListener('change', setTransportFieldsState);
-    transportDialog?.querySelectorAll('[data-transport-hours-row]').forEach((row) => {
-      const checkbox = row.querySelector('[name="transportWeekday"]');
-      checkbox.addEventListener('change', () => {
-        row.classList.toggle('is-active', checkbox.checked);
-        row.querySelectorAll('input[type="time"]').forEach((input) => { input.disabled = !checkbox.checked; });
-      });
-    });
-    transportDialog?.querySelector('[data-transport-apply]')?.addEventListener('click', () => {
-      const enabled = transportEnabledInput.checked;
-      const rules = [...transportDialog.querySelectorAll('[name="transportWeekday"]:checked')].map((checkbox) => {
-        const weekday = Number(checkbox.value);
-        return {
-          weekday,
-          openingTime: transportDialog.querySelector(`[name="transportOpeningTime-${weekday}"]`).value,
-          closingTime: transportDialog.querySelector(`[name="transportClosingTime-${weekday}"]`).value
-        };
-      });
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      const candidate = {
-        ...record,
-        transportEnabled: enabled,
-        transportHoursRules: rules,
-        maxCompanions: Number(scheduleSettingsForm.elements.maxCompanions.value)
-      };
-      const validation = validateStoreSchedule(candidate);
-      const errors = Object.fromEntries(Object.entries(validation.errors).filter(([name]) => name.startsWith('transport')));
-      setFieldErrors(transportDialog, errors);
-      if (Object.keys(errors).length) return;
-      record.transportEnabled = enabled;
-      record.maxCompanions = candidate.maxCompanions;
-      if (enabled) record.transportHoursRules = rules;
-      transportDialog.querySelector('[name="transportHoursRules"]').value = JSON.stringify(enabled ? rules : record.transportHoursRules);
-      document.querySelector('[data-transport-summary]').textContent = enabled
-        ? `${rules.length} ${rules.length === 1 ? 'dia configurado' : 'dias configurados'}`
-        : 'Desativado';
-      transportDialog.close();
-    });
-    const offlineCaptureDialog = document.querySelector('#offline-capture-dialog');
-    const offlineCaptureEnabledInput = document.querySelector('#settings-offline-capture-enabled');
-    const syncOfflineCaptureDraft = () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record || !offlineCaptureDialog) return;
-      offlineCaptureEnabledInput.checked = record.offlineCaptureEnabled;
-    };
-    const discardOfflineCaptureDraft = () => {
-      syncOfflineCaptureDraft();
-      offlineCaptureDialog.close();
-    };
-    document.querySelector('[data-offline-capture-open]')?.addEventListener('click', () => {
-      syncOfflineCaptureDraft();
-      offlineCaptureDialog?.showModal();
-    });
-    offlineCaptureDialog?.querySelectorAll('[data-offline-capture-close]').forEach((button) => {
-      button.addEventListener('click', discardOfflineCaptureDraft);
-    });
-    offlineCaptureDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      discardOfflineCaptureDraft();
-    });
-    offlineCaptureDialog?.querySelector('[data-offline-capture-apply]')?.addEventListener('click', () => {
-      const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
-      if (!record) return;
-      record.offlineCaptureEnabled = offlineCaptureEnabledInput.checked;
-      document.querySelector('[data-offline-capture-summary]').textContent = record.offlineCaptureEnabled ? 'Ativado' : 'Desativado';
-      offlineCaptureDialog.close();
-    });
-    scheduleSettingsForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (state.settings.saving) return;
-      const currentStoreId = scheduleSettingsForm.elements.storeId.value;
-      const current = state.settings.records.find((item) => item.id === currentStoreId) || DEFAULT_STORE_SCHEDULE;
-      const values = scheduleSettingsValues(scheduleSettingsForm, current);
-      state.settings.saving = true;
-      state.settings.error = '';
-      setFieldErrors(scheduleSettingsForm, {});
-      try {
-        if (state.demoMode) {
-          const record = state.settings.records.find((item) => item.id === values.storeId);
-          Object.assign(record, values, {
-            appointmentDurationMinutes: Number(values.appointmentDurationMinutes),
-            noShowGraceMinutes: Number(values.noShowGraceMinutes),
-            rescheduleAfterMinutes: Number(values.rescheduleAfterMinutes),
-            automaticPendingFollowUp: values.automaticPendingFollowUp,
-            showAmetropiaFields: values.showAmetropiaFields,
-            storeHoursRules: values.storeHoursRules,
-            limitedDaysEnabled: values.limitedDaysEnabled,
-            limitedDayRules: values.limitedDayRules,
-            limitedWeekdays: values.limitedWeekdays,
-            limitedDayCapacity: values.limitedDayCapacity,
-            meiDailyQuota: values.meiDailyQuota,
-            meiQuotaEnabled: values.meiQuotaEnabled,
-            meiQuotaRules: values.meiQuotaRules,
-            meiQuotaWeekdays: values.meiQuotaWeekdays,
-            meiMorningQuota: values.meiMorningQuota,
-            meiAfternoonQuota: values.meiAfternoonQuota,
-            optometristEnabled: values.optometristEnabled,
-            optometristWeekdays: values.optometristWeekdays,
-            optometristOpeningTime: values.optometristOpeningTime,
-            optometristClosingTime: values.optometristClosingTime,
-            optometristHoursRules: values.optometristHoursRules,
-            ophthalmologyRoutingEnabled: values.ophthalmologyRoutingEnabled,
-            ophthalmologyMinimumAge: values.ophthalmologyMinimumAge,
-            ophthalmologyWeekdays: values.ophthalmologyWeekdays,
-            ophthalmologyOpeningTime: values.ophthalmologyOpeningTime,
-            ophthalmologyClosingTime: values.ophthalmologyClosingTime,
-            ophthalmologyHoursRules: values.ophthalmologyHoursRules,
-            ophthalmologyPathologyIds: values.ophthalmologyPathologyIds,
-            ophthalmologySurgeryIds: values.ophthalmologySurgeryIds,
-            optometristExamPrice: values.optometristExamPrice,
-            ophthalmologistExamPrice: values.ophthalmologistExamPrice,
-            transportEnabled: values.transportEnabled,
-            maxCompanions: values.maxCompanions,
-            transportHoursRules: values.transportHoursRules,
-            offlineCaptureEnabled: values.offlineCaptureEnabled
-          });
-          if (values.storeId === state.profile.storeId) {
-            state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...record };
-            state.followUps.settings = { ...state.followUps.settings, ...record };
-            state.offlineCapture = { loaded: true, enabled: record.offlineCaptureEnabled };
-          }
-        } else {
-          const result = await saveStoreSchedule(state.profile, values.storeId, values);
-          if (!result.isValid) {
-            state.settings.saving = false;
-            setFieldErrors(scheduleSettingsForm, result.errors);
-            return;
-          }
-          const record = state.settings.records.find((item) => item.id === values.storeId);
-          Object.assign(record, result.data);
-          if (values.storeId === state.profile.storeId) {
-            state.newLeadSchedule.settings = { ...state.newLeadSchedule.settings, ...result.data };
-            state.followUps.settings = { ...state.followUps.settings, ...result.data };
-            state.offlineCapture = { loaded: true, enabled: result.data.offlineCaptureEnabled };
-          }
-        }
-        state.settings.saving = false;
-        render();
-        showToast('Configuração da agenda salva.');
-      } catch (error) {
-        state.settings.saving = false;
-        state.settings.error = error?.code === 'permission-denied'
-          ? 'Seu perfil não pode alterar estas configurações.'
-          : 'Não foi possível salvar a configuração.';
-        render();
-      }
-    });
-  }
-
-  const goalForm = document.querySelector('#goal-form');
-  if (goalForm) {
-    const goalEditorDialog = document.querySelector('#goal-editor-dialog');
-    const reopenGoalEditor = (focusTitle = false) => requestAnimationFrame(() => {
-      const dialog = document.querySelector('#goal-editor-dialog');
-      dialog?.showModal();
-      if (focusTitle) document.querySelector('#goal-title')?.focus();
-    });
-    const readDraft = () => ({
-      title: goalForm.elements.title.value,
-      targetCount: Number(goalForm.elements.targetCount.value),
-      startDate: goalForm.elements.startDate.value,
-      endDate: goalForm.elements.endDate.value,
-      storeId: goalForm.elements.storeId.value,
-      assigneeUids: new FormData(goalForm).getAll('assigneeUids')
-    });
-
-    goalForm.elements.storeId.addEventListener('change', () => {
-      state.goals.draft = { ...readDraft(), assigneeUids: [] };
-      render();
-      reopenGoalEditor();
-    });
-
-    goalForm.querySelectorAll('[name="assigneeUids"]').forEach((input) => {
-      input.addEventListener('change', () => {
-        state.goals.draft = readDraft();
-        const selectedCount = state.goals.draft.assigneeUids.length;
-        const count = goalForm.querySelector('[data-goal-selected-count]');
-        if (count) count.textContent = `${selectedCount} selecionado(s)`;
-      });
-    });
-
-    goalEditorDialog?.addEventListener('cancel', (event) => {
-      event.preventDefault();
-      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
-      state.goals.editorOpen = false;
-      state.goals.editingGroupId = '';
-      state.goals.duplicatingGroupId = '';
-      state.goals.draft = createDefaultGoalDraft(storeId);
-      render();
-    });
-
-    goalForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (state.goals.saving) return;
-      state.goals.draft = readDraft();
-      state.goals.saving = true;
-      state.goals.error = '';
-      setFieldErrors(goalForm, {});
-
-      try {
-        const editingGroup = groupGoalRecords(state.goals.records).find((group) => group.id === state.goals.editingGroupId);
-        const result = editingGroup
-          ? await updateGoalGroup(state.profile, editingGroup.goals, state.goals.draft, state.goals.members)
-          : await createGoals(state.profile, state.goals.draft, state.goals.members);
-        if (!result.isValid) {
-          state.goals.saving = false;
-          setFieldErrors(goalForm, result.errors);
-          return;
-        }
-        const createdCount = state.goals.draft.assigneeUids.length;
-        state.goals.draft = createDefaultGoalDraft(state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId);
-        state.goals.editorOpen = false;
-        state.goals.editingGroupId = '';
-        state.goals.duplicatingGroupId = '';
-        state.goals.loaded = false;
-        await loadGoalsData();
-        showToast(editingGroup ? 'Meta atualizada.' : `${createdCount} meta(s) criada(s).`);
-      } catch (error) {
-        state.goals.saving = false;
-        state.goals.error = error?.code === 'permission-denied'
-          ? 'Seu perfil não possui permissão para salvar esta meta.'
-          : 'Não foi possível salvar a meta. Verifique a conexão e tente novamente.';
-        render();
-        reopenGoalEditor();
-      }
-    });
-  }
 
   const followUpCaptorDialog = document.querySelector('#follow-up-captor-dialog');
   followUpCaptorDialog?.addEventListener('cancel', () => {
@@ -1988,446 +984,67 @@ function ensureManagementData() {
   loadDashboardUpcomingData();
 }
 
-function existingLeadForDetail() {
-  const leadId = currentRouteParam();
+function existingLeadForDetail(leadId = currentRouteParam()) {
   return state.route === 'management-lead'
     ? findManagementLead(leadId)
     : state.leads.find((item) => item.id === leadId);
 }
 
 function refreshLeadDetailAppointmentTime(lead) {
-  const container = document.querySelector('#edit-appointment-time-field');
-  if (container && lead) container.outerHTML = leadDetailAppointmentTimeField(lead);
+  refreshLeadDetailAppointmentTimeField(lead, leadDetailAppointmentTimeField);
 }
 
 function startLeadDetailDayAppointmentsSubscription(lead) {
-  state.unsubscribeDayAppointments?.();
-  state.unsubscribeDayAppointments = null;
-  state.leadDetailSchedule.appointments = [];
-  state.leadDetailSchedule.error = '';
-  const appointmentDate = state.leadDetailSchedule.appointmentDate;
-  if (!lead || !appointmentDate || state.leadDetailSchedule.settings.schedulingMode === 'free') {
-    state.leadDetailSchedule.appointmentLoading = false;
-    refreshLeadDetailAppointmentTime(lead);
-    return;
-  }
-
-  if (state.demoMode) {
-    state.leadDetailSchedule.appointments = state.leads.filter((item) => item.appointmentDate === appointmentDate);
-    state.leadDetailSchedule.appointmentLoading = false;
-    refreshLeadDetailAppointmentTime(lead);
-    return;
-  }
-
-  state.leadDetailSchedule.appointmentLoading = true;
-  refreshLeadDetailAppointmentTime(lead);
-  try {
-    state.unsubscribeDayAppointments = subscribeToDayAppointments(
-      { ...state.profile, storeId: lead.storeId },
-      appointmentDate,
-      (appointments) => {
-        if (state.leadDetailSchedule.appointmentDate !== appointmentDate) return;
-        state.leadDetailSchedule.appointments = appointments;
-        state.leadDetailSchedule.appointmentLoading = false;
-        state.leadDetailSchedule.error = '';
-        refreshLeadDetailAppointmentTime(existingLeadForDetail());
-      },
-      () => {
-        if (state.leadDetailSchedule.appointmentDate !== appointmentDate) return;
-        state.leadDetailSchedule.appointmentLoading = false;
-        state.leadDetailSchedule.error = 'Não foi possível consultar os horários.';
-        refreshLeadDetailAppointmentTime(existingLeadForDetail());
-      },
-      lead.storeId
-    );
-  } catch {
-    state.leadDetailSchedule.appointmentLoading = false;
-    state.leadDetailSchedule.error = 'Não foi possível consultar os horários.';
-    refreshLeadDetailAppointmentTime(lead);
-  }
+  return startLeadDetailDayAppointments({ state, lead, findLead: existingLeadForDetail, renderTimeField: leadDetailAppointmentTimeField });
 }
 
-async function ensureLeadDetailSchedule() {
-  if (!['lead', 'management-lead'].includes(state.route) || !state.profile || state.leadDetailSchedule.loading) return;
-  const leadId = currentRouteParam();
-  const lead = state.route === 'management-lead'
-    ? findManagementLead(leadId)
-    : state.leads.find((item) => item.id === leadId);
-  if (!lead?.storeId || (state.leadDetailSchedule.leadId === lead.id && state.leadDetailSchedule.storeId === lead.storeId)) return;
-
-  state.leadDetailSchedule.loading = true;
-  state.leadDetailSchedule.leadId = lead.id;
-  state.leadDetailSchedule.appointmentDate = lead.appointmentDate || '';
-  state.leadDetailSchedule.appointments = [];
-  state.leadDetailSchedule.services = [];
-  state.leadDetailSchedule.serviceId = lead.appointmentServiceId || '';
-  state.leadDetailSchedule.error = '';
-  try {
-    const [settings, services] = state.demoMode
-      ? [
-          state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId },
-          state.settings.services.length
-            ? state.settings.services
-            : [defaultAppointmentService(lead.storeId, lead.appointmentDurationMinutes || DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)]
-        ]
-      : await Promise.all([
-          loadStoreSchedule(state.profile, lead.storeId),
-          loadAppointmentServices(state.profile)
-        ]);
-    state.leadDetailSchedule.storeId = lead.storeId;
-    state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...settings };
-    state.leadDetailSchedule.services = services;
-    if (!servicesForStore(state.leadDetailSchedule.services, lead.storeId).length) {
-      state.leadDetailSchedule.services.push(defaultAppointmentService(lead.storeId, state.leadDetailSchedule.settings.appointmentDurationMinutes));
-    }
-    const availableServices = servicesForStore(state.leadDetailSchedule.services, lead.storeId);
-    state.leadDetailSchedule.serviceId = availableServices.some((service) => service.id === lead.appointmentServiceId)
-      ? lead.appointmentServiceId
-      : availableServices[0]?.id || '';
-  } catch {
-    state.leadDetailSchedule.storeId = lead.storeId;
-    state.leadDetailSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
-    state.leadDetailSchedule.services = [defaultAppointmentService(lead.storeId, lead.appointmentDurationMinutes || DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)];
-    state.leadDetailSchedule.serviceId = state.leadDetailSchedule.services[0].id;
-    state.leadDetailSchedule.error = 'Não foi possível carregar a agenda desta loja.';
-  } finally {
-    state.leadDetailSchedule.loading = false;
-    render();
-    startLeadDetailDayAppointmentsSubscription(lead);
-  }
+function ensureLeadDetailSchedule() {
+  return ensureLeadDetailScheduleData({ state, routeParam: currentRouteParam, findLead: existingLeadForDetail, render, renderTimeField: leadDetailAppointmentTimeField });
 }
 
 function stopAppointmentsSubscription() {
-  state.unsubscribeAppointments?.();
-  state.unsubscribeAppointments = null;
+  stopAppointmentsLive(state);
 }
 
 function stopConfirmationsSubscription() {
-  state.unsubscribeConfirmations?.();
-  state.unsubscribeConfirmations = null;
+  stopConfirmationsLive(state);
 }
 
 function startConfirmationsSubscription() {
-  if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'confirmations') return;
-  stopConfirmationsSubscription();
-  const startDate = toLocalDateInput(new Date());
-  const endDate = addDaysToDateInput(startDate, 6);
-  state.confirmations.loading = true;
-  state.confirmations.loaded = false;
-  state.confirmations.error = '';
-  render();
-  state.unsubscribeConfirmations = startConfirmationsLiveSubscription({
-    subscribe: subscribeToAppointmentConfirmations,
-    profile: state.profile,
-    startDate,
-    endDate,
-    onData: (result) => {
-      state.confirmations.records = result.records;
-      state.confirmations.truncated = result.truncated;
-      state.confirmations.loaded = true;
-      state.confirmations.loading = false;
-      render();
-    },
-    onError: (error) => {
-      state.confirmations.error = error?.code === 'permission-denied'
-        ? 'Seu perfil não possui permissão para consultar estas confirmações.'
-        : 'Não foi possível carregar as confirmações. Verifique a conexão e tente novamente.';
-      state.confirmations.loading = false;
-      state.confirmations.loaded = false;
-      stopConfirmationsSubscription();
-      render();
-    }
-  });
+  return startConfirmationsLive({ state, render, hasAccess, subscribe: subscribeToAppointmentConfirmations });
 }
 
 function startAppointmentsSubscription() {
-  if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'appointments') return;
-  stopAppointmentsSubscription();
-  state.appointments.loading = true;
-  state.appointments.loaded = false;
-  state.appointments.error = '';
-  render();
-  state.unsubscribeAppointments = startAppointmentsLiveSubscription({
-    subscribe: subscribeToAppointments,
-    profile: state.profile,
-    month: state.appointments.month,
-    storeId: state.appointments.storeId,
-    onData: (result) => {
-      state.appointments.records = result.records;
-      state.appointments.truncated = result.truncated;
-      state.appointments.loaded = true;
-      state.appointments.loading = false;
-      render();
-      if (isAdmin()
-        && !state.appointments.backfilledMonths.includes(state.appointments.month)
-        && state.appointments.backfillingMonth !== state.appointments.month) {
-        const month = state.appointments.month;
-        state.appointments.backfillingMonth = month;
-        backfillAppointmentSlots(state.profile, result.records, month)
-          .then(() => { state.appointments.backfilledMonths.push(month); })
-          .catch(() => {})
-          .finally(() => { state.appointments.backfillingMonth = ''; });
-      }
-    },
-    onError: (error) => {
-      state.appointments.error = error?.code === 'permission-denied'
-        ? 'Seu perfil não possui permissão para consultar esta agenda.'
-        : 'Não foi possível acompanhar a agenda. Verifique a conexão e tente novamente.';
-      state.appointments.loading = false;
-      state.appointments.loaded = false;
-      stopAppointmentsSubscription();
-      render();
-    }
-  });
+  return startAppointmentsLive({ state, render, hasAccess, isAdmin, subscribe: subscribeToAppointments });
 }
 
-async function openAppointmentCreateDialog() {
-  const allowedStores = STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
-  const preferredStoreId = state.appointments.storeId
-    || (allowedStores.some((store) => store.id === state.profile.storeId) ? state.profile.storeId : allowedStores[0]?.id)
-    || '';
-  state.appointmentCreate = {
-    loading: true,
-    saving: false,
-    error: '',
-    schedules: [],
-    storeId: preferredStoreId,
-    services: [],
-    serviceId: '',
-    draft: {}
-  };
-  render();
-  document.querySelector('#appointment-create-dialog')?.showModal();
-  try {
-    if (state.demoMode) {
-      state.appointmentCreate.schedules = allowedStores.map((store) => ({ ...store, ...DEFAULT_STORE_SCHEDULE }));
-      state.appointmentCreate.services = state.settings.services.length
-        ? state.settings.services.filter((service) => service.active)
-        : [defaultAppointmentService(allowedStores.map((store) => store.id))];
-    } else {
-      [state.appointmentCreate.schedules, state.appointmentCreate.services] = await Promise.all([
-        loadStoreSchedules(state.profile),
-        loadAppointmentServices(state.profile)
-      ]);
-    }
-    const schedule = state.appointmentCreate.schedules.find((item) => item.id === preferredStoreId) || DEFAULT_STORE_SCHEDULE;
-    if (!servicesForStore(state.appointmentCreate.services, preferredStoreId).length) {
-      state.appointmentCreate.services.push(defaultAppointmentService(preferredStoreId, schedule.appointmentDurationMinutes));
-    }
-    state.appointmentCreate.serviceId = servicesForStore(state.appointmentCreate.services, preferredStoreId)[0]?.id || '';
-  } catch {
-    state.appointmentCreate.error = 'Não foi possível carregar os horários das lojas.';
-  } finally {
-    state.appointmentCreate.loading = false;
-    render();
-    document.querySelector('#appointment-create-dialog')?.showModal();
-  }
+function openAppointmentCreateDialog() {
+  return openAppointmentCreate({ state, render, profileStoreIds });
 }
 
 function ensureAppointmentsData() {
-  if (state.route === 'appointments' && hasAccess('appointments.view') && !state.demoMode && !state.unsubscribeAppointments) {
-    startAppointmentsSubscription();
-  }
+  return ensureAppointmentData({ state, hasAccess, startAppointments: startAppointmentsSubscription, startConfirmations: startConfirmationsSubscription });
 }
 
 function ensureConfirmationsData() {
-  if (state.route === 'confirmations' && hasAccess('appointments.view') && !state.demoMode && !state.unsubscribeConfirmations) {
-    startConfirmationsSubscription();
-  }
+  return ensureAppointmentData({ state, hasAccess, startAppointments: startAppointmentsSubscription, startConfirmations: startConfirmationsSubscription });
 }
 
 function stopNewLeadScheduleSubscriptions() {
-  state.unsubscribeStoreSchedule?.();
-  state.unsubscribeStoreSchedule = null;
-  state.unsubscribeDayAppointments?.();
-  state.unsubscribeDayAppointments = null;
+  stopNewLeadSchedules(state);
 }
 
 function refreshAppointmentTimeControl() {
-  const container = document.querySelector('#appointment-time-field');
-  if (container) container.innerHTML = appointmentTimeField();
-  const dateField = document.querySelector('[data-field="appointmentDate"]');
-  const dateStatus = dateField?.querySelector('.schedule-date-status');
-  const { settings, appointmentDate, appointments, loading, error } = state.newLeadSchedule;
-  const service = selectedNewLeadService();
-  const triage = ophthalmologyTriage(state.newLeadSchedule.triage || {}, settings);
-  const routeDateAllowed = isCareRouteDateAllowed(settings, triage.careRoute, appointmentDate);
-  const needsTransport = state.newLeadSchedule.triage?.needsTransport === true || state.newLeadSchedule.triage?.needsTransport === 'true';
-  const transportDateAllowed = !needsTransport || isTransportDateAllowed(settings, appointmentDate);
-  const dateAllowed = routeDateAllowed && transportDateAllowed;
-  const slots = appointmentDate && settings.schedulingMode === 'controlled'
-    ? buildAppointmentSlots(
-      {
-        ...careRouteAppointmentSchedule(settings, triage.careRoute),
-        appointmentDurationMinutes: service.durationMinutes
-      },
-      appointments,
-      '',
-      { appointmentDate, profile: newLeadCaptureProfile() }
-    )
-    : [];
-  const availableSlots = slots.filter((slot) => slot.available && (!needsTransport || isTransportAppointmentAllowed(
-    settings,
-    appointmentDate,
-    slot.time,
-    service.durationMinutes
-  )));
-  const fullyBooked = Boolean(appointmentDate && dateAllowed && !loading && !error && slots.length && !availableSlots.length);
-  dateField?.classList.toggle('is-fully-booked', fullyBooked);
-  dateField?.classList.toggle('is-date-restricted', Boolean(appointmentDate && !dateAllowed));
-  if (dateStatus) dateStatus.textContent = !transportDateAllowed
-    ? 'Não há transporte disponível neste dia.'
-    : !routeDateAllowed
-      ? triage.careRoute === 'ophthalmologist' ? 'O oftalmologista não atende neste dia.' : 'O optometrista não atende neste dia.'
-    : fullyBooked ? 'Dia sem horários disponíveis.' : '';
-}
-
-function refreshNewLeadAmetropiaField() {
-  const form = document.querySelector('#lead-form');
-  const pathologiesField = document.querySelector('#new-lead-pathologies');
-  const existingField = document.querySelector('#new-lead-ametropias');
-  if (!form || !pathologiesField) return;
-
-  if (!state.newLeadSchedule.settings.showAmetropiaFields) {
-    existingField?.remove();
-    return;
-  }
-  if (existingField) return;
-
-  pathologiesField.insertAdjacentHTML('beforebegin', `<fieldset id="new-lead-ametropias" class="field ametropia-field">
-    <legend>Ametropias</legend>
-    <small>Marque todas que se aplicam.</small>
-    <div class="ametropia-options">${ametropiaOptions()}</div>
-  </fieldset>`);
-  bindExclusiveOptions(form, 'ametropiaIds');
+  refreshNewLeadAmetropiaField(state);
+  refreshNewLeadAppointmentTime({ state, appointmentTimeMarkup: appointmentTimeField, selectedService: selectedNewLeadService, captureProfile: newLeadCaptureProfile });
 }
 
 function startDayAppointmentsSubscription() {
-  state.unsubscribeDayAppointments?.();
-  state.unsubscribeDayAppointments = null;
-  state.newLeadSchedule.appointments = [];
-  state.newLeadSchedule.error = '';
-  const appointmentDate = state.newLeadSchedule.appointmentDate;
-  if (!appointmentDate || state.newLeadSchedule.settings.schedulingMode === 'free') {
-    state.newLeadSchedule.loading = false;
-    refreshAppointmentTimeControl();
-    return;
-  }
-
-  if (state.demoMode) {
-    state.newLeadSchedule.appointments = state.leads.filter((lead) => (
-      lead.storeId === selectedNewLeadStoreId() && lead.appointmentDate === appointmentDate
-    ));
-    state.newLeadSchedule.loading = false;
-    refreshAppointmentTimeControl();
-    return;
-  }
-
-  state.newLeadSchedule.loading = true;
-  refreshAppointmentTimeControl();
-  try {
-    state.unsubscribeDayAppointments = subscribeToDayAppointments(
-      newLeadCaptureProfile(),
-      appointmentDate,
-      (appointments) => {
-        state.newLeadSchedule.appointments = appointments;
-        state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = '';
-        refreshAppointmentTimeControl();
-      },
-      () => {
-        state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = 'Não foi possível consultar os horários desta data.';
-        refreshAppointmentTimeControl();
-      },
-      selectedNewLeadStoreId()
-    );
-  } catch {
-    state.newLeadSchedule.loading = false;
-    state.newLeadSchedule.error = 'Não foi possível consultar os horários desta data.';
-    refreshAppointmentTimeControl();
-  }
+  return startNewLeadDayAppointments({ state, selectedStoreId: selectedNewLeadStoreId, captureProfile: newLeadCaptureProfile, refresh: refreshAppointmentTimeControl });
 }
 
-async function ensureNewLeadSchedule() {
-  if (state.route !== 'new' || !state.profile || state.newLeadSchedule.loaded || state.newLeadSchedule.loading) return;
-  const storeId = selectedNewLeadStoreId();
-  state.newLeadSchedule.loading = true;
-  if (state.demoMode) {
-    const configured = state.settings.records.find((item) => item.id === storeId);
-    state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE, ...(configured || {}) };
-    state.newLeadSchedule.services = [...state.settings.services];
-    if (storeId && !servicesForStore(state.newLeadSchedule.services, storeId).length) {
-      state.newLeadSchedule.services.push(defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes));
-    }
-    const availableServices = servicesForStore(state.newLeadSchedule.services, storeId);
-    state.newLeadSchedule.serviceId = availableServices.some((service) => service.id === state.newLeadSchedule.draft.appointmentServiceId)
-      ? state.newLeadSchedule.draft.appointmentServiceId
-      : availableServices[0]?.id || '';
-    state.newLeadSchedule.loaded = true;
-    state.newLeadSchedule.loading = false;
-    render();
-    return;
-  }
-  try {
-    state.newLeadSchedule.services = await loadAppointmentServices(state.profile);
-    if (storeId && !servicesForStore(state.newLeadSchedule.services, storeId).length) {
-      state.newLeadSchedule.services.push(defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes));
-    }
-    const availableServices = servicesForStore(state.newLeadSchedule.services, storeId);
-    state.newLeadSchedule.serviceId = availableServices.some((service) => service.id === state.newLeadSchedule.draft.appointmentServiceId)
-      ? state.newLeadSchedule.draft.appointmentServiceId
-      : availableServices[0]?.id || '';
-  } catch {
-    state.newLeadSchedule.services = storeId ? [defaultAppointmentService(storeId, state.newLeadSchedule.settings.appointmentDurationMinutes)] : [];
-    state.newLeadSchedule.serviceId = state.newLeadSchedule.services[0]?.id || '';
-  }
-  if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
-  if (!storeId) {
-    state.newLeadSchedule.loaded = true;
-    state.newLeadSchedule.loading = false;
-    render();
-    return;
-  }
-  try {
-    state.unsubscribeStoreSchedule = subscribeToStoreSchedule(
-      newLeadCaptureProfile(),
-      (settings) => {
-        if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
-        const firstLoad = !state.newLeadSchedule.loaded;
-        state.newLeadSchedule.settings = settings;
-        state.newLeadSchedule.loaded = true;
-        state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = '';
-        if (firstLoad) {
-          render();
-          return;
-        }
-        refreshNewLeadAmetropiaField();
-        refreshAppointmentTimeControl();
-      },
-      () => {
-        if (state.route !== 'new' || storeId !== selectedNewLeadStoreId()) return;
-        const firstLoad = !state.newLeadSchedule.loaded;
-        state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
-        state.newLeadSchedule.loaded = true;
-        state.newLeadSchedule.loading = false;
-        state.newLeadSchedule.error = 'Usando a configuração padrão da agenda.';
-        if (firstLoad) {
-          render();
-          return;
-        }
-        refreshNewLeadAmetropiaField();
-        refreshAppointmentTimeControl();
-      },
-      storeId
-    );
-  } catch {
-    state.newLeadSchedule.settings = { ...DEFAULT_STORE_SCHEDULE };
-    state.newLeadSchedule.loaded = true;
-    state.newLeadSchedule.loading = false;
-    render();
-  }
+function ensureNewLeadSchedule() {
+  return ensureNewLeadScheduleData({ state, render, selectedStoreId: selectedNewLeadStoreId, captureProfile: newLeadCaptureProfile, refresh: refreshAppointmentTimeControl });
 }
 
 async function loadSettingsData() {
@@ -2484,39 +1101,6 @@ function ensureSettingsData() {
   if (state.route === 'settings' && isAdmin() && !state.settings.loaded) loadSettingsData();
 }
 
-async function loadGoalsData() {
-  if (!state.profile || state.demoMode || state.goals.loading) return;
-  state.goals.loading = true;
-  state.goals.error = '';
-  render();
-  try {
-    const result = await loadGoalsDashboard(state.profile);
-    state.goals.records = result.goals;
-    state.goals.members = result.members;
-    state.goals.truncated = result.truncated;
-    state.goals.loaded = true;
-    if (!state.goals.draft.storeId) {
-      state.goals.draft.storeId = state.profile.role === 'manager'
-        ? state.profile.storeId
-        : STORES[0]?.id || '';
-    }
-  } catch (error) {
-    state.goals.error = error?.code === 'permission-denied'
-      ? 'Seu perfil não possui permissão para consultar estas metas.'
-      : 'Não foi possível carregar as metas. Verifique a conexão e tente novamente.';
-  } finally {
-    state.goals.loading = false;
-    state.goals.saving = false;
-    render();
-  }
-}
-
-function ensureGoalsData() {
-  if (state.route === 'goals' && state.profile && !state.demoMode && !state.goals.loaded) {
-    loadGoalsData();
-  }
-}
-
 function refreshAuthorizedData() {
   ensureManagementData();
   ensureAppointmentsData();
@@ -2526,6 +1110,14 @@ function refreshAuthorizedData() {
   ensureAccessData(state, { render });
   ensureGoalsData();
   ensureSettingsData();
+}
+
+function loadGoalsData() {
+  return loadGoalsFeatureData(state, { render });
+}
+
+function ensureGoalsData() {
+  return ensureGoalsFeatureData(state, { render });
 }
 
 function authControllerDependencies() {
@@ -2592,11 +1184,6 @@ async function handleAction(action) {
       state.savwin.loading = false;
       render();
     }
-  }
-
-  if (action === 'reload-goals') {
-    state.goals.loaded = false;
-    await loadGoalsData();
   }
 
   if (action === 'appointments-today') {
@@ -2682,6 +1269,13 @@ export async function startApp() {
       refreshServices: loadServiceCatalogData
     })) return;
     if (await handleRoleProfileClick(event, { state, render, showToast })) return;
+    if (await handleGoalsClick(event, {
+      state,
+      render,
+      showToast,
+      createDefaultGoalDraft,
+      loadGoalsData
+    })) return;
 
     const handledFollowUpClick = await handleFollowUpsClick(event, {
       selectCaptor: (captorId) => {
@@ -2821,97 +1415,6 @@ export async function startApp() {
     if (actionButton) handleAction(actionButton.dataset.action);
     if (await handleAccessClick(event, { state, render, showToast })) return;
 
-    const newGoalButton = event.target.closest('[data-goal-new]');
-    if (newGoalButton && !newGoalButton.disabled) {
-      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId || state.profile.storeId;
-      state.goals.editorOpen = true;
-      state.goals.editingGroupId = '';
-      state.goals.duplicatingGroupId = '';
-      state.goals.draft = createDefaultGoalDraft(storeId);
-      render();
-      requestAnimationFrame(() => {
-        document.querySelector('#goal-editor-dialog')?.showModal();
-        document.querySelector('#goal-title')?.focus();
-      });
-    }
-    const editGoalButton = event.target.closest('[data-edit-goal]');
-    if (editGoalButton && !editGoalButton.disabled) {
-      const group = groupGoalRecords(state.goals.records).find((item) => item.id === editGoalButton.dataset.editGoal);
-      if (!group) return;
-      state.goals.editorOpen = true;
-      state.goals.editingGroupId = group.id;
-      state.goals.duplicatingGroupId = '';
-      state.goals.draft = {
-        title: group.title,
-        targetCount: group.targetPerPerson,
-        startDate: group.startDate,
-        endDate: group.endDate,
-        storeId: group.storeId,
-        assigneeUids: group.goals.map((goal) => goal.assigneeUid)
-      };
-      render();
-      requestAnimationFrame(() => {
-        document.querySelector('#goal-editor-dialog')?.showModal();
-        document.querySelector('#goal-title')?.focus();
-      });
-    }
-    const duplicateGoalButton = event.target.closest('[data-duplicate-goal]');
-    if (duplicateGoalButton && !duplicateGoalButton.disabled) {
-      const group = groupGoalRecords(state.goals.records).find((item) => item.id === duplicateGoalButton.dataset.duplicateGoal);
-      if (!group) return;
-      state.goals.editorOpen = true;
-      state.goals.editingGroupId = '';
-      state.goals.duplicatingGroupId = group.id;
-      state.goals.draft = duplicateGoalDraft(group);
-      showToast('Meta duplicada no formulário. Revise e salve.');
-      requestAnimationFrame(() => {
-        document.querySelector('#goal-editor-dialog')?.showModal();
-        const titleInput = document.querySelector('#goal-title');
-        titleInput?.focus({ preventScroll: true });
-        titleInput?.select();
-      });
-      return;
-    }
-    const cancelGoalEditButton = event.target.closest('[data-cancel-goal-edit]');
-    if (cancelGoalEditButton) {
-      const storeId = state.profile.role === 'manager' ? state.profile.storeId : state.goals.draft.storeId;
-      document.querySelector('#goal-editor-dialog')?.close();
-      state.goals.editorOpen = false;
-      state.goals.editingGroupId = '';
-      state.goals.duplicatingGroupId = '';
-      state.goals.draft = createDefaultGoalDraft(storeId);
-      render();
-    }
-    const deleteGoalButton = event.target.closest('[data-delete-goal]');
-    if (deleteGoalButton && !deleteGoalButton.disabled) {
-      state.goals.pendingDeleteGroupId = deleteGoalButton.dataset.deleteGoal;
-      render();
-      document.querySelector('#delete-goal-dialog')?.showModal();
-    }
-    const closeGoalDialogButton = event.target.closest('[data-close-goal-dialog]');
-    if (closeGoalDialogButton) {
-      closeGoalDialogButton.closest('dialog')?.close();
-      state.goals.pendingDeleteGroupId = '';
-    }
-    const confirmDeleteGoalButton = event.target.closest('[data-confirm-delete-goal]');
-    if (confirmDeleteGoalButton && !confirmDeleteGoalButton.disabled) {
-      const group = groupGoalRecords(state.goals.records).find((item) => item.id === confirmDeleteGoalButton.dataset.confirmDeleteGoal);
-      if (!group) return;
-      confirmDeleteGoalButton.disabled = true;
-      try {
-        await deleteGoalGroup(state.profile, group.goals);
-        state.goals.pendingDeleteGroupId = '';
-        state.goals.loaded = false;
-        await loadGoalsData();
-        showToast('Meta excluida.');
-      } catch (error) {
-        state.goals.pendingDeleteGroupId = '';
-        state.goals.error = error?.code === 'permission-denied'
-          ? 'Seu perfil não pode excluir esta meta.'
-          : 'Não foi possível excluir a meta.';
-        render();
-      }
-    }
   });
 
   await startLifecycle({

@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest';
+import { appShellView, currentPageTitle, loginView } from '../../src/app/shell/app-shell-view.js';
+import { homeView } from '../../src/app/shell/home-view.js';
+import { bottomNavigation } from '../../src/app/shell/navigation.js';
+
+const profile = { displayName: 'Ana Silva', role: 'manager', roleProfileName: 'Gestor de Unidades', storeId: 'loja-06', storeIds: ['loja-06'] };
+const state = { route: 'home', demoMode: false, leads: [{ id: 'lead-1' }], profile };
+const hasAccess = (permission) => ['leads.create', 'leads.view_own', 'followups.own', 'goals.view_own'].includes(permission);
+
+describe('application shell modules', () => {
+  it('renders the login shell with its authentication actions', () => {
+    const markup = loginView({ state: { authError: '', authMessage: '' }, firebaseConfigured: true, devMode: true });
+    expect(markup).toContain('email-login-form');
+    expect(markup).toContain('Abrir modo de desenvolvimento');
+  });
+
+  it('renders the home actions according to permissions', () => {
+    const markup = homeView({ state, hasAccess, canManage: () => true, canManageGoals: () => false, isAdmin: () => false, pendingFollowUps: () => [{ id: 'follow-up' }] });
+    expect(markup).toContain('Nova abordagem');
+    expect(markup).toContain('Meus cadastros');
+    expect(markup).toContain('1 cliente(s) em acompanhamento');
+    expect(markup).not.toContain('Acessos da equipe');
+  });
+
+  it('keeps navigation active state and management grouping', () => {
+    const navigation = bottomNavigation({ state: { ...state, route: 'dashboard' }, hasAccess, canManage: () => true, pendingFollowUps: () => [] });
+    expect(navigation).toContain('Gestão');
+    expect(navigation).toContain('aria-current="page"');
+    expect(currentPageTitle({ route: 'follow-ups' }, () => true)).toBe('Retornos da equipe');
+  });
+
+  it('composes header, page and navigation through the shell', () => {
+    const markup = appShellView({ state, page: '<section>Conteúdo</section>', canManage: () => true, hasAccess, pendingFollowUps: () => [] });
+    expect(markup).toContain('LEADFLOW');
+    expect(markup).toContain('Conteúdo');
+    expect(markup).toContain('bottom-nav');
+  });
+});
