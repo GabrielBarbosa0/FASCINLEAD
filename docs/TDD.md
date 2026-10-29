@@ -54,7 +54,7 @@ O sistema permite cadastro rapido e oferece uma capacidade experimental de capta
 | Colaborador | Realizar abordagens na rua | Criar, consultar e corrigir os proprios cadastros; realizar retornos e acompanhar as proprias metas |
 | MEI | Atuar como captador externo | Mesmas permissoes iniciais do colaborador, com dias e cotas de agendamento configuraveis por loja e periodo do dia |
 | Atendente de balcao | Operar a agenda da unidade | Criar cadastros, consultar a agenda e registrar comparecimento ou falta |
-| Gestor de unidades | Acompanhar unidades permitidas | Consultar e exportar registros, administrar metas, agenda, relatorios e retornos conforme as permissoes ativas |
+| Gestor de Unidades | Acompanhar unidades permitidas | Consultar e exportar registros, administrar metas, agenda, relatorios e retornos conforme as permissoes ativas |
 | Administrador | Administrar o FascinLead | Todas as permissoes sempre ativas; gerencia acessos, cargos, configuracoes, metas e todos os registros |
 
 Os perfis padrao podem ter permissoes restauradas ao padrao; perfis personalizados possuem nome, alcance (`own` ou `stores`) e permissoes editaveis. O perfil Administrador nao pode perder permissoes. As permissoes sao aplicadas pelas regras do Firestore; ocultar botoes na interface nao substitui a autorizacao no banco.
@@ -264,7 +264,7 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 
 ### RF-15 - Perfis e permissoes
 
-- O sistema fornece os perfis padrao Colaborador, MEI, Gestor de unidades, Atendente de balcao e Administrador.
+- O sistema fornece os perfis padrao Colaborador, MEI, Gestor de Unidades, Atendente Balcão e Administrador.
 - Colaborador e Atendente de balcao ficam vinculados a uma unidade operacional, usada automaticamente nos novos cadastros.
 - Gestores podem receber uma ou mais unidades permitidas; quando possuirem mais de uma, escolhem a loja de destino em cada captacao. A unidade principal sempre pertence a essa lista e muda automaticamente quando a unidade principal anterior e desmarcada.
 - MEI e um captador externo sem loja principal operacional. O acesso define uma ou mais unidades permitidas, e a loja de destino e obrigatoria em cada novo cadastro.

@@ -1,0 +1,150 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { leadDetailSubmissionValues } from '../../src/app/features/leads/lead-detail-events.js';
+import { leadDetailAppointmentTimeField, selectedLeadDetailService } from '../../src/app/features/leads/lead-appointment.js';
+import { leadDetailView } from '../../src/app/features/leads/lead-detail-view.js';
+import { leadsView } from '../../src/app/features/leads/leads-view.js';
+import { DEFAULT_STORE_SCHEDULE } from '../../src/utils/schedule.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function sampleLead(overrides = {}) {
+  return {
+    id: 'lead-1',
+    fullName: 'Maria Silva',
+    phone: '81999991234',
+    phoneSearch: '81999991234',
+    customerCpf: '',
+    customerRg: '',
+    birthDate: '1985-04-12',
+    sex: 'female',
+    preferredName: 'Maria',
+    street: '',
+    streetNumber: '',
+    neighborhood: '',
+    city: '',
+    state: 'PE',
+    addressReference: '',
+    interestId: 'eye-exam',
+    interestLabel: 'Exame de vista',
+    ametropiaIds: [],
+    pathologyIds: [],
+    examPaymentMethods: [],
+    appointmentDate: '',
+    appointmentTime: '',
+    appointmentDurationMinutes: 20,
+    appointmentServiceId: 'exam',
+    notes: '',
+    storeId: 'loja-06',
+    capturedAtClient: '2026-10-29T12:00:00-03:00',
+    syncState: 'synced',
+    ...overrides
+  };
+}
+
+function scheduleState(overrides = {}) {
+  return {
+    storeId: 'loja-06',
+    settings: { ...DEFAULT_STORE_SCHEDULE },
+    services: [{ id: 'exam', name: 'Exame de vista', durationMinutes: 20, storeIds: ['loja-06'], active: true }],
+    serviceId: 'exam',
+    appointmentDate: '',
+    appointments: [],
+    appointmentLoading: false,
+    error: '',
+    ...overrides
+  };
+}
+
+describe('leads feature modules', () => {
+  it('filters the lead list by name and phone', () => {
+    const leads = [sampleLead(), sampleLead({ id: 'lead-2', fullName: 'João Santos', phoneSearch: '81988887777' })];
+    expect(leadsView({ leads, search: 'maria', canCreate: true })).toContain('Maria Silva');
+    expect(leadsView({ leads, search: 'maria', canCreate: true })).not.toContain('João Santos');
+    expect(leadsView({ leads, search: '988887777', canCreate: true })).toContain('João Santos');
+  });
+
+  it('selects the configured service and renders free appointment time', () => {
+    const lead = sampleLead();
+    const state = scheduleState({
+      settings: { ...DEFAULT_STORE_SCHEDULE, schedulingMode: 'free' },
+      appointmentDate: '2026-10-30'
+    });
+    expect(selectedLeadDetailService(lead, state).id).toBe('exam');
+    expect(leadDetailAppointmentTimeField({ lead, scheduleState: state, profile: {}, online: true })).toContain('type="time"');
+  });
+
+  it('renders an editable lead detail without application-global state', () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const lead = sampleLead();
+    const markup = leadDetailView({
+      lead,
+      managementMode: false,
+      canManage: false,
+      profileRole: 'captor',
+      scheduleState: scheduleState(),
+      appointmentTimeMarkup: '<div id="edit-appointment-time-field"></div>',
+      canDelete: true
+    });
+    expect(markup).toContain('id="edit-lead-form"');
+    expect(markup).toContain('Maria Silva');
+    expect(markup).toContain('Excluir lead');
+    expect(markup).toContain('edit-appointment-time-field');
+  });
+
+  it('preserves original data when a manager only reschedules', () => {
+    class FormDataStub {
+      constructor(form) {
+        this.values = form.values;
+      }
+
+      *[Symbol.iterator]() {
+        yield* Object.entries(this.values);
+      }
+
+      getAll(name) {
+        const value = this.values[name];
+        return Array.isArray(value) ? value : value ? [value] : [];
+      }
+    }
+    vi.stubGlobal('FormData', FormDataStub);
+    const existing = sampleLead({ fullName: 'Nome original', appointmentDate: '2026-10-30', appointmentTime: '08:00' });
+    const form = {
+      values: { appointmentDate: '2026-11-02', appointmentTime: '09:00' },
+      elements: {
+        schedulingMode: { value: 'controlled' },
+        appointmentDurationMinutes: { value: '20' },
+        appointmentServiceId: { value: 'exam' },
+        appointmentServiceName: { value: 'Exame de vista' },
+        appointmentDate: { value: '2026-11-02' },
+        appointmentTime: { value: '09:00' }
+      },
+      querySelector: () => null
+    };
+    const values = leadDetailSubmissionValues(form, existing, DEFAULT_STORE_SCHEDULE, { managerReschedule: true });
+    expect(values).toMatchObject({
+      fullName: 'Nome original',
+      appointmentDate: '2026-11-02',
+      appointmentTime: '09:00',
+      schedulingMode: 'controlled',
+      appointmentServiceId: 'exam'
+    });
+  });
+
+  it('keeps appointment date editable for manager rescheduling', () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const markup = leadDetailView({
+      lead: sampleLead({ appointmentDate: '2026-10-30', appointmentTime: '08:00' }),
+      managementMode: true,
+      canManage: true,
+      profileRole: 'manager',
+      scheduleState: scheduleState(),
+      appointmentTimeMarkup: '<div id="edit-appointment-time-field"></div>',
+      canDelete: false
+    });
+    const appointmentDate = markup.match(/<input id="edit-appointmentDate"[^>]+>/)?.[0] || '';
+    expect(appointmentDate).not.toContain('disabled');
+    expect(markup).toContain('Salvar reagendamento');
+  });
+});

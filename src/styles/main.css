@@ -3130,8 +3130,8 @@ svg {
 }
 
 .schedule-rule-dialog[open] {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .schedule-rule-dialog > header,

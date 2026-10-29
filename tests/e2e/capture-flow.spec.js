@@ -36,8 +36,8 @@ test('shows only menus allowed for the front desk profile', async ({ page }, tes
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
-  await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
-  await expect(page.locator('.profile-card').getByText('Atendente de balcão', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Lojas: Loja 06')).toHaveText(/Loja 06/);
+  await expect(page.locator('.profile-card').getByText('Atendente Balcão', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nova abordagem/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Meus cadastros/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Agenda de exames/ })).toBeVisible();
@@ -236,7 +236,7 @@ test('captures and lists a lead in development mode', async ({ page }, testInfo)
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
 
   await expect(page.getByRole('heading', { name: 'Início' })).toBeVisible();
-  await expect(page.getByLabel('Loja: Loja 06')).toHaveText(/Loja 06/);
+  await expect(page.getByLabel('Lojas: Loja 06')).toHaveText(/Loja 06/);
   await page.screenshot({
     path: testInfo.outputPath('home.png'),
     fullPage: true
@@ -570,7 +570,7 @@ test('opens goal creation in a modal from the goals heading', async ({ page }, t
 test('configures multiple permitted stores for a manager access', async ({ page }, testInfo) => {
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'admin'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await expect(page.getByLabel('Loja: Todas as unidades')).toHaveText(/Todas/);
+  await expect(page.getByLabel('Lojas: Todas as unidades')).toHaveText(/Todas/);
   await page.getByRole('button', { name: /Acessos da equipe/ }).click();
 
   await page.getByRole('button', { name: 'Novo acesso' }).click();
@@ -1331,7 +1331,12 @@ test('lets a manager monitor follow-ups grouped by collaborator', async ({ page 
   await expect(page.getByLabel('Nome *')).toBeDisabled();
   await expect(page.getByLabel('Data do pré-agendamento')).toBeEnabled();
   await page.getByLabel('Data do pré-agendamento').fill(rescheduleDate);
-  await page.getByLabel('Horário').fill('10:30');
+  const rescheduleTimeField = page.getByLabel('Horário');
+  if (await rescheduleTimeField.evaluate((element) => element.tagName === 'SELECT')) {
+    await rescheduleTimeField.selectOption({ index: 1 });
+  } else {
+    await rescheduleTimeField.fill('10:30');
+  }
   await page.getByRole('button', { name: 'Salvar reagendamento' }).click();
   await expect(page.getByText('Lead atualizado com sucesso.')).toBeVisible();
 });
@@ -1399,15 +1404,25 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.getByLabel('Loja', { exact: true }).selectOption('loja-06');
   await page.getByRole('button', { name: 'Configurar agenda' }).click();
   const generalScheduleDialog = page.getByRole('dialog', { name: 'Configurações gerais' });
+  const revealDialogControl = async (locator) => locator.evaluate((element) => {
+    const scroller = element.closest('.schedule-rule-dialog-body');
+    const elementRect = element.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    scroller.scrollTop += elementRect.top - scrollerRect.top - 32;
+  });
   const storeScheduleGap = await generalScheduleDialog.evaluate((dialog) => {
     const availability = dialog.querySelector('[name="schedulingMode"]').getBoundingClientRect();
     const legend = dialog.querySelector('[data-field="storeHoursRules"] legend').getBoundingClientRect();
     return legend.top - availability.bottom;
   });
-  expect(storeScheduleGap).toBeLessThanOrEqual(40);
+  expect(storeScheduleGap).toBeGreaterThanOrEqual(40);
+  expect(storeScheduleGap).toBeLessThanOrEqual(80);
   await expect(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro')).not.toBeChecked();
-  await generalScheduleDialog.getByLabel('Exibir ametropias no cadastro').check();
+  await revealDialogControl(generalScheduleDialog.getByLabel('Exibir ametropias no cadastro'));
+  await generalScheduleDialog.locator('label[for="settings-show-ametropias"]').click();
+  await revealDialogControl(generalScheduleDialog.getByLabel('Alertar atraso após'));
   await generalScheduleDialog.getByLabel('Alertar atraso após').fill('5');
+  await revealDialogControl(generalScheduleDialog.getByLabel('Sugerir reagendamento após'));
   await generalScheduleDialog.getByLabel('Sugerir reagendamento após').fill('30');
   const graceLayout = await generalScheduleDialog.evaluate((dialog) => {
     const help = dialog.querySelector('#settings-no-show-help').getBoundingClientRect();
@@ -1415,9 +1430,12 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
     return { helpBottom: help.bottom, inputTop: input.top };
   });
   expect(graceLayout.helpBottom).toBeLessThanOrEqual(graceLayout.inputTop);
-  await generalScheduleDialog.getByLabel('Gerar retorno automaticamente').check();
+  await revealDialogControl(generalScheduleDialog.getByLabel('Gerar retorno automaticamente'));
+  await generalScheduleDialog.locator('label[for="settings-automatic-follow-up"]').click();
+  await revealDialogControl(generalScheduleDialog.getByLabel('Início de Quinta'));
   await generalScheduleDialog.getByLabel('Início de Quinta').fill('09:00');
   await generalScheduleDialog.getByLabel('Fim de Quinta').fill('17:00');
+  await revealDialogControl(generalScheduleDialog.getByLabel('Início de Sabado'));
   await generalScheduleDialog.getByLabel('Início de Sabado').fill('08:00');
   await generalScheduleDialog.getByLabel('Fim de Sabado').fill('12:00');
   await page.screenshot({ path: testInfo.outputPath('general-schedule-dialog.png') });
@@ -1451,30 +1469,34 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await meiQuotaDialog.getByRole('button', { name: 'Aplicar cotas' }).click();
   await expect(meiQuotaDialog).not.toBeVisible();
   await expect(page.getByText('2 dias configurados')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Configurar triagem' }).click();
-  const ophthalmologyDialog = page.getByRole('dialog', { name: 'Atendimento oftalmológico' });
-  const ophthalmologyScheduleGap = await ophthalmologyDialog.evaluate((dialog) => {
-    const minimumAge = dialog.querySelector('[name="ophthalmologyMinimumAge"]').getBoundingClientRect();
-    const legend = dialog.querySelector('[data-field="ophthalmologyHoursRules"] legend').getBoundingClientRect();
-    return legend.top - minimumAge.bottom;
-  });
-  expect(ophthalmologyScheduleGap).toBeLessThanOrEqual(40);
+  await page.getByRole('button', { name: 'Configurar', exact: true }).click();
+  const ophthalmologyDialog = page.getByRole('dialog', { name: 'Triagem e valores de consulta' });
+  const professionalOrder = await ophthalmologyDialog.evaluate((dialog) => [
+    dialog.querySelector('[name="ophthalmologyMinimumAge"]'),
+    dialog.querySelector('#settings-optometrist-enabled'),
+    dialog.querySelector('[data-field="optometristHoursRules"] legend'),
+    dialog.querySelector('#settings-ophthalmology-enabled'),
+    dialog.querySelector('[data-field="ophthalmologyHoursRules"] legend')
+  ].map((element) => element.getBoundingClientRect().top));
+  expect(professionalOrder).toEqual([...professionalOrder].sort((a, b) => a - b));
+  await expect(ophthalmologyDialog.getByLabel('Ativar atendimento com optometrista')).toBeChecked();
   await expect(ophthalmologyDialog.getByLabel('Ativar triagem para oftalmologista')).toBeChecked();
   await expect(ophthalmologyDialog.getByLabel('Perguntar sobre cirurgia a partir de')).toHaveValue('55');
-  await ophthalmologyDialog.getByRole('checkbox', { name: 'Quinta', exact: true }).check();
+  const ophthalmologySchedule = ophthalmologyDialog.getByRole('group', { name: 'Escala do oftalmologista' });
+  await ophthalmologySchedule.getByRole('checkbox', { name: 'Quinta', exact: true }).check();
   await expect(ophthalmologyDialog).toBeVisible();
   await ophthalmologyDialog.getByLabel('Início do oftalmologista em Quinta').fill('08:00');
   await expect(ophthalmologyDialog).toBeVisible();
   await ophthalmologyDialog.getByLabel('Fim do oftalmologista em Quinta').fill('18:00');
   await expect(ophthalmologyDialog).toBeVisible();
-  await expect(ophthalmologyDialog.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
+  await expect(ophthalmologySchedule.getByRole('checkbox', { name: 'Sabado', exact: true })).toBeChecked();
   await ophthalmologyDialog.getByLabel('Início do oftalmologista em Sabado').fill('08:00');
   await ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado').fill('12:00');
   await expect(ophthalmologyDialog.getByLabel('Fim do oftalmologista em Sabado')).toHaveValue('12:00');
   await page.screenshot({ path: testInfo.outputPath('ophthalmology-weekly-schedule-dialog.png') });
-  await ophthalmologyDialog.getByRole('button', { name: 'Aplicar triagem' }).click();
+  await ophthalmologyDialog.getByRole('button', { name: 'Aplicar configurações' }).click();
   await expect(ophthalmologyDialog).not.toBeVisible();
-  await expect(page.getByText('2 dias configurados')).toHaveCount(3);
+  await expect(page.locator('[data-ophthalmology-summary]')).toContainText('Optometrista');
   await page.getByRole('button', { name: 'Configurar transporte' }).click();
   const transportDialog = page.getByRole('dialog', { name: 'Transporte' });
   await transportDialog.getByLabel('Disponibilizar transporte').check();
@@ -1487,7 +1509,7 @@ test('configures the schedule and hides occupied slots', async ({ page }, testIn
   await page.screenshot({ path: testInfo.outputPath('transport-weekly-schedule-dialog.png') });
   await transportDialog.getByRole('button', { name: 'Aplicar transporte' }).click();
   await expect(transportDialog).not.toBeVisible();
-  await expect(page.getByText('2 dias configurados')).toHaveCount(4);
+  await expect(page.locator('[data-transport-summary]')).toHaveText('2 dias configurados');
   await page.getByRole('button', { name: 'Salvar configuração' }).click();
   await expect(page.getByText('Configuração da agenda salva.')).toBeVisible();
   if (!testInfo.project.name.includes('mobile')) {
@@ -1642,22 +1664,22 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(page.getByRole('button', { name: 'Adicionar cargo' })).toBeVisible();
   await expect(page.locator('#role-profile-form')).toHaveCount(0);
   await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
-  await expect(page.getByText('Gestor de unidades', { exact: true })).toBeVisible();
-  await expect(page.getByText('Atendente de balcão', { exact: true })).toBeVisible();
+  await expect(page.getByText('Gestor de Unidades', { exact: true })).toBeVisible();
+  await expect(page.getByText('Atendente Balcão', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
   await expect(page.getByText('MEI', { exact: true })).toBeVisible();
   await expect(page.locator('.role-catalog-row')).toHaveCount(5);
-  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
-  const receptionistDialog = page.getByRole('dialog', { name: 'Atendente de balcão' });
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente Balcão' }).click();
+  const receptionistDialog = page.getByRole('dialog', { name: 'Atendente Balcão' });
   await expect(receptionistDialog.locator('.role-details-permission.is-active')).toHaveCount(6);
   await expect(receptionistDialog.getByText('6 de 17 permissões ativadas')).toBeVisible();
   await receptionistDialog.getByLabel('Registrar comparecimento e falta').uncheck();
   await expect(receptionistDialog.getByText('5 de 17 permissões ativadas')).toBeVisible();
   await receptionistDialog.getByRole('button', { name: 'Salvar permissões' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente Balcão' }).click();
   await expect(receptionistDialog.getByLabel('Registrar comparecimento e falta')).not.toBeChecked();
   await receptionistDialog.getByRole('button', { name: 'Restaurar padrão' }).click();
-  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente de balcão' }).click();
+  await page.getByRole('button', { name: 'Visualizar permissões do perfil Atendente Balcão' }).click();
   await expect(receptionistDialog.getByLabel('Registrar comparecimento e falta')).toBeChecked();
   await receptionistDialog.getByRole('button', { name: 'Cancelar' }).click();
   await page.getByRole('button', { name: 'Visualizar permissões do perfil Administrador' }).click();
