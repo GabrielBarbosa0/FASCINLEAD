@@ -56,7 +56,7 @@ export function normalizeScheduleSettingsValues(source, current) {
   values.ophthalmologyOpeningTime = values.ophthalmologyHoursRules[0]?.openingTime || current.ophthalmologyOpeningTime;
   values.ophthalmologyClosingTime = values.ophthalmologyHoursRules[0]?.closingTime || current.ophthalmologyClosingTime;
   values.ophthalmologyPathologyIds = JSON.parse(values.ophthalmologyPathologyIds || '["cataract"]');
-  values.ophthalmologySurgeryIds = JSON.parse(values.ophthalmologySurgeryIds || '["cataract"]');
+  values.ophthalmologySurgeryIds = JSON.parse(values.ophthalmologySurgeryIds || '["cataract","refractive","corneal-transplant"]');
   values.transportHoursRules = JSON.parse(values.transportHoursRules || '[]');
   if (values.schedulingMode === 'free') {
     values.openingTime = current.openingTime;

@@ -47,7 +47,7 @@ describe('store schedule helpers', () => {
         { weekday: 6, openingTime: '08:00', closingTime: '12:00' }
       ],
       ophthalmologyPathologyIds: ['cataract'],
-      ophthalmologySurgeryIds: ['cataract'],
+      ophthalmologySurgeryIds: ['cataract', 'refractive', 'corneal-transplant'],
       optometristExamPrice: 150,
       ophthalmologistExamPrice: 200,
       transportEnabled: false,

@@ -29,7 +29,7 @@ export const DEFAULT_STORE_SCHEDULE = Object.freeze({
     Object.freeze({ weekday: 6, openingTime: '08:00', closingTime: '12:00' })
   ]),
   ophthalmologyPathologyIds: Object.freeze(['cataract']),
-  ophthalmologySurgeryIds: Object.freeze(['cataract']),
+  ophthalmologySurgeryIds: Object.freeze(['cataract', 'refractive', 'corneal-transplant']),
   optometristExamPrice: 150,
   ophthalmologistExamPrice: 200,
   transportEnabled: false,

@@ -294,6 +294,7 @@ function leadDetailView() {
     scheduleState: state.leadDetailSchedule,
     appointmentTimeMarkup: lead ? leadDetailAppointmentTimeField(lead) : '',
     canDelete: hasAccess('leads.delete'),
+    canEditClinical: hasAccess('leads.clinical_update'),
     history: state.leadHistory
   });
 }

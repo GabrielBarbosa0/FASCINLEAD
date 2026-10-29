@@ -23,6 +23,7 @@ export function leadDetailView({
   scheduleState,
   appointmentTimeMarkup,
   canDelete,
+  canEditClinical = false,
   history = { loading: false, error: '', records: [], stage: '' }
 }) {
   if (managementMode && !canManage) {
@@ -35,7 +36,7 @@ export function leadDetailView({
   }
 
   const [syncStatus, syncTone] = managementMode ? ['Sincronizado', 'success'] : syncLabel(lead);
-  const managerReschedule = managementMode && profileRole === 'manager';
+  const managerReschedule = managementMode && profileRole === 'manager' && !canEditClinical;
   const offlineEdit = !navigator.onLine;
   const locked = managerReschedule || offlineEdit ? 'disabled' : '';
   const showAmetropiaFields = scheduleState.storeId === lead.storeId && scheduleState.settings.showAmetropiaFields;

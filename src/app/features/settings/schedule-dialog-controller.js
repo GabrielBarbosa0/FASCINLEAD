@@ -438,7 +438,7 @@ export function bindScheduleDialogController({ state, render, showToast }) {
         ophthalmologyClosingTime: primaryHours.closingTime,
         ophthalmologyHoursRules,
         ophthalmologyPathologyIds: ['cataract'],
-        ophthalmologySurgeryIds: ['cataract']
+        ophthalmologySurgeryIds: ['cataract', 'refractive', 'corneal-transplant']
       };
       const record = state.settings.records.find((item) => item.id === state.settings.selectedStoreId);
       const validation = validateStoreSchedule({ ...record, ...candidate });

@@ -18,6 +18,10 @@ const validInput = {
   interestId: 'complete-glasses',
   ametropiaIds: ['myopia', 'astigmatism'],
   pathologyIds: ['glaucoma', 'diabetes'],
+  diabetesLevel: '150',
+  eyeSurgeryStatus: 'no',
+  eyeSurgeryType: '',
+  eyeSurgeryDetails: '',
   appointmentDate: '2026-10-02',
   appointmentTime: '14:30',
   appointmentServiceId: 'service-eye-exam',
@@ -63,6 +67,21 @@ describe('lead validation', () => {
 
   it('limits the address reference to 160 characters', () => {
     expect(validateLeadInput({ ...validInput, addressReference: 'a'.repeat(161) }).errors.addressReference).toBeDefined();
+  });
+
+  it('requires diabetes measurement and flags values above 150 mg/dL', () => {
+    expect(validateLeadInput({ ...validInput, diabetesLevel: '' }).errors.diabetesLevel).toBeDefined();
+    const result = createLeadDocument({ ...validInput, diabetesLevel: '151' }, profile, 'installation-test');
+    expect(result.data).toMatchObject({ diabetesLevel: 151, diabetesNeedsMedicalAlert: true });
+    expect(createLeadDocument({ ...validInput, pathologyIds: [], diabetesLevel: '151' }, profile, 'installation-test').data)
+      .toMatchObject({ diabetesLevel: null, diabetesNeedsMedicalAlert: false });
+  });
+
+  it('routes refractive and corneal transplant surgeries to ophthalmology', () => {
+    expect(ophthalmologyTriage({ ...validInput, eyeSurgeryStatus: 'yes', eyeSurgeryType: 'refractive' }).careRoute)
+      .toBe('ophthalmologist');
+    expect(ophthalmologyTriage({ ...validInput, eyeSurgeryStatus: 'yes', eyeSurgeryType: 'corneal-transplant' }).careRoute)
+      .toBe('ophthalmologist');
   });
 
   it('requires a valid birth date and rejects a future date', () => {
@@ -129,6 +148,8 @@ describe('lead validation', () => {
       ametropiaLabels: ['Miopia', 'Astigmatismo'],
       pathologyIds: ['glaucoma', 'diabetes'],
       pathologyLabels: ['Glaucoma', 'Diabetes'],
+      diabetesLevel: 150,
+      diabetesNeedsMedicalAlert: false,
       examPaymentType: 'paid',
       examPaymentMethods: ['pix', 'cash'],
       examPrice: 150,
@@ -265,7 +286,7 @@ describe('lead validation', () => {
     expect(result.data.pathologyLabels).toEqual([]);
   });
 
-  it('requires the eye surgery answer from the configured minimum age', () => {
+  it('requires the eye surgery answer at every age', () => {
     const result = validateLeadInput({
       ...validInput,
       birthDate: '1960-01-01',

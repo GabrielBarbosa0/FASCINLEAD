@@ -48,8 +48,12 @@ export const EYE_SURGERY_STATUS_OPTIONS = [
 export const EYE_SURGERIES = [
   { id: '', label: 'Selecione' },
   { id: 'cataract', label: 'Catarata' },
+  { id: 'refractive', label: 'Cirurgia refrativa (correcao de grau)' },
+  { id: 'corneal-transplant', label: 'Transplante de cornea' },
   { id: 'other', label: 'Outra' }
 ];
+
+export const DIABETES_MEDICAL_ALERT_LEVEL = 150;
 
 export const EXAM_PRICES = Object.freeze({
   optometrist: 150,
@@ -169,7 +173,7 @@ export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = n
     ? Number(settings.ophthalmologyMinimumAge)
     : 55;
   const age = calculateAge(input.birthDate, referenceDate);
-  const surgeryQuestionRequired = enabled && age !== null && age >= minimumAge;
+  const surgeryQuestionRequired = true;
   const surgeryStatus = EYE_SURGERY_STATUS_OPTIONS.some((item) => item.id === input.eyeSurgeryStatus)
     ? input.eyeSurgeryStatus
     : '';
@@ -179,9 +183,7 @@ export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = n
   const pathologyCriteria = Array.isArray(settings.ophthalmologyPathologyIds)
     ? settings.ophthalmologyPathologyIds
     : ['cataract'];
-  const surgeryCriteria = Array.isArray(settings.ophthalmologySurgeryIds)
-    ? settings.ophthalmologySurgeryIds
-    : ['cataract'];
+  const surgeryCriteria = ['cataract', 'refractive', 'corneal-transplant'];
   const pathologyIds = normalizePathologies(input.pathologyIds);
   const pathologyMatch = pathologyIds.some((id) => pathologyCriteria.includes(id));
   const surgeryMatch = surgeryStatus === 'yes' && surgeryCriteria.includes(surgeryType);
@@ -209,6 +211,17 @@ export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = n
   };
 }
 
+function diabetesData(input, pathologyIds) {
+  const hasDiabetes = pathologyIds.includes('diabetes');
+  const value = Number(input.diabetesLevel);
+  const diabetesLevel = hasDiabetes && Number.isInteger(value) ? value : null;
+  return {
+    hasDiabetes,
+    diabetesLevel,
+    diabetesNeedsMedicalAlert: diabetesLevel !== null && diabetesLevel > DIABETES_MEDICAL_ALERT_LEVEL
+  };
+}
+
 export function validateLeadInput(input, options = {}) {
   const errors = {};
   const fullName = input.fullName?.trim() || '';
@@ -226,12 +239,18 @@ export function validateLeadInput(input, options = {}) {
     ? requestedCompanionCount
     : 0;
   const hasCompanion = companionCount > 0;
+  const diabetes = diabetesData(input, normalizePathologies(input.pathologyIds));
 
   if (fullName.length < 2) errors.fullName = 'Informe o nome do cliente.';
   if (fullName.length > 120) errors.fullName = 'Use no máximo 120 caracteres.';
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF válido.';
   if (customerRg.length > 20) errors.customerRg = 'Use no máximo 20 caracteres.';
+  if (diabetes.hasDiabetes && diabetes.diabetesLevel === null) {
+    errors.diabetesLevel = 'Informe o nivel de glicemia medido.';
+  } else if (diabetes.hasDiabetes && (diabetes.diabetesLevel < 20 || diabetes.diabetesLevel > 600)) {
+    errors.diabetesLevel = 'Informe um nivel entre 20 e 600 mg/dL.';
+  }
   if (!birthDate) {
     if (options.requireBirthDate !== false) errors.birthDate = 'Informe a data de nascimento.';
   } else if (calculateAge(birthDate) === null) {
@@ -275,7 +294,7 @@ export function validateLeadInput(input, options = {}) {
   if (pricing.examPaymentType === 'paid' && invalidPaymentMethod) {
     errors.examPaymentMethods = 'Selecione somente formas de pagamento válidas.';
   }
-  if (triage.surgeryQuestionRequired && !triage.eyeSurgeryStatus) {
+  if (!triage.eyeSurgeryStatus) {
     errors.eyeSurgeryStatus = 'Informe se o cliente já realizou cirurgia nos olhos.';
   }
   if (triage.eyeSurgeryStatus === 'yes' && !triage.eyeSurgeryType) {
@@ -339,6 +358,7 @@ export function validateLeadInput(input, options = {}) {
     hasCompanion,
     companionCount,
     transportSeats: needsTransport ? companionCount + 1 : 0,
+    diabetes,
     triage,
     pricing,
     examPaymentMethods
@@ -373,6 +393,8 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
       ...pathologyData(input),
+      diabetesLevel: validation.diabetes.diabetesLevel,
+      diabetesNeedsMedicalAlert: validation.diabetes.diabetesNeedsMedicalAlert,
       eyeSurgeryStatus: validation.triage.eyeSurgeryStatus,
       eyeSurgeryType: validation.triage.eyeSurgeryType,
       eyeSurgeryDetails: validation.triage.eyeSurgeryDetails,
@@ -439,6 +461,8 @@ export function createLeadUpdate(input) {
       interestLabel: interest.id ? interest.label : '',
       ...ametropiaData(input),
       ...pathologyData(input),
+      diabetesLevel: validation.diabetes.diabetesLevel,
+      diabetesNeedsMedicalAlert: validation.diabetes.diabetesNeedsMedicalAlert,
       eyeSurgeryStatus: validation.triage.eyeSurgeryStatus,
       eyeSurgeryType: validation.triage.eyeSurgeryType,
       eyeSurgeryDetails: validation.triage.eyeSurgeryDetails,

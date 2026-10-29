@@ -5,6 +5,7 @@ import {
   EYE_SURGERY_STATUS_OPTIONS,
   PATHOLOGIES,
   SEX_OPTIONS,
+  DIABETES_MEDICAL_ALERT_LEVEL,
   examPricing,
   ophthalmologyTriage
 } from '../../../utils/lead.js';
@@ -67,15 +68,23 @@ export function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, 
     <input type="checkbox" name="examPaymentMethods" value="${method.id}" ${selectedPaymentMethods.includes(method.id) ? 'checked' : ''} ${pricing.examPaymentType === 'courtesy' ? 'disabled' : ''} />
     <span>${method.label}</span>
   </label>`).join('');
-  const showSurgeryQuestion = triage.surgeryQuestionRequired || Boolean(values.eyeSurgeryStatus);
   const showSurgeryType = values.eyeSurgeryStatus === 'yes';
+  const hasDiabetes = (values.pathologyIds || []).includes('diabetes');
+  const diabetesLevel = Number(values.diabetesLevel);
+  const diabetesAlert = hasDiabetes && Number.isFinite(diabetesLevel) && diabetesLevel > DIABETES_MEDICAL_ALERT_LEVEL;
   return `<section class="eye-triage-section" data-eye-triage data-initial-care-route="${triage.careRoute}" data-initial-payment-type="${pricing.examPaymentType}" data-initial-exam-price="${pricing.examPrice}" data-preserve-exam-price="${Boolean(values.id)}">
     <input type="hidden" name="examPrice" value="${pricing.examPrice}" data-exam-price-value />
-    <div class="field-row eye-surgery-fields" data-eye-surgery-question ${showSurgeryQuestion ? '' : 'hidden'}>
+    <div class="field" data-field="diabetesLevel" data-diabetes-level ${hasDiabetes ? '' : 'hidden'}>
+      <label for="${idPrefix}-diabetes-level">Nivel de glicemia (mg/dL) <span aria-hidden="true">*</span></label>
+      <input id="${idPrefix}-diabetes-level" name="diabetesLevel" type="number" inputmode="numeric" min="20" max="600" step="1" value="${hasDiabetes && values.diabetesLevel !== null && values.diabetesLevel !== undefined ? escapeHtml(values.diabetesLevel) : ''}" placeholder="Ex.: 150" ${hasDiabetes ? 'required' : ''} />
+      <small class="field-help">Registrar a medicao feita no atendimento.</small><small class="field-error"></small>
+    </div>
+    <div class="notice notice-warning" data-diabetes-medical-alert ${diabetesAlert ? '' : 'hidden'}><i data-lucide="triangle-alert"></i><span>Glicemia acima de ${DIABETES_MEDICAL_ALERT_LEVEL} mg/dL: avisar o medico antes do exame.</span></div>
+    <div class="field-row eye-surgery-fields" data-eye-surgery-question>
       <div class="field" data-field="eyeSurgeryStatus">
         <label for="${idPrefix}-surgery-status">Já realizou cirurgia nos olhos? <span aria-hidden="true">*</span></label>
         <select id="${idPrefix}-surgery-status" name="eyeSurgeryStatus">${eyeSurgeryStatusOptions(values.eyeSurgeryStatus || '')}</select>
-        <small class="field-help">Pergunta obrigatória a partir de ${settings.ophthalmologyMinimumAge} anos.</small>
+        <small class="field-help">Informacao obrigatoria para todos os clientes.</small>
         <small class="field-error"></small>
       </div>
       <div class="field eye-surgery-dependent ${showSurgeryType ? '' : 'is-disabled'}" data-field="eyeSurgeryType" data-eye-surgery-type>
@@ -145,14 +154,22 @@ export function bindEyeTriage(form, settings, onChange = () => {}) {
     const routeStatus = section.querySelector('[data-eye-route-status]');
     const price = section.querySelector('[data-exam-price]');
     const priceDetail = section.querySelector('[data-exam-price-detail]');
-    question.hidden = !triage.surgeryQuestionRequired && !values.eyeSurgeryStatus;
+    question.hidden = false;
     const surgeryTypeEnabled = values.eyeSurgeryStatus === 'yes';
     typeField.classList.toggle('is-disabled', !surgeryTypeEnabled);
     form.elements.eyeSurgeryType.disabled = !surgeryTypeEnabled;
     detailsField.hidden = values.eyeSurgeryStatus !== 'yes' || values.eyeSurgeryType !== 'other';
-    form.elements.eyeSurgeryStatus.required = triage.surgeryQuestionRequired;
+    form.elements.eyeSurgeryStatus.required = true;
     form.elements.eyeSurgeryType.required = surgeryTypeEnabled;
     form.elements.eyeSurgeryDetails.required = values.eyeSurgeryStatus === 'yes' && values.eyeSurgeryType === 'other';
+    const hasDiabetes = values.pathologyIds.includes('diabetes');
+    const diabetesField = section.querySelector('[data-diabetes-level]');
+    const diabetesInput = form.elements.diabetesLevel;
+    const diabetesAlert = section.querySelector('[data-diabetes-medical-alert]');
+    diabetesField.hidden = !hasDiabetes;
+    diabetesInput.required = hasDiabetes;
+    if (!hasDiabetes) diabetesInput.value = '';
+    diabetesAlert.hidden = !hasDiabetes || Number(diabetesInput.value) <= DIABETES_MEDICAL_ALERT_LEVEL;
     routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
     routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
     const configuredPricing = examPricing(triage.careRoute, values.examPaymentType, settings);

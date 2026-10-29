@@ -22,7 +22,7 @@ describe('role profiles', () => {
     expect(mei.permissions).toEqual(collaborator.permissions);
   });
 
-  it('keeps the receptionist focused on front-desk scheduling', () => {
+  it('allows the receptionist to update clinical data from the assigned stores', () => {
     const receptionist = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-receptionist');
 
     expect(receptionist).toMatchObject({
@@ -36,10 +36,11 @@ describe('role profiles', () => {
       'leads.view_own',
       'leads.edit_own',
       'followups.own',
+      'management.view',
+      'leads.clinical_update',
       'appointments.view',
       'appointments.attendance'
     ]);
-    expect(receptionist.permissions).not.toContain('management.view');
     expect(receptionist.permissions).not.toContain('dashboard.view');
     expect(systemRoleProfileForId('system-receptionist')).toBe(receptionist);
     expect(systemRoleProfileForId('missing-profile')).toBeNull();

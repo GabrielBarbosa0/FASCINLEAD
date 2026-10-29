@@ -34,7 +34,6 @@ describe('settings feature modules', () => {
       saving: false
     });
     const labels = [
-      'Perguntar sobre cirurgia a partir de',
       'Ativar atendimento com optometrista',
       'Escala do optometrista',
       'Ativar triagem para oftalmologista',
@@ -75,7 +74,8 @@ describe('settings feature modules', () => {
       optometristExamPrice: 150,
       ophthalmologistExamPrice: 200,
       ophthalmologyMinimumAge: 55,
-      ophthalmologyPathologyIds: ['cataract']
+      ophthalmologyPathologyIds: ['cataract'],
+      ophthalmologySurgeryIds: ['cataract', 'refractive', 'corneal-transplant']
     });
   });
 

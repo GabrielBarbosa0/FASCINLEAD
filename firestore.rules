@@ -127,7 +127,7 @@ service cloud.firestore {
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'careRouteReasons',
           'examPaymentType', 'examPaymentMethods', 'examPrice',
@@ -318,7 +318,7 @@ service cloud.firestore {
           && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))))
         && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
         && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
-        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'other'])
+        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'refractive', 'corneal-transplant', 'other'])
         && (!('eyeSurgeryDetails' in data) || (data.eyeSurgeryDetails is string && data.eyeSurgeryDetails.size() <= 120))
         && (!('careRoute' in data) || data.careRoute in ['optometrist', 'ophthalmologist'])
         && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
@@ -406,7 +406,7 @@ service cloud.firestore {
           'fullName', 'preferredName', 'phone', 'phoneSearch',
           'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
           'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
@@ -512,6 +512,12 @@ service cloud.firestore {
               'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
               'appointmentAttendance', 'updatedAtServer'
             ]))
+          || (hasPermission('leads.clinical_update')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
+              'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
+              'careRoute', 'careRouteOverride', 'examPrice', 'updatedAtServer'
+            ]))
         );
     }
 
@@ -540,7 +546,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels',
+          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
           'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
           'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
