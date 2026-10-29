@@ -146,6 +146,12 @@ function parseBirthDate(value) {
   return { year, month, day };
 }
 
+export function birthMonthDay(birthDate) {
+  const birth = parseBirthDate(birthDate);
+  if (!birth) return '';
+  return `${String(birth.month).padStart(2, '0')}-${String(birth.day).padStart(2, '0')}`;
+}
+
 export function calculateAge(birthDate, referenceDate = new Date()) {
   const birth = parseBirthDate(birthDate);
   if (!birth || Number.isNaN(referenceDate.getTime())) return null;
@@ -382,6 +388,7 @@ export function createLeadDocument(input, profile, installationId, now = new Dat
       customerCpf: validation.customerCpf,
       customerRg: validation.customerRg,
       birthDate: validation.birthDate,
+      birthMonthDay: birthMonthDay(validation.birthDate),
       sex: validation.sex,
       street: input.street?.trim() || '',
       streetNumber: normalizeStreetNumber(input.streetNumber),
@@ -450,6 +457,7 @@ export function createLeadUpdate(input) {
       customerCpf: validation.customerCpf,
       customerRg: validation.customerRg,
       birthDate: validation.birthDate,
+      birthMonthDay: birthMonthDay(validation.birthDate),
       sex: validation.sex,
       street: input.street?.trim() || '',
       streetNumber: normalizeStreetNumber(input.streetNumber),

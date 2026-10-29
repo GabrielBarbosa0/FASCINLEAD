@@ -125,7 +125,7 @@ service cloud.firestore {
     function validLead(data) {
       return data.keys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'customerRg', 'birthDate', 'sex',
+          'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
@@ -160,6 +160,8 @@ service cloud.firestore {
         && (!('examPrice' in data) || (data.examPrice is number && data.examPrice >= 0 && data.examPrice <= 100000))
         && data.birthDate is string
         && data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && (!('birthMonthDay' in data) || (data.birthMonthDay is string
+          && data.birthMonthDay.matches('^\\d{2}-\\d{2}$')))
         && (!('needsTransport' in data) || data.needsTransport is bool)
         && (!('hasCompanion' in data) || data.hasCompanion is bool)
         && (!('companionCount' in data) || (data.companionCount is int
@@ -214,6 +216,7 @@ service cloud.firestore {
     function validLeadHistory(data) {
       return data.keys().hasOnly([
           'leadId', 'storeId', 'eventType', 'funnelStage', 'reasonCode',
+          'benefitType', 'benefitValue', 'benefitLabel',
           'actorUid', 'actorName', 'actorRole', 'occurredAtClient',
           'occurredAtServer', 'schemaVersion'
         ])
@@ -222,7 +225,8 @@ service cloud.firestore {
         && data.eventType in [
           'lead_created', 'appointment_scheduled', 'appointment_rescheduled',
           'appointment_cancelled', 'appointment_reminder_sent',
-          'appointment_attended', 'appointment_missed', 'follow_up_contacted'
+          'appointment_attended', 'appointment_missed', 'follow_up_contacted',
+          'birthday_benefit_planned', 'birthday_congratulated'
         ]
         && data.funnelStage in [
           'captured', 'awaiting_appointment', 'scheduled', 'confirmation',
@@ -231,6 +235,10 @@ service cloud.firestore {
         ]
         && data.reasonCode is string
         && data.reasonCode.size() <= 64
+        && (!('benefitType' in data) || data.benefitType in ['voucher', 'cashback'])
+        && (!('benefitValue' in data) || (data.benefitValue is number
+          && data.benefitValue >= 0 && data.benefitValue <= 100000))
+        && (!('benefitLabel' in data) || (data.benefitLabel is string && data.benefitLabel.size() <= 80))
         && data.actorUid is string
         && data.actorName is string
         && data.actorName.size() >= 2
@@ -404,7 +412,7 @@ service cloud.firestore {
         && resource.data.capturedByUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'customerRg', 'birthDate', 'sex',
+          'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
@@ -544,7 +552,7 @@ service cloud.firestore {
     function isAdminLeadCorrection() {
       return isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'sex',
+          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
           'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
           'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
           'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',

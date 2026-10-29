@@ -19,7 +19,9 @@ export const FUNNEL_EVENT_LABELS = Object.freeze({
   appointment_reminder_sent: 'Lembrete enviado',
   appointment_attended: 'Comparecimento registrado',
   appointment_missed: 'Falta registrada',
-  follow_up_contacted: 'Retorno iniciado'
+  follow_up_contacted: 'Retorno iniciado',
+  birthday_benefit_planned: 'Beneficio de aniversario planejado',
+  birthday_congratulated: 'Cliente parabenizado'
 });
 
 export function funnelStageLabel(stage) {

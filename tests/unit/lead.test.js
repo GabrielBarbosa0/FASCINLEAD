@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAge, createLeadDocument, createLeadUpdate, examPricing, ophthalmologyTriage, validateLeadInput } from '../../src/utils/lead.js';
+import { birthMonthDay, calculateAge, createLeadDocument, createLeadUpdate, examPricing, ophthalmologyTriage, validateLeadInput } from '../../src/utils/lead.js';
 
 const validInput = {
   fullName: 'Cliente Exemplo',
@@ -107,6 +107,11 @@ describe('lead validation', () => {
     expect(result.isValid).toBe(false);
     expect(result.errors.appointmentDate).toBeDefined();
     expect(result.errors.appointmentTime).toBeDefined();
+  });
+
+  it('stores the birthday month and day without exposing the birth year', () => {
+    expect(birthMonthDay('1985-04-12')).toBe('04-12');
+    expect(createLeadDocument(validInput, profile, 'installation-test').data.birthMonthDay).toBe('04-12');
   });
 
   it('requires a service when scheduling a registration', () => {
