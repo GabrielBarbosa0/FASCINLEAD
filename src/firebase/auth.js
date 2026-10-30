@@ -145,6 +145,17 @@ export async function updateTeamMemberPassword(emailInput, password) {
   return updatePassword({ email, password });
 }
 
+export async function renameTeamMemberEmail(currentEmailInput, newEmailInput) {
+  if (!isFirebaseConfigured || !functions) throw new Error('Firebase ainda não foi configurado.');
+  const currentEmail = normalizeEmail(currentEmailInput);
+  const newEmail = normalizeEmail(newEmailInput);
+  if (!/^\S+@\S+\.\S+$/.test(currentEmail) || !/^\S+@\S+\.\S+$/.test(newEmail)) {
+    throw new Error('Informe um e-mail válido.');
+  }
+  const renameEmail = httpsCallable(functions, 'renameTeamMemberEmail');
+  return renameEmail({ currentEmail, newEmail });
+}
+
 export async function requestPasswordReset(emailInput) {
   if (!isFirebaseConfigured) throw new Error('Firebase ainda não foi configurado.');
   const email = normalizeEmail(emailInput);

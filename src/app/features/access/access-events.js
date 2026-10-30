@@ -1,7 +1,7 @@
-import { createTeamPasswordAccount } from '../../../firebase/auth.js';
+import { createTeamPasswordAccount, renameTeamMemberEmail } from '../../../firebase/auth.js';
 import { deleteAccess, loadAccesses, saveAccess, setAccessActive } from '../../../services/access-service.js';
 import { loadRoleProfiles } from '../../../services/role-profile-service.js';
-import { DEFAULT_TEAM_PASSWORD } from '../../../utils/access.js';
+import { DEFAULT_TEAM_PASSWORD, normalizeAccessEmail, validateAccess } from '../../../utils/access.js';
 import { formatBrazilianPhone } from '../../../utils/phone.js';
 import { SYSTEM_ROLE_PROFILES } from '../../../utils/role-profile.js';
 import { setFieldErrors } from '../../shared/form-helpers.js';
@@ -84,6 +84,23 @@ function syncAccessStorePicker(form, state, creatingAccess) {
 }
 
 export function bindAccessEvents({ state, render, showToast }) {
+  const searchInput = document.querySelector('[data-access-search]');
+  searchInput?.addEventListener('input', () => {
+    const selectionStart = searchInput.selectionStart;
+    const selectionEnd = searchInput.selectionEnd;
+    state.access.query = searchInput.value;
+    render();
+    requestAnimationFrame(() => {
+      const nextInput = document.querySelector('[data-access-search]');
+      nextInput?.focus();
+      nextInput?.setSelectionRange(selectionStart, selectionEnd);
+    });
+  });
+  document.querySelector('[data-access-store-filter]')?.addEventListener('change', (event) => {
+    state.access.storeFilter = event.target.value;
+    render();
+  });
+
   const form = document.querySelector('#access-form');
   if (form) {
     const creatingAccess = !state.access.editingEmail;
@@ -123,6 +140,18 @@ export function bindAccessEvents({ state, render, showToast }) {
       submitButton.disabled = true;
 
       try {
+        const validation = validateAccess(values, state.settings.roleProfiles, { requirePassword: creating });
+        if (!validation.isValid) {
+          state.access.saving = false;
+          submitButton.disabled = false;
+          setFieldErrors(form, validation.errors);
+          return;
+        }
+        const currentEmail = normalizeAccessEmail(state.access.editingEmail);
+        if (!creating && validation.data.email !== currentEmail) {
+          await renameTeamMemberEmail(currentEmail, validation.data.email);
+          state.access.editingEmail = validation.data.email;
+        }
         const result = await saveAccess(state.profile, values, state.settings.roleProfiles, { requirePassword: creating });
         if (!result.isValid) {
           state.access.saving = false;
@@ -146,10 +175,18 @@ export function bindAccessEvents({ state, render, showToast }) {
         showToast(`${creating ? 'Acesso criado.' : 'Acesso atualizado.'}${credentialWarning}`, credentialWarning ? 'warning' : 'success', credentialWarning ? 'circle-alert' : 'circle-check');
       } catch (error) {
         state.access.saving = false;
-        state.access.error = error?.code === 'permission-denied'
-          ? 'Seu perfil não possui permissão para gerenciar acessos.'
-          : 'Não foi possível salvar o acesso. Verifique a conexão e tente novamente.';
-        render();
+        submitButton.disabled = false;
+        const errorMessages = {
+          'functions/already-exists': 'Este e-mail já está cadastrado para outra pessoa.',
+          'functions/failed-precondition': error?.message || 'Este e-mail não pode ser alterado por esta tela.',
+          'functions/not-found': 'A autorização original não foi encontrada. Atualize a página e tente novamente.',
+          'functions/permission-denied': 'Seu perfil não possui permissão para gerenciar acessos.',
+          'permission-denied': 'Seu perfil não possui permissão para gerenciar acessos.'
+        };
+        const message = errorMessages[error?.code]
+          || 'Não foi possível salvar o acesso. Verifique a conexão e tente novamente.';
+        if (error?.code === 'functions/already-exists') setFieldErrors(form, { email: message });
+        else showToast(message, 'danger', 'circle-alert');
       }
     });
   }
@@ -168,6 +205,13 @@ export function bindAccessEvents({ state, render, showToast }) {
 }
 
 export async function handleAccessClick(event, { state, render, showToast }) {
+  if (event.target.closest('[data-access-clear-filters]')) {
+    state.access.query = '';
+    state.access.storeFilter = '';
+    render();
+    return true;
+  }
+
   if (event.target.closest('[data-action="reload-accesses"]')) {
     await loadAccessData(state, { render });
     return true;

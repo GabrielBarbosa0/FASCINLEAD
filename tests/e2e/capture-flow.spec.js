@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
-test('keeps the header width fixed while page content follows its own layout', async ({ page }) => {
+test('keeps the header fixed while wide pages and Kanban use their intended widths', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'manager'));
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
@@ -18,7 +18,7 @@ test('keeps the header width fixed while page content follows its own layout', a
     contentWidth: document.querySelector('.app-main').getBoundingClientRect().width
   }));
 
-  await page.getByRole('button', { name: /Painel de gestão/ }).click();
+  await page.getByRole('button', { name: /Painel de gest/ }).click();
   await expect(page.getByRole('heading', { name: 'Painel de leads' })).toBeVisible();
   const managementLayout = await page.evaluate(() => ({
     headerWidth: document.querySelector('.header-inner').getBoundingClientRect().width,
@@ -29,6 +29,55 @@ test('keeps the header width fixed while page content follows its own layout', a
   expect(homeLayout.headerWidth).toBeCloseTo(1180, 0);
   expect(homeLayout.contentWidth).toBeCloseTo(760, 0);
   expect(managementLayout.contentWidth).toBeCloseTo(1180, 0);
+
+  await page.getByRole('button', { name: 'Kanban', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Kanban de leads' })).toBeVisible();
+  const kanbanLayout = await page.evaluate(() => {
+    const main = document.querySelector('.app-main').getBoundingClientRect();
+    const board = document.querySelector('.kanban-board').getBoundingClientRect();
+    const dock = document.querySelector('.kanban-scrollbar-dock').getBoundingClientRect();
+    return {
+      mainWidth: main.width,
+      boardLeft: board.left,
+      boardRight: board.right,
+      dockWidth: dock.width
+    };
+  });
+
+  expect(kanbanLayout.mainWidth).toBeCloseTo(1440, 0);
+  expect(kanbanLayout.boardLeft).toBeCloseTo(20, 0);
+  expect(kanbanLayout.boardRight).toBeCloseTo(1420, 0);
+  expect(kanbanLayout.dockWidth).toBeCloseTo(1440, 0);
+  await page.screenshot({ path: testInfo.outputPath('kanban-full-width.png'), fullPage: false });
+});
+
+test('keeps the full-width Kanban contained on compact screens', async ({ page }, testInfo) => {
+  await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'manager'));
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Painel de gest/ }).click();
+  await page.getByRole('button', { name: 'Kanban', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Kanban de leads' })).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector('.app-main').getBoundingClientRect();
+    const board = document.querySelector('.kanban-board').getBoundingClientRect();
+    const dock = document.querySelector('.kanban-scrollbar-dock').getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      mainWidth: main.width,
+      boardLeft: board.left,
+      boardRight: board.right,
+      dockWidth: dock.width
+    };
+  });
+
+  expect(layout.mainWidth).toBeCloseTo(layout.viewportWidth, 0);
+  expect(layout.documentWidth).toBe(layout.viewportWidth);
+  expect(layout.boardLeft).toBeGreaterThanOrEqual(15);
+  expect(layout.boardRight).toBeLessThanOrEqual(layout.viewportWidth - 15);
+  expect(layout.dockWidth).toBeCloseTo(layout.viewportWidth, 0);
+  await page.screenshot({ path: testInfo.outputPath('kanban-compact-width.png'), fullPage: false });
 });
 
 test('shows only menus allowed for the front desk profile', async ({ page }, testInfo) => {

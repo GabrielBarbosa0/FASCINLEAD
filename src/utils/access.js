@@ -63,7 +63,7 @@ export function validateAccess(values, roleProfiles = [], options = {}) {
       : 'A nova senha deve ter entre 6 e 72 caracteres.';
   }
 
-  if (phone.length < 10 || phone.length > 11) {
+  if (phone && (phone.length < 10 || phone.length > 11)) {
     errors.phone = 'Informe um telefone com DDD.';
   }
 

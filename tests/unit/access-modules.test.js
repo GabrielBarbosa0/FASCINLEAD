@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleAccessClick } from '../../src/app/features/access/access-events.js';
-import { accessView } from '../../src/app/features/access/access-view.js';
+import { accessView, filterTeamAccesses } from '../../src/app/features/access/access-view.js';
 import { createDefaultRoleDraft, handleRoleProfileClick } from '../../src/app/features/access/role-profiles-events.js';
 import { roleProfilesView } from '../../src/app/features/access/role-profiles-view.js';
 import { SYSTEM_ROLE_PROFILES } from '../../src/utils/role-profile.js';
@@ -15,6 +15,8 @@ function accessState(overrides = {}) {
     loading: false,
     saving: false,
     error: '',
+    query: '',
+    storeFilter: '',
     editorOpen: false,
     editingEmail: '',
     pendingDeleteEmail: '',
@@ -77,6 +79,21 @@ describe('access feature modules', () => {
     expect(markup).toContain('Gestor loja');
     expect(markup).toContain('Editar acesso');
     expect(markup).toContain('value="loja-06" checked');
+    expect(markup).toContain('data-access-search');
+    expect(markup).toContain('data-access-store-filter');
+    expect(markup).toContain('class="access-toolbar-actions"');
+    expect(markup.indexOf('data-action="reload-accesses"')).toBeLessThan(markup.indexOf('data-access-new'));
+    expect(markup).not.toContain('id="access-email" name="email" type="email" maxlength="254" autocomplete="email" value="maria@example.com" placeholder="nome@exemplo.com" readonly');
+  });
+
+  it('filters collaborators by an accent-insensitive name, email, and store', () => {
+    const accesses = [
+      { displayName: 'Márcia Souza', email: 'marcia@example.com', role: 'captor', storeIds: ['loja-02'] },
+      { displayName: 'Luan Israel', email: 'luan@example.com', role: 'captor', storeIds: ['loja-04'] }
+    ];
+    expect(filterTeamAccesses(accesses, { query: 'marcia' })).toEqual([accesses[0]]);
+    expect(filterTeamAccesses(accesses, { query: 'luan@' })).toEqual([accesses[1]]);
+    expect(filterTeamAccesses(accesses, { storeId: 'loja-04' })).toEqual([accesses[1]]);
   });
 
   it('renders system roles and the custom-role editor', () => {

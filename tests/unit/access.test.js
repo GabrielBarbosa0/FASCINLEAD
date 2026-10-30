@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEAM_PASSWORD, formatAccessStoreSummary, normalizeAccessEmail, validateAccess } from '../../src/utils/access.js';
+import { SYSTEM_ROLE_PROFILES } from '../../src/utils/role-profile.js';
 
 describe('access validation', () => {
+  it('allows a team access without a phone number', () => {
+    const result = validateAccess({
+      displayName: 'Maria Silva',
+      email: 'maria@example.com',
+      phone: '',
+      roleProfileId: 'system-captor',
+      storeIds: ['loja-04']
+    }, SYSTEM_ROLE_PROFILES);
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.phone).toBe('');
+  });
+
   it('normalizes an authorized Google email', () => {
     expect(normalizeAccessEmail('  Pessoa@Exemplo.COM ')).toBe('pessoa@exemplo.com');
   });

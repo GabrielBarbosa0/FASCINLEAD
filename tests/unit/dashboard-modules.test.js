@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { dashboardDistributionRows, performanceTableRows, reportDistributionPanel, statusRows } from '../../src/app/features/dashboard/dashboard-components.js';
 import { filterDashboardRecords, loadDashboardUpcomingRecords } from '../../src/app/features/dashboard/dashboard-data.js';
-import { appointmentDistribution, dashboardGroupStats, dashboardMetrics } from '../../src/app/features/dashboard/dashboard-metrics.js';
+import { appointmentDistribution, dashboardCaptorStats, dashboardGroupStats, dashboardMetrics } from '../../src/app/features/dashboard/dashboard-metrics.js';
 import { dashboardView } from '../../src/app/features/dashboard/dashboard-view.js';
 
 const records = [
@@ -35,6 +35,9 @@ describe('dashboard feature modules', () => {
     const metrics = dashboardMetrics(records, records, (id) => id, new Date('2026-10-29T12:00:00-03:00'));
     expect(metrics).toMatchObject({ attended: 1, missed: 1, attendanceRate: 50 });
     expect(metrics.captors).toHaveLength(2);
+    expect(dashboardCaptorStats(records, 'loja-06')).toEqual([
+      expect.objectContaining({ label: 'Ana', total: 1 })
+    ]);
   });
 
   it('renders reusable distribution and table components', () => {
@@ -52,6 +55,12 @@ describe('dashboard feature modules', () => {
       records,
       metrics,
       management: { filters: { startDate: '2026-10-01', endDate: '2026-10-29' }, loading: false, error: '', truncated: false },
+      ranking: {
+        open: true,
+        storeId: 'loja-06',
+        captors: dashboardCaptorStats(records, 'loja-06'),
+        stores: [{ id: 'loja-06', displayLabel: 'Loja 06 - Surubim' }]
+      },
       upcoming: { loading: false, loaded: true, error: '', truncated: false },
       savwin: { loading: false, error: '', result: null },
       savwinEnabled: false,
@@ -62,5 +71,9 @@ describe('dashboard feature modules', () => {
     expect(markup).toContain('Desempenho por unidade');
     expect(markup).toContain('Resultados por captador');
     expect(markup).toContain('Agendamentos por dia da semana');
+    expect(markup).toContain('data-dashboard-ranking-open');
+    expect(markup).toContain('id="dashboard-ranking-dialog"');
+    expect(markup).toContain('data-dashboard-ranking-store');
+    expect(markup).toContain('Loja 06 - Surubim');
   });
 });

@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../shared/formatters.js';
 import { dashboardDistributionRows, performanceTableRows, reportDistributionPanel, statusRows } from './dashboard-components.js';
 
-export function dashboardView({ allowed, records, metrics, management, upcoming, savwin, savwinEnabled, managementLimit, appointmentsLimit }) {
+export function dashboardView({ allowed, records, metrics, management, ranking = {}, upcoming, savwin, savwinEnabled, managementLimit, appointmentsLimit }) {
   if (!allowed) return '<div class="notice notice-danger"><i data-lucide="circle-alert"></i><span>Seu perfil não possui acesso ao dashboard.</span></div>';
   const { summary, attended, missed, pending, attendanceRate, daily, stores, captors, appointmentDistribution } = metrics;
   const { filters, loading, error, truncated } = management;
@@ -22,7 +22,33 @@ export function dashboardView({ allowed, records, metrics, management, upcoming,
   }).join('') : '<div class="dashboard-panel-empty">Nenhum transporte agendado nos próximos 7 dias</div>';
   const periodSummary = appointmentDistribution.predominantPeriod ? `Predomínio: ${appointmentDistribution.predominantPeriod}` : summary.scheduled ? 'Sem predomínio no período' : 'Nenhum agendamento no período';
   const appointmentAnalysis = `${reportDistributionPanel('Agendamentos por dia da semana', `${summary.scheduled} agendamento(s) distribuído(s) por dia`, 'calendar-days', appointmentDistribution.weekdays, summary.scheduled)}${reportDistributionPanel('Agendamentos por horário', periodSummary, 'clock-3', appointmentDistribution.periods, summary.scheduled, appointmentDistribution.predominantPeriod)}`;
-  const captorRanking = captors.map((captor, index) => `<div class="dashboard-ranking-row"><span>${index + 1}</span><div><strong>${escapeHtml(captor.label)}</strong><small>${captor.scheduled} agendado(s) · ${captor.attended} comparecimento(s)</small></div><strong>${captor.total}</strong></div>`).join('');
+  const rankingPreview = captors.slice(0, 5).map((captor, index) => `<button class="dashboard-ranking-row dashboard-ranking-preview-row" type="button" data-dashboard-ranking-open aria-label="Abrir ranking completo"><span>${index + 1}</span><div><strong>${escapeHtml(captor.label)}</strong><small>${captor.scheduled} agendado(s) · ${captor.attended} comparecimento(s)</small></div><strong>${captor.total}</strong></button>`).join('');
+  const rankingStoreOptions = (ranking.stores || []).map((store) => `<option value="${escapeHtml(store.id)}" ${ranking.storeId === store.id ? 'selected' : ''}>${escapeHtml(store.displayLabel || store.label)}</option>`).join('');
+  const rankingRows = (ranking.captors || []).map((captor, index) => `<article class="dashboard-ranking-dialog-row">
+    <span class="dashboard-ranking-position">${index + 1}</span>
+    <div class="dashboard-ranking-person"><strong>${escapeHtml(captor.label)}</strong><small>${captor.total} cadastro(s) no período</small></div>
+    <dl>
+      <div><dt>Agendados</dt><dd>${captor.scheduled}</dd></div>
+      <div><dt>Compareceram</dt><dd>${captor.attended}</dd></div>
+      <div><dt>Faltaram</dt><dd>${captor.missed}</dd></div>
+      <div><dt>Taxa</dt><dd>${captor.attendanceRate}%</dd></div>
+    </dl>
+  </article>`).join('');
+  const rankingDialog = ranking.open ? `<dialog id="dashboard-ranking-dialog" class="appointment-create-dialog dashboard-ranking-dialog" aria-labelledby="dashboard-ranking-title">
+    <div class="appointment-create-header">
+      <div><span>EQUIPE</span><h2 id="dashboard-ranking-title">Ranking completo</h2><p>Desempenho de todos os captadores no período analisado.</p></div>
+      <button class="icon-button" type="button" data-dashboard-ranking-close aria-label="Fechar ranking"><i data-lucide="circle-x"></i></button>
+    </div>
+    <div class="dashboard-ranking-dialog-toolbar">
+      <div class="field"><label for="dashboard-ranking-store">Loja</label><select id="dashboard-ranking-store" data-dashboard-ranking-store><option value="">Todas as lojas permitidas</option>${rankingStoreOptions}</select></div>
+      <div class="dashboard-ranking-dialog-total"><span>Captadores</span><strong>${(ranking.captors || []).length}</strong></div>
+    </div>
+    <div class="dashboard-ranking-dialog-content">
+      ${rankingRows || '<div class="empty-state"><i data-lucide="users"></i><strong>Nenhum captador encontrado</strong><p>Não há cadastros para esta loja no período selecionado.</p></div>'}
+    </div>
+    <div class="appointment-create-actions"><button class="button button-secondary" type="button" data-dashboard-ranking-close>Fechar</button></div>
+  </dialog>` : '';
+  const captorRanking = `${rankingPreview}<button class="dashboard-ranking-view-all" type="button" data-dashboard-ranking-open><i data-lucide="list-ordered"></i><span>Ver ranking completo</span><i data-lucide="chevron-right"></i></button>${rankingDialog}`;
   const upcomingValue = upcoming.loading && !upcoming.loaded ? '...' : summary.upcomingAppointments;
   const upcomingDetail = upcoming.error ? 'consulta indisponível' : `${summary.upcomingTransportSeats} assento(s) de transporte`;
   return `<section class="dashboard-toolbar"><button class="button button-secondary" type="button" data-route="management"><i data-lucide="arrow-left"></i><span>Voltar para gestão</span></button><div>${savwinEnabled ? `<button class="button button-secondary" type="button" data-action="consult-savwin" ${savwin.loading ? 'disabled' : ''}><i data-lucide="cloud-check"></i><span>${savwin.loading ? 'Consultando...' : 'Consultar SavWin'}</span></button>` : ''}<button class="button button-secondary" type="button" data-action="reload-reports" ${loading ? 'disabled' : ''}><i data-lucide="refresh-cw"></i><span>${loading ? 'Atualizando...' : 'Atualizar'}</span></button></div></section>

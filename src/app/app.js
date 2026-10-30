@@ -64,7 +64,7 @@ import { managementView as renderManagementView } from './features/management/ma
 import { kanbanView as renderKanbanView } from './features/kanban/kanban-view.js';
 import { initializeKanbanScrollbar } from './features/kanban/kanban-scrollbar.js';
 import { filterDashboardRecords, loadDashboardUpcomingRecords } from './features/dashboard/dashboard-data.js';
-import { dashboardMetrics } from './features/dashboard/dashboard-metrics.js';
+import { dashboardCaptorStats, dashboardMetrics } from './features/dashboard/dashboard-metrics.js';
 import { dashboardView as renderDashboardView } from './features/dashboard/dashboard-view.js';
 import { loadGoalsData as loadGoalsFeatureData, ensureGoalsData as ensureGoalsFeatureData } from './features/goals/goals-data.js';
 import { bindGoalDialog } from './features/goals/goal-dialog.js';
@@ -390,11 +390,23 @@ function kanbanView() {
 function dashboardView() {
   const records = filteredReportRecords();
   const upcomingRecords = state.demoMode ? state.leads : state.dashboardUpcoming.records;
+  const rankingRecords = filterDashboardRecords(
+    state.demoMode ? state.leads : state.management.records,
+    { ...state.management.filters, storeId: '', capturedByUid: '' }
+  );
+  const rankingStores = isAdmin()
+    ? STORES
+    : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   return renderDashboardView({
     allowed: hasAccess('dashboard.view'),
     records,
     metrics: dashboardMetrics(records, upcomingRecords, storeLabel),
     management: state.management,
+    ranking: {
+      ...state.dashboardRanking,
+      captors: dashboardCaptorStats(rankingRecords, state.dashboardRanking.storeId),
+      stores: rankingStores
+    },
     upcoming: state.dashboardUpcoming,
     savwin: state.savwin,
     savwinEnabled: isLocalSavwinEnabled,
@@ -523,6 +535,27 @@ function handleConnectivityChange() {
 
 function bindPageEvents() {
   initializeKanbanScrollbar();
+  const rankingDialog = document.querySelector('#dashboard-ranking-dialog');
+  if (rankingDialog) {
+    requestAnimationFrame(() => {
+      if (!rankingDialog.open) rankingDialog.showModal();
+    });
+    rankingDialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      state.dashboardRanking.open = false;
+      render();
+    });
+    rankingDialog.addEventListener('click', (event) => {
+      if (event.target === rankingDialog) {
+        state.dashboardRanking.open = false;
+        render();
+      }
+    });
+    rankingDialog.querySelector('[data-dashboard-ranking-store]')?.addEventListener('change', (event) => {
+      state.dashboardRanking.storeId = event.target.value;
+      render();
+    });
+  }
   const leadDetailDialog = document.querySelector('#lead-detail-dialog');
   if (leadDetailDialog) {
     requestAnimationFrame(() => {
@@ -1328,6 +1361,22 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const rankingPanel = event.target.closest('.dashboard-panel');
+    const openRankingButton = event.target.closest('[data-dashboard-ranking-open]')
+      || (!event.target.closest('#dashboard-ranking-dialog') && rankingPanel?.querySelector(':scope > .dashboard-ranking-list')
+        ? rankingPanel
+        : null);
+    if (openRankingButton) {
+      state.dashboardRanking.open = true;
+      render();
+      return;
+    }
+    const closeRankingButton = event.target.closest('[data-dashboard-ranking-close]');
+    if (closeRankingButton) {
+      state.dashboardRanking.open = false;
+      render();
+      return;
+    }
     const openLeadHistoryButton = event.target.closest('[data-open-lead-history]');
     if (openLeadHistoryButton) {
       state.leadHistoryDialogOpen = true;

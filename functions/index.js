@@ -131,6 +131,85 @@ async function assertAdministrator(request) {
   return callerEmail;
 }
 
+exports.renameTeamMemberEmail = onCall({ region: 'southamerica-east1' }, async (request) => {
+  const callerEmail = await assertAdministrator(request);
+  const currentEmail = normalizeEmail(request.data?.currentEmail);
+  const newEmail = normalizeEmail(request.data?.newEmail);
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(currentEmail) || !emailPattern.test(newEmail)) {
+    throw new HttpsError('invalid-argument', 'Informe um e-mail valido.');
+  }
+  if (currentEmail === newEmail) return { updated: false };
+  if (currentEmail === callerEmail) {
+    throw new HttpsError('failed-precondition', 'O administrador conectado nao pode alterar o proprio e-mail por esta tela.');
+  }
+
+  const firestore = getFirestore();
+  const currentAccessRef = firestore.doc(`allowedEmails/${currentEmail}`);
+  const newAccessRef = firestore.doc(`allowedEmails/${newEmail}`);
+  const [currentAccess, newAccess] = await Promise.all([currentAccessRef.get(), newAccessRef.get()]);
+  if (!currentAccess.exists) throw new HttpsError('not-found', 'O acesso informado nao existe.');
+  if (newAccess.exists) throw new HttpsError('already-exists', 'Este e-mail ja possui um acesso cadastrado.');
+
+  let authUser = null;
+  try {
+    authUser = await getAuth().getUserByEmail(currentEmail);
+  } catch (error) {
+    if (error?.code !== 'auth/user-not-found') throw error;
+  }
+
+  try {
+    const existingUser = await getAuth().getUserByEmail(newEmail);
+    if (!authUser || existingUser.uid !== authUser.uid) {
+      throw new HttpsError('already-exists', 'Este e-mail ja esta vinculado a outra conta de login.');
+    }
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    if (error?.code !== 'auth/user-not-found') throw error;
+  }
+
+  if (authUser) await getAuth().updateUser(authUser.uid, { email: newEmail, emailVerified: true });
+
+  try {
+    const linkedUsers = await firestore.collection('users').where('email', '==', currentEmail).get();
+    const batch = firestore.batch();
+    batch.set(newAccessRef, {
+      ...currentAccess.data(),
+      email: newEmail,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid
+    });
+    batch.delete(currentAccessRef);
+    linkedUsers.docs.forEach((userSnapshot) => batch.update(userSnapshot.ref, {
+      email: newEmail,
+      accessSyncedAt: FieldValue.serverTimestamp()
+    }));
+    const auditRef = firestore.collection('accessAuditEvents').doc();
+    batch.set(auditRef, {
+      action: 'team_email_renamed',
+      actorEmail: callerEmail,
+      actorUid: request.auth.uid,
+      currentEmail,
+      newEmail,
+      targetUid: authUser?.uid || '',
+      createdAt: FieldValue.serverTimestamp()
+    });
+    await batch.commit();
+  } catch (error) {
+    if (authUser) {
+      try {
+        await getAuth().updateUser(authUser.uid, { email: currentEmail, emailVerified: true });
+      } catch {
+        // The audit log and support tooling can reconcile an unlikely rollback failure.
+      }
+    }
+    throw error;
+  }
+
+  return { updated: true, uid: authUser?.uid || '' };
+});
+
 exports.updateTeamMemberPassword = onCall({ region: 'southamerica-east1' }, async (request) => {
   const callerEmail = await assertAdministrator(request);
   const targetEmail = normalizeEmail(request.data?.email);

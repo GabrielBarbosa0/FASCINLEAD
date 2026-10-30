@@ -11,6 +11,8 @@ describe('application shell modules', () => {
   it('renders the login shell with its authentication actions', () => {
     const markup = loginView({ state: { authError: '', authMessage: '' }, firebaseConfigured: true, devMode: true });
     expect(markup).toContain('email-login-form');
+    expect(markup).toContain('data-action="google-login"');
+    expect(markup).toContain('Entrar com Google');
     expect(markup).toContain('Abrir modo de desenvolvimento');
   });
 
@@ -34,5 +36,13 @@ describe('application shell modules', () => {
     expect(markup).toContain('LEADFLOW');
     expect(markup).toContain('Conteúdo');
     expect(markup).toContain('bottom-nav');
+  });
+
+  it('uses the full-width layout only for the Kanban route', () => {
+    const kanbanMarkup = appShellView({ state: { ...state, route: 'kanban' }, page: '<section>Kanban</section>', canManage: () => true, hasAccess, pendingFollowUps: () => [] });
+    const managementMarkup = appShellView({ state: { ...state, route: 'management' }, page: '<section>Management</section>', canManage: () => true, hasAccess, pendingFollowUps: () => [] });
+
+    expect(kanbanMarkup).toContain('app-main layout-wide layout-kanban');
+    expect(managementMarkup).not.toContain('layout-kanban');
   });
 });
