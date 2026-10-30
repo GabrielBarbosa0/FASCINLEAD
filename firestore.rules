@@ -440,7 +440,9 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendance', 'updatedAtServer'
+          'appointmentAttendance', 'funnelStage', 'funnelReasonCode',
+          'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
+          'updatedAtServer'
         ])
         && resource.data.capturedByUid == request.auth.uid
         && request.resource.data.appointmentDate != ''

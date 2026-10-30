@@ -5,6 +5,7 @@ import { enrichLeadTriage, eyeTriageFields, triageConfigFields } from '../../src
 import { transportFields } from '../../src/app/features/capture/capture-transport.js';
 import { captureView } from '../../src/app/features/capture/capture-view.js';
 import { DEFAULT_STORE_SCHEDULE } from '../../src/utils/schedule.js';
+import { leadDetailAppointmentTimeField } from '../../src/app/features/leads/lead-appointment.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -51,7 +52,10 @@ describe('capture feature modules', () => {
     const enriched = enrichLeadTriage(values, settings);
 
     expect(enriched).toMatchObject({ careRoute: 'ophthalmologist', examPrice: 260 });
-    expect(eyeTriageFields(values, settings)).toContain('Oftalmologista');
+    const triageMarkup = eyeTriageFields(values, settings);
+    expect(triageMarkup).toContain('Oftalmologista');
+    expect(triageMarkup).toContain('name="careRouteSelection"');
+    expect(triageMarkup).not.toContain('>Automático<');
     expect(triageConfigFields(settings)).toContain('name="ophthalmologistExamPrice"');
   });
 
@@ -77,6 +81,39 @@ describe('capture feature modules', () => {
       profile: {},
       online: true
     })).toContain('type="time"');
+  });
+
+  it('uses the currently selected route when refreshing an existing lead schedule', () => {
+    const settings = {
+      ...DEFAULT_STORE_SCHEDULE,
+      ophthalmologyWeekdays: [6],
+      optometristHoursRules: [{ weekday: 5, openingTime: '08:00', closingTime: '17:00' }]
+    };
+    const lead = {
+      id: 'lead-1',
+      storeId: 'loja-06',
+      appointmentDate: '2026-10-31',
+      appointmentTime: '08:00',
+      careRouteOverride: 'ophthalmologist'
+    };
+    const markup = leadDetailAppointmentTimeField({
+      lead,
+      scheduleState: {
+        settings,
+        appointmentDate: '2026-10-30',
+        appointments: [],
+        appointmentLoading: false,
+        error: '',
+        services: [],
+        serviceId: '',
+        triage: { careRouteOverride: 'optometrist' }
+      },
+      profile: { role: 'admin' },
+      online: true
+    });
+
+    expect(markup).not.toContain('O oftalmologista não atende neste dia');
+    expect(markup).toContain('08:00 - 08:20');
   });
 
   it('renders the capture page without reading application-global state', () => {

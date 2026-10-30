@@ -1180,7 +1180,25 @@ describe('appointment slot reservations', () => {
       appointmentDurationMinutes: 20,
       appointmentServiceId: 'eye-exam',
       appointmentServiceName: 'Exame de vista',
+      funnelStage: 'scheduled',
+      funnelReasonCode: '',
+      funnelUpdatedAtClient: '2026-10-19T12:00:00.000Z',
+      funnelUpdatedAtServer: Timestamp.now(),
+      appointmentCycle: 1,
       updatedAtServer: Timestamp.now()
+    });
+    batch.set(doc(db, 'leads', 'offline-limited-lead', 'history', 'appointment-created'), {
+      leadId: 'offline-limited-lead',
+      storeId: 'loja-06',
+      eventType: 'appointment_scheduled',
+      funnelStage: 'scheduled',
+      reasonCode: '',
+      actorUid: 'captor-uid',
+      actorName: 'Captador Teste',
+      actorRole: 'captor',
+      occurredAtClient: '2026-10-19T12:00:00.000Z',
+      occurredAtServer: Timestamp.now(),
+      schemaVersion: 1
     });
     batch.set(doc(db, 'appointmentSlots', 'slot-consultorio-surubim-2026-10-20-08:00'), {
       ...slot,

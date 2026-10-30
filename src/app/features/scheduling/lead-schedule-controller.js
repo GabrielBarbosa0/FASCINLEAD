@@ -45,11 +45,11 @@ export function startLeadDetailDayAppointmentsSubscription({ state, lead, findLe
   }
 }
 
-export async function ensureLeadDetailSchedule({ state, routeParam, findLead, render, renderTimeField }) {
-  if (!['lead', 'management-lead'].includes(state.route) || !state.profile || state.leadDetailSchedule.loading) return;
+export async function ensureLeadDetailSchedule({ state, routeParam, findLead, render, renderTimeField, isOpen = () => ['lead', 'management-lead'].includes(state.route) }) {
+  if (!isOpen() || !state.profile || state.leadDetailSchedule.loading) return;
   const lead = findLead(routeParam());
   if (!lead?.storeId || (state.leadDetailSchedule.leadId === lead.id && state.leadDetailSchedule.storeId === lead.storeId)) return;
-  Object.assign(state.leadDetailSchedule, { loading: true, leadId: lead.id, appointmentDate: lead.appointmentDate || '', appointments: [], services: [], serviceId: lead.appointmentServiceId || '', error: '' });
+  Object.assign(state.leadDetailSchedule, { loading: true, leadId: lead.id, appointmentDate: lead.appointmentDate || '', appointments: [], services: [], serviceId: lead.appointmentServiceId || '', triage: {}, error: '' });
   try {
     const [settings, services] = state.demoMode
       ? [state.settings.records.find((item) => item.id === lead.storeId) || { ...DEFAULT_STORE_SCHEDULE, id: lead.storeId }, state.settings.services.length ? state.settings.services : [defaultAppointmentService(lead.storeId, lead.appointmentDurationMinutes || DEFAULT_STORE_SCHEDULE.appointmentDurationMinutes)]]

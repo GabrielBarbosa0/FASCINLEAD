@@ -219,8 +219,9 @@ export function ophthalmologyTriage(input = {}, settings = {}, referenceDate = n
 
 function diabetesData(input, pathologyIds) {
   const hasDiabetes = pathologyIds.includes('diabetes');
-  const value = Number(input.diabetesLevel);
-  const diabetesLevel = hasDiabetes && Number.isInteger(value) ? value : null;
+  const rawValue = String(input.diabetesLevel ?? '').trim();
+  const value = Number(rawValue);
+  const diabetesLevel = hasDiabetes && rawValue !== '' && Number.isInteger(value) ? value : null;
   return {
     hasDiabetes,
     diabetesLevel,
@@ -252,9 +253,7 @@ export function validateLeadInput(input, options = {}) {
   if (!phone) errors.phone = 'Informe um telefone com DDD.';
   if (customerCpf && !isValidCpf(customerCpf)) errors.customerCpf = 'Informe um CPF válido.';
   if (customerRg.length > 20) errors.customerRg = 'Use no máximo 20 caracteres.';
-  if (diabetes.hasDiabetes && diabetes.diabetesLevel === null) {
-    errors.diabetesLevel = 'Informe o nivel de glicemia medido.';
-  } else if (diabetes.hasDiabetes && (diabetes.diabetesLevel < 20 || diabetes.diabetesLevel > 600)) {
+  if (diabetes.hasDiabetes && diabetes.diabetesLevel !== null && (diabetes.diabetesLevel < 20 || diabetes.diabetesLevel > 600)) {
     errors.diabetesLevel = 'Informe um nivel entre 20 e 600 mg/dL.';
   }
   if (!birthDate) {

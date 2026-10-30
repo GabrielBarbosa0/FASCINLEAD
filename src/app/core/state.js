@@ -99,6 +99,7 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
       appointments: [],
       services: [],
       serviceId: '',
+      triage: {},
       error: '',
       settings: { ...DEFAULT_STORE_SCHEDULE }
     },
@@ -109,6 +110,10 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
       records: [],
       stage: ''
     },
+    leadDetailDialog: {
+      leadId: ''
+    },
+    leadHistoryDialogOpen: false,
     offlineCapture: {
       loaded: false,
       enabled: false

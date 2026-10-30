@@ -4,7 +4,6 @@ import { servicesForStore } from '../../../utils/service-catalog.js';
 import { formatBrazilianCpf } from '../../../utils/savwin-matching.js';
 import {
   escapeHtml,
-  formatCapturedAt,
   storeLabel,
   syncLabel,
   toLocalDateInput
@@ -13,7 +12,6 @@ import { birthAgeText } from '../../shared/form-helpers.js';
 import { ametropiaOptions, eyeTriageFields, pathologyOptions, sexOptions, triageConfigFields } from '../capture/capture-triage.js';
 import { transportFields } from '../capture/capture-transport.js';
 import { selectedLeadDetailService } from './lead-appointment.js';
-import { leadHistoryView } from '../funnel/lead-history-view.js';
 
 export function leadDetailView({
   lead,
@@ -24,6 +22,7 @@ export function leadDetailView({
   appointmentTimeMarkup,
   canDelete,
   canEditClinical = false,
+  inDialog = false,
   history = { loading: false, error: '', records: [], stage: '' }
 }) {
   if (managementMode && !canManage) {
@@ -46,17 +45,16 @@ export function leadDetailView({
   const serviceOptions = (availableServices.length ? availableServices : [selectedService])
     .map((service) => `<option value="${escapeHtml(service.id)}" ${service.id === selectedService.id ? 'selected' : ''}>${escapeHtml(service.name)} - ${service.durationMinutes} min</option>`)
     .join('');
+  const heading = inDialog
+    ? `<header class="lead-detail-dialog-header"><div><p class="eyebrow">CADASTRO</p><h2>${escapeHtml(lead.fullName)}</h2></div><button class="icon-button" type="button" data-close-lead-detail title="Fechar" aria-label="Fechar cadastro"><i data-lucide="circle-x"></i></button></header>`
+    : `<section class="page-toolbar detail-toolbar"><button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button><h2>${escapeHtml(lead.fullName)}</h2></section>`;
   return `
-    <section class="page-toolbar detail-toolbar">
-      <button class="back-button" type="button" data-route="${backRoute}" aria-label="Voltar"><i data-lucide="arrow-left"></i></button>
-      <h2>${escapeHtml(lead.fullName)}</h2>
-    </section>
+    ${heading}
     <section class="lead-detail-summary" aria-label="Informações do cadastro">
       <div><span>Status</span><strong class="status-badge status-${syncTone}">${syncStatus}</strong></div>
       <div><span>Loja</span><strong>${escapeHtml(storeLabel(lead.storeId))}</strong></div>
-      <div><span>Cadastrado em</span><strong>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</strong></div>
+      <button class="lead-history-summary" type="button" data-open-lead-history aria-haspopup="dialog"><span>Histórico do lead</span><strong>Ver histórico</strong><small>Ver todas as alterações</small></button>
     </section>
-    ${leadHistoryView({ ...history, stage: lead.funnelStage || history.stage })}
     <form id="edit-lead-form" class="form-panel" data-lead-id="${escapeHtml(lead.id)}" data-management="${managementMode}" novalidate>
       ${offlineEdit ? '<div class="notice notice-warning"><i data-lucide="wifi-off"></i><span>O cadastro pode ser consultado offline, mas alterações e agendamento exigem internet.</span></div>' : ''}
       <input name="schedulingMode" type="hidden" value="${escapeHtml(scheduleState.settings.schedulingMode || lead.appointmentSchedulingMode || 'controlled')}" />

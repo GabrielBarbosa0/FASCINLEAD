@@ -69,8 +69,8 @@ describe('lead validation', () => {
     expect(validateLeadInput({ ...validInput, addressReference: 'a'.repeat(161) }).errors.addressReference).toBeDefined();
   });
 
-  it('requires diabetes measurement and flags values above 150 mg/dL', () => {
-    expect(validateLeadInput({ ...validInput, diabetesLevel: '' }).errors.diabetesLevel).toBeDefined();
+  it('allows an omitted diabetes measurement and flags values above 150 mg/dL', () => {
+    expect(validateLeadInput({ ...validInput, diabetesLevel: '' }).errors.diabetesLevel).toBeUndefined();
     const result = createLeadDocument({ ...validInput, diabetesLevel: '151' }, profile, 'installation-test');
     expect(result.data).toMatchObject({ diabetesLevel: 151, diabetesNeedsMedicalAlert: true });
     expect(createLeadDocument({ ...validInput, pathologyIds: [], diabetesLevel: '151' }, profile, 'installation-test').data)
@@ -82,6 +82,20 @@ describe('lead validation', () => {
       .toBe('ophthalmologist');
     expect(ophthalmologyTriage({ ...validInput, eyeSurgeryStatus: 'yes', eyeSurgeryType: 'corneal-transplant' }).careRoute)
       .toBe('ophthalmologist');
+  });
+
+  it('defaults the route to optometry and allows a manual optometry override', () => {
+    expect(ophthalmologyTriage(validInput).careRoute).toBe('optometrist');
+    const manualOverride = ophthalmologyTriage({
+      ...validInput,
+      pathologyIds: ['cataract'],
+      careRouteOverride: 'optometrist'
+    });
+    expect(manualOverride).toMatchObject({
+      careRoute: 'optometrist',
+      careRouteOverride: 'optometrist',
+      careRouteReasons: ['pathology', 'manual']
+    });
   });
 
   it('requires a valid birth date and rejects a future date', () => {

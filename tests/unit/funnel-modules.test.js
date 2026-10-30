@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { funnelStageLabel, initialFunnelStage, leadCreationEvents } from '../../src/app/features/funnel/funnel-model.js';
+import { appointmentChangeEvent, funnelStageLabel, initialFunnelStage, leadCreationEvents } from '../../src/app/features/funnel/funnel-model.js';
 import { leadHistoryView } from '../../src/app/features/funnel/lead-history-view.js';
 
 describe('funnel feature modules', () => {
@@ -24,6 +24,18 @@ describe('funnel feature modules', () => {
     expect(events).toHaveLength(2);
     expect(events.map((event) => event.eventType)).toEqual(['lead_created', 'appointment_scheduled']);
     expect(events[1]).toMatchObject({ leadId: 'lead-1', funnelStage: 'scheduled', actorUid: 'user-1' });
+  });
+
+  it('records the correct event when an offline lead receives its first appointment', () => {
+    const event = appointmentChangeEvent({
+      id: 'lead-1', storeId: 'loja-06', appointmentDate: '', appointmentTime: ''
+    }, {
+      id: 'lead-1', storeId: 'loja-06', appointmentDate: '2026-11-03', appointmentTime: '08:00'
+    }, {
+      uid: 'user-1', displayName: 'Maria Captadora', role: 'captor'
+    }, new Date('2026-10-29T12:00:00.000Z'));
+
+    expect(event).toMatchObject({ eventType: 'appointment_scheduled', funnelStage: 'scheduled' });
   });
 
   it('renders the history with its current funnel stage', () => {

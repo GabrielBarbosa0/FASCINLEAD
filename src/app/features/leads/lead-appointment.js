@@ -19,6 +19,10 @@ export function selectedLeadDetailService(lead, scheduleState) {
 
 export function leadDetailAppointmentTimeField({ lead, scheduleState, profile, online = navigator.onLine }) {
   const { settings, appointmentDate, appointments, appointmentLoading, error } = scheduleState;
+  const currentValues = {
+    ...lead,
+    ...(scheduleState.triage || {})
+  };
   const selectedTime = appointmentDate === lead.appointmentDate ? lead.appointmentTime : '';
   if (!online) {
     return '<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horário disponível</label><select id="edit-appointmentTime" name="appointmentTime" disabled><option>Conecte-se para consultar os horários</option></select><small class="field-error"></small></div>';
@@ -27,9 +31,10 @@ export function leadDetailAppointmentTimeField({ lead, scheduleState, profile, o
     return `<div id="edit-appointment-time-field" class="field" data-field="appointmentTime"><label for="edit-appointmentTime">Horário</label><input id="edit-appointmentTime" name="appointmentTime" type="time" value="${escapeHtml(selectedTime)}" /><small class="field-error"></small></div>`;
   }
 
-  const triage = ophthalmologyTriage(lead, settings);
+  const triage = ophthalmologyTriage(currentValues, settings);
   const routeAllowed = isCareRouteDateAllowed(settings, triage.careRoute, appointmentDate);
-  const transportAllowed = !lead.needsTransport || isTransportDateAllowed(settings, appointmentDate);
+  const transportAllowed = !(currentValues.needsTransport === true || currentValues.needsTransport === 'true')
+    || isTransportDateAllowed(settings, appointmentDate);
   const durationMinutes = selectedLeadDetailService(lead, scheduleState).durationMinutes;
   const serviceSchedule = {
     ...careRouteAppointmentSchedule(settings, triage.careRoute),
@@ -38,7 +43,7 @@ export function leadDetailAppointmentTimeField({ lead, scheduleState, profile, o
   const quota = appointmentQuotaStatus(settings, appointmentDate, appointments, profile, lead.id);
   const available = appointmentDate && routeAllowed && transportAllowed && !appointmentLoading && !error
     ? buildAppointmentSlots(serviceSchedule, appointments, lead.id, { appointmentDate, profile })
-      .filter((slot) => slot.available && (!lead.needsTransport || isTransportAppointmentAllowed(
+      .filter((slot) => slot.available && (!(currentValues.needsTransport === true || currentValues.needsTransport === 'true') || isTransportAppointmentAllowed(
         settings,
         appointmentDate,
         slot.time,

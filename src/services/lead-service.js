@@ -19,7 +19,7 @@ import { getInstallationId } from '../utils/installation.js';
 import { createId } from '../utils/id.js';
 import { canAccessStore } from '../utils/permissions.js';
 import { appointmentBlockTimes, appointmentSlotId } from '../utils/schedule.js';
-import { leadCreationEvents } from '../app/features/funnel/funnel-model.js';
+import { appointmentChangeEvent, leadCreationEvents } from '../app/features/funnel/funnel-model.js';
 import { addLeadHistoryEvents } from './lead-history-service.js';
 import {
   listOfflineLeads,
@@ -223,15 +223,33 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
   const result = createLeadUpdate(input);
   if (!result.isValid) return result;
 
+  const appointmentChanged = existingLead && (
+    existingLead.appointmentDate !== result.data.appointmentDate
+    || existingLead.appointmentTime !== result.data.appointmentTime
+  );
+  const now = new Date();
+  const isScheduled = Boolean(result.data.appointmentDate && result.data.appointmentTime);
+  const appointmentFunnelUpdate = appointmentChanged ? {
+    funnelStage: isScheduled ? 'scheduled' : 'awaiting_reschedule',
+    funnelReasonCode: '',
+    funnelUpdatedAtClient: now.toISOString(),
+    funnelUpdatedAtServer: serverTimestamp(),
+    appointmentCycle: isScheduled && !existingLead.appointmentDate
+      ? Number(existingLead.appointmentCycle || 0) + 1
+      : Number(existingLead.appointmentCycle || 0)
+  } : {};
+  const historyEvent = appointmentChanged && options.profile
+    ? appointmentChangeEvent(existingLead, { id, ...existingLead, ...result.data }, options.profile, now)
+    : null;
+
   if (demoMode || !isFirebaseConfigured) {
     const leads = readDemoLeads();
     const index = leads.findIndex((lead) => lead.id === id);
     if (index === -1) return { isValid: false, errors: {}, notFound: true };
-    const appointmentChanged = leads[index].appointmentDate !== result.data.appointmentDate
-      || leads[index].appointmentTime !== result.data.appointmentTime;
     leads[index] = {
       ...leads[index],
       ...result.data,
+      ...appointmentFunnelUpdate,
       ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
       syncState: 'demo',
       fromCache: true
@@ -240,10 +258,6 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
     return { ...result, id };
   }
 
-  const appointmentChanged = existingLead && (
-    existingLead.appointmentDate !== result.data.appointmentDate
-    || existingLead.appointmentTime !== result.data.appointmentTime
-  );
   const appointmentUpdate = {
     appointmentDate: result.data.appointmentDate,
     appointmentTime: result.data.appointmentTime,
@@ -254,6 +268,7 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
       appointmentServiceName: result.data.appointmentServiceName
     } : {}),
     ...(appointmentChanged && result.data.appointmentDate ? { appointmentAttendance: 'pending' } : {}),
+    ...appointmentFunnelUpdate,
     updatedAtServer: serverTimestamp()
   };
   const leadUpdate = options.appointmentOnly
@@ -307,7 +322,13 @@ export function updateLead(id, input, demoMode, onRemoteError, existingLead = nu
       leadId: id,
       capturedByUid: existingLead.capturedByUid
     }));
+    if (historyEvent) addLeadHistoryEvents(batch, id, [historyEvent]);
     writePromise = commitReservationBatch(batch, newBlocks, id);
+  } else if (historyEvent) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'leads', id), leadUpdate, { merge: true });
+    addLeadHistoryEvents(batch, id, [historyEvent]);
+    writePromise = batch.commit();
   } else {
     writePromise = setDoc(doc(db, 'leads', id), leadUpdate, { merge: true });
   }

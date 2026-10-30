@@ -18,8 +18,8 @@ export function initializeLeadDetailForm(form, options) {
   });
   bindExclusiveOptions(form, 'ametropiaIds');
   bindExclusiveOptions(form, 'pathologyIds');
-  bindEyeTriage(form, options.settings);
-  bindTransportFields(form, options.settings);
+  bindEyeTriage(form, options.settings, (values) => options.onTriageChange?.(values, form));
+  bindTransportFields(form, options.settings, (values) => options.onTriageChange?.(values, form));
   form.elements.appointmentServiceId?.addEventListener('change', () => options.onServiceChange?.(form.elements.appointmentServiceId.value, form));
   form.elements.appointmentDate?.addEventListener('input', () => options.onAppointmentDateChange?.(form.elements.appointmentDate.value, form));
 }

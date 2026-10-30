@@ -49,3 +49,26 @@ export function leadCreationEvents(lead, profile, now = new Date()) {
   }
   return events;
 }
+
+export function appointmentChangeEvent(previousLead, nextLead, profile, now = new Date()) {
+  const wasScheduled = Boolean(previousLead?.appointmentDate && previousLead?.appointmentTime);
+  const isScheduled = Boolean(nextLead?.appointmentDate && nextLead?.appointmentTime);
+  if (!wasScheduled && !isScheduled) return null;
+
+  const eventType = isScheduled
+    ? (wasScheduled ? 'appointment_rescheduled' : 'appointment_scheduled')
+    : 'appointment_cancelled';
+  const funnelStage = isScheduled ? 'scheduled' : 'awaiting_reschedule';
+  return {
+    leadId: nextLead.id || previousLead.id,
+    storeId: nextLead.storeId || previousLead.storeId,
+    eventType,
+    funnelStage,
+    reasonCode: '',
+    actorUid: profile.uid,
+    actorName: String(profile.displayName || 'Usuario'),
+    actorRole: String(profile.role || 'captor'),
+    occurredAtClient: now.toISOString(),
+    schemaVersion: 1
+  };
+}

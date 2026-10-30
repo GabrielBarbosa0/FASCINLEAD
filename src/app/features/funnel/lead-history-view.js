@@ -1,8 +1,18 @@
 import { escapeHtml, formatCapturedAt } from '../../shared/formatters.js';
 import { FUNNEL_EVENT_LABELS, funnelStageLabel } from './funnel-model.js';
 
-export function leadHistoryView(history) {
-  const { loading, error, records } = history;
+export function leadHistoryView(history, { lead = null } = {}) {
+  const { loading, error } = history;
+  const records = [...history.records];
+  if (lead?.capturedAtClient && !records.some((event) => event.eventType === 'lead_created')) {
+    records.unshift({
+      id: `lead-created-${lead.id}`,
+      eventType: 'lead_created',
+      funnelStage: 'captured',
+      actorName: lead.capturedByName || 'Sistema',
+      occurredAtClient: lead.capturedAtClient
+    });
+  }
   const content = loading
     ? '<div class="lead-history-empty">Carregando histórico...</div>'
     : error

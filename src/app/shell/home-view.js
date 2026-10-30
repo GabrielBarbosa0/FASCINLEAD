@@ -4,7 +4,36 @@ function profileCard(profile) {
   return `<section class="profile-card"><div class="avatar">${escapeHtml(profileInitials(profile.displayName))}</div><div><strong>${escapeHtml(profile.displayName)}</strong><span>${escapeHtml(profile.roleProfileName || roleLabel(profile.role))}</span></div><i data-lucide="shield-check" class="profile-status"></i></section>`;
 }
 
+function actionCard(route, icon, title, description, extra = '') {
+  return `<button class="action-card" type="button" data-route="${route}"><span class="action-icon"><i data-lucide="${icon}"></i></span><span><strong>${title}</strong><small>${description}</small></span>${extra || '<i data-lucide="chevron-right"></i>'}</button>`;
+}
+
 export function homeView({ state, hasAccess, canManage, canManageGoals, isAdmin, pendingFollowUps }) {
   const followUps = pendingFollowUps();
-  return `${profileCard(state.profile)}${state.demoMode ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Não utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>' : ''}<section class="action-grid" aria-label="Ações principais">${hasAccess('leads.create') ? '<button class="action-card action-card-primary" type="button" data-route="new"><span class="action-icon"><i data-lucide="user-plus"></i></span><span><strong>Nova abordagem</strong><small>Cadastrar novo contato</small></span><i data-lucide="chevron-right"></i></button>' : ''}${hasAccess('leads.view_own') ? `<button class="action-card" type="button" data-route="leads"><span class="action-icon"><i data-lucide="clipboard-list"></i></span><span><strong>Meus cadastros</strong><small>${state.leads.length} registro(s) neste acesso</small></span><i data-lucide="chevron-right"></i></button>` : ''}${hasAccess('followups.own') || hasAccess('followups.team') ? `<button class="action-card" type="button" data-route="follow-ups"><span class="action-icon"><i data-lucide="bell-ring"></i></span><span><strong>${hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes'}</strong><small>${followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente'}</small></span>${followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendência(s)">${followUps.length}</span>` : '<i data-lucide="chevron-right"></i>'}</button>` : ''}${canManage() ? '<button class="action-card" type="button" data-route="management"><span class="action-icon"><i data-lucide="bar-chart-3"></i></span><span><strong>Painel de gestão</strong><small>Consultar e exportar captações</small></span><i data-lucide="chevron-right"></i></button>' : ''}${hasAccess('appointments.view') ? '<button class="action-card" type="button" data-route="appointments"><span class="action-icon"><i data-lucide="calendar-days"></i></span><span><strong>Agenda de exames</strong><small>Visualizar os pré-agendamentos</small></span><i data-lucide="chevron-right"></i></button><button class="action-card" type="button" data-route="confirmations"><span class="action-icon"><i data-lucide="message-circle"></i></span><span><strong>Confirmações</strong><small>Enviar lembretes aos clientes</small></span><i data-lucide="chevron-right"></i></button>' : ''}${hasAccess('goals.view_own') || canManageGoals() ? `<button class="action-card" type="button" data-route="goals"><span class="action-icon"><i data-lucide="target"></i></span><span><strong>Metas</strong><small>${canManageGoals() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'}</small></span><i data-lucide="chevron-right"></i></button>` : ''}${isAdmin() ? '<button class="action-card" type="button" data-route="access"><span class="action-icon"><i data-lucide="user-round-cog"></i></span><span><strong>Acessos da equipe</strong><small>Autorizar colaboradores e administradores</small></span><i data-lucide="chevron-right"></i></button><button class="action-card" type="button" data-route="settings"><span class="action-icon"><i data-lucide="settings"></i></span><span><strong>Configurações</strong><small>Agenda e preferências do sistema</small></span><i data-lucide="chevron-right"></i></button>' : ''}</section>`;
+  const cards = [];
+  if (hasAccess('leads.create')) cards.push(actionCard('new', 'user-plus', 'Nova abordagem', 'Cadastrar novo contato', '<i data-lucide="chevron-right"></i>').replace('class="action-card"', 'class="action-card action-card-primary"'));
+  if (hasAccess('leads.view_own')) cards.push(actionCard('leads', 'clipboard-list', 'Meus cadastros', `${state.leads.length} registro(s) neste acesso`));
+  if (hasAccess('followups.own') || hasAccess('followups.team')) {
+    const title = hasAccess('followups.team') ? 'Retornos da equipe' : 'Retornos pendentes';
+    const description = followUps.length ? `${followUps.length} cliente(s) em acompanhamento` : 'Nenhum retorno pendente';
+    const extra = followUps.length ? `<span class="notification-count" aria-label="${followUps.length} pendencia(s)">${followUps.length}</span>` : '';
+    cards.push(actionCard('follow-ups', 'bell-ring', title, description, extra));
+  }
+  if (canManage()) {
+    cards.push(actionCard('management', 'bar-chart-3', 'Painel de gestao', 'Consultar e exportar captacoes'));
+  }
+  if (hasAccess('appointments.view')) {
+    cards.push(actionCard('appointments', 'calendar-days', 'Agenda de exames', 'Visualizar os pre-agendamentos'));
+    cards.push(actionCard('confirmations', 'message-circle', 'Confirmacoes', 'Enviar lembretes aos clientes'));
+  }
+  if (hasAccess('goals.view_own') || canManageGoals()) cards.push(actionCard('goals', 'target', 'Metas', canManageGoals() ? 'Definir e acompanhar a equipe' : 'Acompanhar meu desempenho'));
+  if (isAdmin()) {
+    cards.push(actionCard('access', 'user-round-cog', 'Acessos da equipe', 'Autorizar colaboradores e administradores'));
+    cards.push(actionCard('settings', 'settings', 'Configuracoes', 'Agenda e preferencias do sistema'));
+  }
+
+  const demoNotice = state.demoMode
+    ? '<div class="notice notice-warning"><i data-lucide="flask-conical"></i><div><strong>Modo de desenvolvimento</strong><span>Nao utilize dados reais. Os registros ficam somente neste navegador.</span></div></div>'
+    : '';
+  return `${profileCard(state.profile)}${demoNotice}<section class="action-grid" aria-label="Acoes principais">${cards.join('')}</section>`;
 }

@@ -47,6 +47,7 @@ import { initializeLeadDetailForm, leadDetailSubmissionValues } from './features
 import { leadDetailAppointmentTimeField as renderLeadDetailAppointmentTimeField, selectedLeadDetailService as resolveLeadDetailService } from './features/leads/lead-appointment.js';
 import { leadDetailView as renderLeadDetailView } from './features/leads/lead-detail-view.js';
 import { ensureLeadHistory, stopLeadHistorySubscription } from './features/funnel/lead-history-subscriptions.js';
+import { leadHistoryView } from './features/funnel/lead-history-view.js';
 import { leadsView as renderLeadsView } from './features/leads/leads-view.js';
 import { handleFollowUpsClick } from './features/follow-ups/follow-ups-events.js';
 import { initialFollowUpsState, startFollowUpsSubscriptions } from './features/follow-ups/follow-ups-subscriptions.js';
@@ -60,6 +61,8 @@ import { findManagementLead as selectManagementLead, loadManagementRecords, vali
 import { createDefaultManagementFilters as buildDefaultManagementFilters, filterManagementRecords } from './features/management/management-filters.js';
 import { handleManagementClick, initializeManagementFilters } from './features/management/management-events.js';
 import { managementView as renderManagementView } from './features/management/management-view.js';
+import { kanbanView as renderKanbanView } from './features/kanban/kanban-view.js';
+import { initializeKanbanScrollbar } from './features/kanban/kanban-scrollbar.js';
 import { filterDashboardRecords, loadDashboardUpcomingRecords } from './features/dashboard/dashboard-data.js';
 import { dashboardMetrics } from './features/dashboard/dashboard-metrics.js';
 import { dashboardView as renderDashboardView } from './features/dashboard/dashboard-view.js';
@@ -135,6 +138,7 @@ function canAccessRoute(route) {
     'follow-ups': () => hasAccess('followups.own') || hasAccess('followups.team'),
     management: () => hasAccess('management.view'),
     'management-lead': () => hasAccess('management.view'),
+    kanban: () => hasAccess('management.view'),
     dashboard: () => hasAccess('dashboard.view'),
     appointments: () => hasAccess('appointments.view'),
     confirmations: () => hasAccess('appointments.view'),
@@ -179,9 +183,9 @@ function homeView() {
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, kanban: kanbanView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
-  return appShellView({ state, page: page(), canManage, hasAccess, pendingFollowUps });
+  return appShellView({ state, page: `${page()}${leadDetailDialogView()}${leadHistoryDialogView()}`, canManage, hasAccess, pendingFollowUps });
 }
 
 function appointmentTimeField() {
@@ -299,6 +303,62 @@ function leadDetailView() {
   });
 }
 
+function leadDetailDialogView() {
+  const leadId = state.leadDetailDialog.leadId;
+  if (!leadId) return '';
+  const lead = findManagementLead(leadId);
+  if (!lead) return '';
+  return `<dialog id="lead-detail-dialog" class="lead-detail-dialog">${renderLeadDetailView({
+    lead,
+    managementMode: true,
+    canManage: canManage(),
+    profileRole: state.profile?.role,
+    scheduleState: state.leadDetailSchedule,
+    appointmentTimeMarkup: leadDetailAppointmentTimeField(lead),
+    canDelete: hasAccess('leads.delete'),
+    canEditClinical: hasAccess('leads.clinical_update'),
+    inDialog: true,
+    history: state.leadHistory
+  })}</dialog>`;
+}
+
+function leadHistoryDialogView() {
+  if (!state.leadHistoryDialogOpen) return '';
+  const lead = existingLeadForDetail(activeLeadDetailId());
+  if (!lead) return '';
+  return `<dialog id="lead-history-dialog" class="lead-history-dialog" aria-labelledby="lead-history-dialog-title"><header><div><p class="eyebrow">FUNIL</p><h2 id="lead-history-dialog-title">Histórico do lead</h2><p>${lead.fullName}</p></div><button class="icon-button" type="button" data-close-lead-history title="Fechar" aria-label="Fechar histórico"><i data-lucide="circle-x"></i></button></header><div class="lead-history-dialog-body">${leadHistoryView({ ...state.leadHistory, stage: lead.funnelStage || state.leadHistory.stage }, { lead })}</div></dialog>`;
+}
+
+function isLeadDetailOpen() {
+  return ['lead', 'management-lead'].includes(state.route) || Boolean(state.leadDetailDialog.leadId);
+}
+
+function activeLeadDetailId() {
+  return state.leadDetailDialog.leadId || currentRouteParam();
+}
+
+function openLeadDetailDialog(lead) {
+  if (!lead) return;
+  state.management.activeLead = lead;
+  state.leadDetailDialog.leadId = lead.id;
+  state.leadDetailSchedule.leadId = '';
+  render();
+  ensureLeadDetailSchedule();
+  ensureLeadDetailHistory();
+}
+
+function closeLeadDetailDialog() {
+  if (!state.leadDetailDialog.leadId) return;
+  state.leadDetailDialog.leadId = '';
+  state.leadHistoryDialogOpen = false;
+  state.leadDetailSchedule.leadId = '';
+  state.unsubscribeDayAppointments?.();
+  state.unsubscribeDayAppointments = null;
+  stopLeadHistorySubscription(state);
+  state.leadHistory = { leadId: '', loading: false, error: '', records: [], stage: '' };
+  render();
+}
+
 function managementView() {
   const allowedStores = isAdmin() ? STORES : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   return renderManagementView({
@@ -309,10 +369,21 @@ function managementView() {
     permissions: {
       appointments: hasAccess('appointments.view'),
       followUps: hasAccess('followups.team'),
+      kanban: canManage(),
       dashboard: hasAccess('dashboard.view'),
       export: hasAccess('leads.export')
     },
     queryLimit: MANAGEMENT_QUERY_LIMIT
+  });
+}
+
+function kanbanView() {
+  return renderKanbanView({
+    allowed: canManage(),
+    records: filteredManagementRecords(),
+    loading: state.management.loading,
+    error: state.management.error,
+    truncated: state.management.truncated
   });
 }
 function dashboardView() {
@@ -450,6 +521,37 @@ function handleConnectivityChange() {
 
 
 function bindPageEvents() {
+  initializeKanbanScrollbar();
+  const leadDetailDialog = document.querySelector('#lead-detail-dialog');
+  if (leadDetailDialog) {
+    requestAnimationFrame(() => {
+      if (!leadDetailDialog.open) leadDetailDialog.showModal();
+    });
+    leadDetailDialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeLeadDetailDialog();
+    });
+    leadDetailDialog.addEventListener('click', (event) => {
+      if (event.target === leadDetailDialog) closeLeadDetailDialog();
+    });
+  }
+  const leadHistoryDialog = document.querySelector('#lead-history-dialog');
+  if (leadHistoryDialog) {
+    requestAnimationFrame(() => {
+      if (!leadHistoryDialog.open) leadHistoryDialog.showModal();
+    });
+    leadHistoryDialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      state.leadHistoryDialogOpen = false;
+      render();
+    });
+    leadHistoryDialog.addEventListener('click', (event) => {
+      if (event.target === leadHistoryDialog) {
+        state.leadHistoryDialogOpen = false;
+        render();
+      }
+    });
+  }
   const form = document.querySelector('#lead-form');
   if (form) {
     initializeCaptureForm(form, {
@@ -603,6 +705,10 @@ function bindPageEvents() {
       onAppointmentDateChange: (appointmentDate) => {
         state.leadDetailSchedule.appointmentDate = appointmentDate;
         startLeadDetailDayAppointmentsSubscription(existingLeadForDetail());
+      },
+      onTriageChange: (values) => {
+        state.leadDetailSchedule.triage = values;
+        refreshLeadDetailAppointmentTime(existingLeadForDetail());
       }
     });
     editLeadForm.addEventListener('submit', async (event) => {
@@ -640,7 +746,8 @@ function bindPageEvents() {
           state.management.activeLead = existingLead
             ? { ...existingLead, ...result.data }
             : state.management.activeLead;
-          navigate('management');
+          if (state.leadDetailDialog.leadId) closeLeadDetailDialog();
+          else navigate('management');
           showToast('Lead atualizado com sucesso.');
         } catch (error) {
           submitButton.disabled = false;
@@ -655,7 +762,8 @@ function bindPageEvents() {
           render();
         }
       }, existingLead, {
-        appointmentOnly: !hasAccess('leads.edit_own')
+        appointmentOnly: !hasAccess('leads.edit_own'),
+        profile: state.profile
       });
       setFieldErrors(editLeadForm, result.errors || {});
       if (!result.isValid) {
@@ -681,7 +789,8 @@ function bindPageEvents() {
           return;
         }
       }
-      navigate('leads');
+      if (state.leadDetailDialog.leadId) closeLeadDetailDialog();
+      else navigate('leads');
       showToast(state.demoMode ? 'Cadastro atualizado neste navegador.' : values.appointmentDate ? 'Agendamento salvo com sucesso.' : 'Alterações salvas com sucesso.');
     });
   }
@@ -982,16 +1091,17 @@ async function loadDashboardUpcomingData() {
 }
 
 function ensureManagementData() {
-  if (['management', 'management-lead', 'dashboard'].includes(state.route) && canManage() && !state.management.loaded) {
+  if (['management', 'management-lead', 'kanban', 'dashboard'].includes(state.route) && canManage() && !state.management.loaded) {
     loadManagementData();
   }
   loadDashboardUpcomingData();
 }
 
 function existingLeadForDetail(leadId = currentRouteParam()) {
-  return state.route === 'management-lead'
-    ? findManagementLead(leadId)
-    : state.leads.find((item) => item.id === leadId);
+  const detailLeadId = leadId || activeLeadDetailId();
+  return state.route === 'management-lead' || state.leadDetailDialog.leadId
+    ? findManagementLead(detailLeadId)
+    : state.leads.find((item) => item.id === detailLeadId);
 }
 
 function refreshLeadDetailAppointmentTime(lead) {
@@ -1003,16 +1113,16 @@ function startLeadDetailDayAppointmentsSubscription(lead) {
 }
 
 function ensureLeadDetailSchedule() {
-  return ensureLeadDetailScheduleData({ state, routeParam: currentRouteParam, findLead: existingLeadForDetail, render, renderTimeField: leadDetailAppointmentTimeField });
+  return ensureLeadDetailScheduleData({ state, routeParam: activeLeadDetailId, findLead: existingLeadForDetail, render, renderTimeField: leadDetailAppointmentTimeField, isOpen: isLeadDetailOpen });
 }
 
 function ensureLeadDetailHistory() {
-  if (!['lead', 'management-lead'].includes(state.route)) {
+  if (!isLeadDetailOpen()) {
     stopLeadHistorySubscription(state);
     state.leadHistory = { leadId: '', loading: false, error: '', records: [], stage: '' };
     return;
   }
-  ensureLeadHistory({ state, lead: existingLeadForDetail(), render });
+  ensureLeadHistory({ state, lead: existingLeadForDetail(activeLeadDetailId()), render });
 }
 
 function stopAppointmentsSubscription() {
@@ -1217,6 +1327,23 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const openLeadHistoryButton = event.target.closest('[data-open-lead-history]');
+    if (openLeadHistoryButton) {
+      state.leadHistoryDialogOpen = true;
+      render();
+      return;
+    }
+    const closeLeadHistoryButton = event.target.closest('[data-close-lead-history]');
+    if (closeLeadHistoryButton) {
+      state.leadHistoryDialogOpen = false;
+      render();
+      return;
+    }
+    const closeLeadDetailButton = event.target.closest('[data-close-lead-detail]');
+    if (closeLeadDetailButton) {
+      closeLeadDetailDialog();
+      return;
+    }
     const handledConfirmationClick = await handleConfirmationClick(event, {
       selectFilter: (filter) => {
         state.confirmations.filter = filter;
@@ -1343,7 +1470,8 @@ export async function startApp() {
       openLead: (leadId) => {
         const lead = state.management.records.find((item) => item.id === leadId);
         if (lead) state.management.activeLead = lead;
-        navigate('management-lead', leadId);
+        if (state.route === 'kanban') openLeadDetailDialog(lead);
+        else navigate('management-lead', leadId);
       },
       changePage: (page) => {
         state.management.page = page;
@@ -1357,7 +1485,7 @@ export async function startApp() {
         const lead = appointmentRecords().find((item) => item.id === leadId);
         if (lead) {
           state.management.activeLead = lead;
-          navigate('management-lead', lead.id);
+          openLeadDetailDialog(lead);
         }
       },
       markAttendance: async (leadId, attendance) => {
@@ -1409,6 +1537,7 @@ export async function startApp() {
       const lead = findManagementLead(confirmDeleteButton.dataset.confirmDelete)
         || state.leads.find((item) => item.id === confirmDeleteButton.dataset.confirmDelete);
       if (!lead) return;
+      const openedInDialog = Boolean(state.leadDetailDialog.leadId);
       const returnRoute = state.route === 'management-lead' ? 'management' : 'leads';
       confirmDeleteButton.disabled = true;
       try {
@@ -1417,7 +1546,8 @@ export async function startApp() {
         state.management.records = state.management.records.filter((item) => item.id !== lead.id);
         state.appointments.records = state.appointments.records.filter((item) => item.id !== lead.id);
         state.management.activeLead = null;
-        navigate(returnRoute);
+        if (openedInDialog) closeLeadDetailDialog();
+        else navigate(returnRoute);
         showToast('Lead excluído definitivamente.');
       } catch (error) {
         confirmDeleteButton.disabled = false;

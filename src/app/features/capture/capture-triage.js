@@ -75,9 +75,9 @@ export function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, 
   return `<section class="eye-triage-section" data-eye-triage data-initial-care-route="${triage.careRoute}" data-initial-payment-type="${pricing.examPaymentType}" data-initial-exam-price="${pricing.examPrice}" data-preserve-exam-price="${Boolean(values.id)}">
     <input type="hidden" name="examPrice" value="${pricing.examPrice}" data-exam-price-value />
     <div class="field" data-field="diabetesLevel" data-diabetes-level ${hasDiabetes ? '' : 'hidden'}>
-      <label for="${idPrefix}-diabetes-level">Nivel de glicemia (mg/dL) <span aria-hidden="true">*</span></label>
-      <input id="${idPrefix}-diabetes-level" name="diabetesLevel" type="number" inputmode="numeric" min="20" max="600" step="1" value="${hasDiabetes && values.diabetesLevel !== null && values.diabetesLevel !== undefined ? escapeHtml(values.diabetesLevel) : ''}" placeholder="Ex.: 150" ${hasDiabetes ? 'required' : ''} />
-      <small class="field-help">Registrar a medicao feita no atendimento.</small><small class="field-error"></small>
+      <label for="${idPrefix}-diabetes-level">Nivel de glicemia (mg/dL)</label>
+      <input id="${idPrefix}-diabetes-level" name="diabetesLevel" type="number" inputmode="numeric" min="20" max="600" step="1" value="${hasDiabetes && values.diabetesLevel !== null && values.diabetesLevel !== undefined ? escapeHtml(values.diabetesLevel) : ''}" placeholder="Ex.: 150" />
+      <small class="field-help">Opcional na captação. Registrar quando a medição for feita no atendimento.</small><small class="field-error"></small>
     </div>
     <div class="notice notice-warning" data-diabetes-medical-alert ${diabetesAlert ? '' : 'hidden'}><i data-lucide="triangle-alert"></i><span>Glicemia acima de ${DIABETES_MEDICAL_ALERT_LEVEL} mg/dL: avisar o medico antes do exame.</span></div>
     <div class="field-row eye-surgery-fields" data-eye-surgery-question>
@@ -99,7 +99,7 @@ export function eyeTriageFields(values = {}, settings = DEFAULT_STORE_SCHEDULE, 
       </div>
     </div>
     <div class="field-row exam-billing-fields">
-      <div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><select id="${idPrefix}-care-route" name="careRouteOverride"><option value="automatic" ${!values.careRouteOverride || values.careRouteOverride === 'automatic' ? 'selected' : ''}>Automático</option><option value="optometrist" ${values.careRouteOverride === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${values.careRouteOverride === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>
+      <div class="field eye-route-override"><label for="${idPrefix}-care-route">Encaminhamento</label><input type="hidden" name="careRouteOverride" value="${escapeHtml(triage.careRouteOverride)}" /><select id="${idPrefix}-care-route" name="careRouteSelection"><option value="optometrist" ${triage.careRoute === 'optometrist' ? 'selected' : ''}>Optometrista</option><option value="ophthalmologist" ${triage.careRoute === 'ophthalmologist' ? 'selected' : ''}>Oftalmologista</option></select></div>
       <div class="field"><label for="${idPrefix}-exam-payment">Tipo do exame</label><select id="${idPrefix}-exam-payment" name="examPaymentType"><option value="paid" ${values.examPaymentType !== 'courtesy' ? 'selected' : ''}>Exame pago</option><option value="courtesy" ${values.examPaymentType === 'courtesy' ? 'selected' : ''}>Cortesia</option></select></div>
       <div class="field exam-price-field"><span class="exam-price-label">Valor do exame</span><div class="exam-price-display"><strong data-exam-price>${pricing.examPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><small data-exam-price-detail>${triage.careRoute === 'ophthalmologist' ? 'Oftalmologista' : 'Optometrista'}</small></div></div>
     </div>
@@ -167,11 +167,13 @@ export function bindEyeTriage(form, settings, onChange = () => {}) {
     const diabetesInput = form.elements.diabetesLevel;
     const diabetesAlert = section.querySelector('[data-diabetes-medical-alert]');
     diabetesField.hidden = !hasDiabetes;
-    diabetesInput.required = hasDiabetes;
+    diabetesInput.required = false;
     if (!hasDiabetes) diabetesInput.value = '';
     diabetesAlert.hidden = !hasDiabetes || Number(diabetesInput.value) <= DIABETES_MEDICAL_ALERT_LEVEL;
     routeStatus.hidden = triage.careRoute !== 'ophthalmologist';
     routeStatus.classList.toggle('is-ophthalmology', triage.careRoute === 'ophthalmologist');
+    const routeSelection = form.elements.careRouteSelection;
+    if (routeSelection) routeSelection.value = triage.careRoute;
     const configuredPricing = examPricing(triage.careRoute, values.examPaymentType, settings);
     const preservePrice = section.dataset.preserveExamPrice === 'true'
       && triage.careRoute === section.dataset.initialCareRoute
@@ -198,7 +200,10 @@ export function bindEyeTriage(form, settings, onChange = () => {}) {
   form.elements.birthDate?.addEventListener('input', refresh);
   form.elements.eyeSurgeryStatus?.addEventListener('change', refresh);
   form.elements.eyeSurgeryType?.addEventListener('change', refresh);
-  form.elements.careRouteOverride?.addEventListener('change', refresh);
+  form.elements.careRouteSelection?.addEventListener('change', (event) => {
+    form.elements.careRouteOverride.value = event.target.value;
+    refresh();
+  });
   form.elements.examPaymentType?.addEventListener('change', refresh);
   form.querySelectorAll('[name="pathologyIds"]').forEach((input) => input.addEventListener('change', refresh));
   refresh();
