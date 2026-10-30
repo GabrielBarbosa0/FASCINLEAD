@@ -1664,7 +1664,7 @@ test('shows the role and permission editor on desktop and mobile', async ({ page
   await expect(page.getByRole('button', { name: 'Adicionar cargo' })).toBeVisible();
   await expect(page.locator('#role-profile-form')).toHaveCount(0);
   await expect(page.getByText('Colaborador', { exact: true })).toBeVisible();
-  await expect(page.getByText('Gestor de Unidades', { exact: true })).toBeVisible();
+  await expect(page.getByText('Gestor loja', { exact: true })).toBeVisible();
   await expect(page.getByText('Atendente Balcão', { exact: true })).toBeVisible();
   await expect(page.getByText('Administrador', { exact: true })).toBeVisible();
   await expect(page.getByText('MEI', { exact: true })).toBeVisible();

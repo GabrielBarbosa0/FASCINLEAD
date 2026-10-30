@@ -22,7 +22,7 @@ describe('role profiles', () => {
     expect(mei.permissions).toEqual(collaborator.permissions);
   });
 
-  it('allows the receptionist to update clinical data from the assigned stores', () => {
+  it('gives the receptionist operational lead access without dashboard, export or deletion', () => {
     const receptionist = SYSTEM_ROLE_PROFILES.find((profile) => profile.id === 'system-receptionist');
 
     expect(receptionist).toMatchObject({
@@ -37,11 +37,15 @@ describe('role profiles', () => {
       'leads.edit_own',
       'followups.own',
       'management.view',
+      'leads.edit_all',
       'leads.clinical_update',
       'appointments.view',
-      'appointments.attendance'
+      'appointments.attendance',
+      'followups.team'
     ]);
     expect(receptionist.permissions).not.toContain('dashboard.view');
+    expect(receptionist.permissions).not.toContain('leads.export');
+    expect(receptionist.permissions).not.toContain('leads.delete');
     expect(systemRoleProfileForId('system-receptionist')).toBe(receptionist);
     expect(systemRoleProfileForId('missing-profile')).toBeNull();
   });
@@ -61,6 +65,10 @@ describe('role profiles', () => {
   it('allows deletion permission in own-data and store profiles', () => {
     expect(normalizeRolePermissions('own', ['leads.delete'])).toEqual(['leads.delete']);
     expect(normalizeRolePermissions('stores', ['leads.delete'])).toEqual(['leads.delete']);
+  });
+
+  it('allows store-scoped profiles to edit any permitted lead', () => {
+    expect(normalizeRolePermissions('stores', ['leads.edit_all'])).toEqual(['leads.edit_all']);
   });
 
   it('adds management access when a dependent team feature is enabled', () => {

@@ -90,6 +90,22 @@ describe('access validation', () => {
     expect(result.data.storeIds).toEqual(['loja-02', 'loja-05']);
   });
 
+  it('gives a collaborator the same permitted-store selection as MEI', () => {
+    const roleProfiles = [{ id: 'system-captor', baseRole: 'captor', active: true }];
+    const result = validateAccess({
+      displayName: 'Colaborador Externo',
+      email: 'colaborador@example.com',
+      phone: '81999999999',
+      roleProfileId: 'system-captor',
+      storeId: 'loja-06',
+      storeIds: ['loja-04', 'loja-06']
+    }, roleProfiles);
+
+    expect(result.isValid).toBe(true);
+    expect(result.data.storeId).toBe('loja-04');
+    expect(result.data.storeIds).toEqual(['loja-04', 'loja-06']);
+  });
+
   it('uses the standard initial password for new non-admin access', () => {
     const result = validateAccess({
       displayName: 'Pessoa de Teste',

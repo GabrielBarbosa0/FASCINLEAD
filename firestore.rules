@@ -34,7 +34,8 @@ service cloud.firestore {
       return permission in ['leads.create', 'leads.view_own', 'leads.edit_own', 'followups.own', 'goals.view_own']
         || (userProfile().role == 'manager' && permission in [
           'management.view', 'appointments.view', 'appointments.attendance',
-          'followups.team', 'goals.manage', 'dashboard.view', 'leads.export'
+          'followups.team', 'goals.manage', 'dashboard.view', 'leads.export',
+          'leads.clinical_update', 'leads.edit_all', 'leads.delete'
         ]);
     }
 
@@ -420,7 +421,9 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendance', 'notes', 'updatedAtServer'
+          'appointmentAttendance', 'funnelStage', 'funnelReasonCode',
+          'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
+          'notes', 'updatedAtServer'
         ])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
           || (
@@ -493,7 +496,8 @@ service cloud.firestore {
         && (!('appointmentAttendance' in request.resource.data)
           || request.resource.data.appointmentAttendance in ['pending', 'attended', 'missed'])
         && (
-          (
+          hasPermission('leads.edit_all')
+          || (
             hasPermission('appointments.attendance')
             &&
             resource.data.appointmentDate is string
@@ -521,12 +525,6 @@ service cloud.firestore {
               'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
               'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
               'appointmentAttendance', 'updatedAtServer'
-            ]))
-          || (hasPermission('leads.clinical_update')
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
-              'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-              'careRoute', 'careRouteOverride', 'examPrice', 'updatedAtServer'
             ]))
         );
     }
@@ -562,7 +560,9 @@ service cloud.firestore {
           'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
           'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
           'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendance', 'notes', 'updatedAtServer'
+          'appointmentAttendance', 'funnelStage', 'funnelReasonCode',
+          'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
+          'notes', 'updatedAtServer'
         ]);
     }
 

@@ -61,8 +61,8 @@ describe('deleteManagementLead', () => {
     expect(firestoreMocks.batch.commit).toHaveBeenCalledOnce();
   });
 
-  it('rejects deletion by a non-administrator before creating a batch', async () => {
-    await expect(deleteManagementLead({ role: 'manager' }, { id: 'lead-1' }))
+  it('rejects deletion by a profile without deletion permission before creating a batch', async () => {
+    await expect(deleteManagementLead({ role: 'manager', permissions: [] }, { id: 'lead-1' }))
       .rejects.toMatchObject({ code: 'permission-denied' });
 
     expect(firestoreMocks.writeBatch).not.toHaveBeenCalled();

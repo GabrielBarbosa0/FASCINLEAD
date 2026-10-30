@@ -8,7 +8,7 @@ import {
 } from './report-components.js';
 import { reportFiltersView } from './report-filters.js';
 
-export function reportsView({ management, allowedStores, adminView, permissions, queryLimit }) {
+export function reportsView({ management, allowedStores, adminView, canOpenLead, permissions, queryLimit }) {
   const { filters, loaded, loading, error, records, truncated, pageSize } = management;
   const filtered = filterManagementRecords(records, filters);
   const pagination = paginateReportRecords(filtered, management.page, pageSize);
@@ -20,7 +20,7 @@ export function reportsView({ management, allowedStores, adminView, permissions,
     <section class="management-results" aria-busy="${loading}">${reportResultsView({
       records: pagination.pageRecords,
       loaded,
-      adminView,
+      canOpenLead,
       currentPage: pagination.currentPage,
       totalPages: pagination.totalPages,
       totalRecords: filtered.length

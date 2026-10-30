@@ -48,12 +48,12 @@ function syncAccessStorePicker(form, state, creatingAccess) {
   const selected = selectedRoleProfile(form, state);
   const manager = selected?.baseRole === 'manager';
   const administrator = selected?.baseRole === 'admin';
-  const mei = selected?.id === 'system-mei';
-  const multiStore = manager || mei;
+  const captor = selected?.baseRole === 'captor';
+  const multiStore = manager || captor;
   const picker = document.querySelector('#access-stores-field');
   const primaryStoreField = document.querySelector('#access-primary-store-field');
   if (picker) picker.hidden = !multiStore;
-  if (primaryStoreField) primaryStoreField.hidden = mei;
+  if (primaryStoreField) primaryStoreField.hidden = captor;
 
   if (creatingAccess) {
     const passwordInput = form.elements.password;
@@ -66,7 +66,7 @@ function syncAccessStorePicker(form, state, creatingAccess) {
       : 'Senha padrão para o primeiro acesso. A pessoa poderá alterá-la depois.';
   }
 
-  if (mei && creatingAccess && new FormData(form).getAll('storeIds').length <= 1) {
+  if (selected?.id === 'system-mei' && creatingAccess && new FormData(form).getAll('storeIds').length <= 1) {
     form.querySelectorAll('[name="storeIds"]').forEach((input) => { input.checked = true; });
   }
   const selectedStoreIds = new FormData(form).getAll('storeIds');
@@ -77,7 +77,7 @@ function syncAccessStorePicker(form, state, creatingAccess) {
     const primary = form.querySelector(`[name="storeIds"][value="${form.elements.storeId.value}"]`);
     if (primary) primary.checked = true;
   }
-  if (mei) {
+  if (captor) {
     const firstStore = new FormData(form).getAll('storeIds')[0];
     if (firstStore) form.elements.storeId.value = firstStore;
   }
@@ -93,7 +93,7 @@ export function bindAccessEvents({ state, render, showToast }) {
     form.querySelectorAll('[name="storeIds"]').forEach((input) => input.addEventListener('change', () => {
       const selected = selectedRoleProfile(form, state);
       const selectedStoreIds = new FormData(form).getAll('storeIds');
-      if (selected?.id === 'system-mei') {
+      if (selected?.baseRole === 'captor') {
         const firstStore = selectedStoreIds[0];
         if (firstStore) form.elements.storeId.value = firstStore;
         return;

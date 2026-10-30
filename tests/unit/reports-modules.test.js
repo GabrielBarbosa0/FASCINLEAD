@@ -33,7 +33,7 @@ describe('reports feature modules', () => {
     expect(filterMarkup).toContain('Ana Souza');
     expect(filterMarkup).toContain('Loja &lt;06&gt;');
 
-    const results = reportResultsView({ records: [records[0]], loaded: true, adminView: true, currentPage: 1, totalPages: 2, totalRecords: 2 });
+    const results = reportResultsView({ records: [records[0]], loaded: true, canOpenLead: true, currentPage: 1, totalPages: 2, totalRecords: 2 });
     expect(results).toContain('data-management-lead-id="lead-1"');
     expect(results).toContain('1 de 2');
   });
@@ -43,6 +43,7 @@ describe('reports feature modules', () => {
       management: { filters, loaded: true, loading: false, error: '', records, truncated: false, page: 1, pageSize: 20 },
       allowedStores: [{ id: 'loja-02', displayLabel: 'Loja 02' }, { id: 'loja-06', displayLabel: 'Loja 06' }],
       adminView: true,
+      canOpenLead: true,
       permissions: { appointments: true, followUps: true, dashboard: true, export: true },
       queryLimit: 500
     });

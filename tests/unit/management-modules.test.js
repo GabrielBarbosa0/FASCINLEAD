@@ -40,6 +40,7 @@ describe('management feature modules', () => {
       management: { filters: { startDate: '2026-10-01', endDate: '2026-10-29', storeId: '', capturedByUid: '', search: '' }, loaded: true, loading: false, error: '', records, truncated: false, page: 1, pageSize: 1 },
       allowedStores: [{ id: 'loja-02', displayLabel: 'Loja 02' }, { id: 'loja-06', displayLabel: 'Loja 06' }],
       adminView: true,
+      canOpenLead: true,
       permissions: { appointments: true, followUps: true, dashboard: true, export: true },
       queryLimit: 500
     });

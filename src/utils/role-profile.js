@@ -30,7 +30,7 @@ export const PERMISSION_GROUPS = [
   {
     label: 'Administração',
     permissions: [
-      { id: 'leads.edit_all', label: 'Editar qualquer lead permitido', scopes: ['admin'] },
+      { id: 'leads.edit_all', label: 'Editar qualquer lead permitido', scopes: ['stores', 'admin'] },
       { id: 'leads.delete', label: 'Excluir leads', scopes: ['own', 'stores', 'admin'] },
       { id: 'schedule.manage', label: 'Configurar agendas', scopes: ['admin'] },
       { id: 'access.manage', label: 'Gerenciar acessos', scopes: ['admin'] },
@@ -51,7 +51,10 @@ const CAPTOR_PERMISSIONS = [
 
 const MANAGER_PERMISSIONS = [
   ...CAPTOR_PERMISSIONS,
+  'leads.edit_all',
+  'leads.delete',
   'management.view',
+  'leads.clinical_update',
   'appointments.view',
   'appointments.attendance',
   'followups.team',
@@ -66,15 +69,17 @@ const RECEPTIONIST_PERMISSIONS = [
   'leads.edit_own',
   'followups.own',
   'management.view',
+  'leads.edit_all',
   'leads.clinical_update',
   'appointments.view',
-  'appointments.attendance'
+  'appointments.attendance',
+  'followups.team'
 ];
 
 export const SYSTEM_ROLE_PROFILES = [
   { id: 'system-captor', name: 'Colaborador', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
   { id: 'system-mei', name: 'MEI', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
-  { id: 'system-manager', name: 'Gestor de Unidades', scope: 'stores', baseRole: 'manager', permissions: MANAGER_PERMISSIONS, system: true, active: true },
+  { id: 'system-manager', name: 'Gestor loja', scope: 'stores', baseRole: 'manager', permissions: MANAGER_PERMISSIONS, system: true, active: true },
   { id: 'system-receptionist', name: 'Atendente Balcão', scope: 'stores', baseRole: 'manager', permissions: RECEPTIONIST_PERMISSIONS, system: true, active: true },
   { id: 'system-admin', name: 'Administrador', scope: 'admin', baseRole: 'admin', permissions: ALL_PERMISSION_IDS, system: true, active: true }
 ];

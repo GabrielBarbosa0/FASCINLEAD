@@ -366,6 +366,7 @@ function managementView() {
     management: state.management,
     allowedStores,
     adminView: isAdmin(),
+    canOpenLead: hasAccess('leads.edit_all'),
     permissions: {
       appointments: hasAccess('appointments.view'),
       followUps: hasAccess('followups.team'),
@@ -421,7 +422,7 @@ function appointmentsView() {
     backRoute: canManage() ? 'management' : 'home',
     canCreate,
     canMarkAttendance: hasAccess('appointments.attendance'),
-    adminView: isAdmin(),
+    adminView: hasAccess('leads.edit_all'),
     createDialog: canCreate ? appointmentCreateDialog(allowedAppointmentStores()) : '',
     queryLimit: APPOINTMENTS_QUERY_LIMIT
   });

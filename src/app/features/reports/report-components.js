@@ -22,21 +22,21 @@ export function paginateReportRecords(records, page, pageSize) {
   };
 }
 
-function reportLeadIdentity(lead, adminView, compact = false) {
+function reportLeadIdentity(lead, canOpenLead, compact = false) {
   const name = escapeHtml(lead.fullName);
   const phone = escapeHtml(formatBrazilianPhone(lead.phoneSearch));
-  return adminView
+  return canOpenLead
     ? `<button class="management-lead-link" type="button" data-management-lead-id="${escapeHtml(lead.id)}"><strong>${name}</strong><${compact ? 'span' : 'small'}>${phone}</${compact ? 'span' : 'small'}></button>`
     : `<strong>${name}</strong><${compact ? 'span' : 'small'}>${phone}</${compact ? 'span' : 'small'}>`;
 }
 
-export function reportResultsView({ records, loaded, adminView, currentPage, totalPages, totalRecords }) {
+export function reportResultsView({ records, loaded, canOpenLead, currentPage, totalPages, totalRecords }) {
   if (!records.length) {
     return `<div class="empty-state management-empty"><i data-lucide="bar-chart-3"></i><strong>${loaded ? 'Nenhum cadastro no período' : 'Consulte as captações'}</strong><p>${loaded ? 'Ajuste os filtros para ampliar a busca.' : 'Escolha o período e carregue os resultados.'}</p></div>`;
   }
 
-  const tableRows = records.map((lead) => `<tr><td>${reportLeadIdentity(lead, adminView)}</td><td>${escapeHtml(lead.capturedByName || 'Não informado')}</td><td>${escapeHtml(storeLabel(lead.storeId))}</td><td>${escapeHtml(lead.interestLabel || 'Não informado')}</td><td>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</td></tr>`).join('');
-  const mobileRows = records.map((lead) => `<article class="management-card"><div>${reportLeadIdentity(lead, adminView, true)}</div><dl><div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Não informado')}</dd></div><div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div><div><dt>Captado em</dt><dd>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</dd></div></dl></article>`).join('');
+  const tableRows = records.map((lead) => `<tr><td>${reportLeadIdentity(lead, canOpenLead)}</td><td>${escapeHtml(lead.capturedByName || 'Não informado')}</td><td>${escapeHtml(storeLabel(lead.storeId))}</td><td>${escapeHtml(lead.interestLabel || 'Não informado')}</td><td>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</td></tr>`).join('');
+  const mobileRows = records.map((lead) => `<article class="management-card"><div>${reportLeadIdentity(lead, canOpenLead, true)}</div><dl><div><dt>Captador</dt><dd>${escapeHtml(lead.capturedByName || 'Não informado')}</dd></div><div><dt>Loja</dt><dd>${escapeHtml(storeLabel(lead.storeId))}</dd></div><div><dt>Captado em</dt><dd>${escapeHtml(formatCapturedAt(lead.capturedAtClient))}</dd></div></dl></article>`).join('');
 
   return `<div class="management-table-wrap"><table class="management-table"><thead><tr><th>Lead</th><th>Captador</th><th>Loja</th><th>Interesse</th><th>Captado em</th></tr></thead><tbody>${tableRows}</tbody></table></div>
     <div class="management-mobile-list">${mobileRows}</div>

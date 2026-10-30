@@ -74,7 +74,7 @@ describe('access feature modules', () => {
       allowed: true
     });
     expect(markup).toContain('Maria Silva');
-    expect(markup).toContain('Gestor de Unidades');
+    expect(markup).toContain('Gestor loja');
     expect(markup).toContain('Editar acesso');
     expect(markup).toContain('value="loja-06" checked');
   });

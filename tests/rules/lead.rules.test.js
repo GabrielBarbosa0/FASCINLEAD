@@ -495,6 +495,45 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('lets an administrator reschedule while updating the lead funnel', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      careRoute: 'optometrist',
+      careRouteOverride: 'optometrist',
+      pathologyIds: ['cataract'],
+      pathologyLabels: ['Catarata'],
+      needsTransport: false,
+      hasCompanion: false,
+      companionCount: 0,
+      transportSeats: 0,
+      appointmentDate: '2026-10-30',
+      appointmentTime: '08:20',
+      appointmentSchedulingMode: 'controlled',
+      appointmentDurationMinutes: 20,
+      appointmentAttendance: 'pending',
+      funnelStage: 'scheduled',
+      funnelReasonCode: '',
+      funnelUpdatedAtClient: '2026-10-29T21:00:00.000Z',
+      funnelUpdatedAtServer: Timestamp.now(),
+      appointmentCycle: 1,
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('requires full lead editing permission for clinical lead corrections', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'users', 'manager-uid'), {
+        permissions: ['management.view', 'leads.clinical_update']
+      });
+    });
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      careRoute: 'optometrist',
+      careRouteOverride: 'optometrist',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('accepts a concise address reference and rejects values above the limit', async () => {
     const db = authenticatedDb('captor-uid', 'captor@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
@@ -620,9 +659,9 @@ describe('lead correction rules', () => {
     await assertSucceeds(deleteDoc(doc(db, 'leads', 'lead-test')));
   });
 
-  it('rejects lead deletion by a manager', async () => {
+  it('lets a manager delete a lead in an authorized store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
-    await assertFails(deleteDoc(doc(db, 'leads', 'lead-test')));
+    await assertSucceeds(deleteDoc(doc(db, 'leads', 'lead-test')));
   });
 
   it('lets a manager with deletion permission remove an allowed lead and its slot', async () => {
@@ -765,6 +804,11 @@ describe('appointment calendar queries', () => {
   });
 
   it('does not let a manager edit customer data while registering attendance', async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'users', 'manager-uid'), {
+        permissions: ['appointments.attendance']
+      });
+    });
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
       fullName: 'Alteracao indevida pelo gestor',
@@ -864,14 +908,14 @@ describe('appointment calendar queries', () => {
     }));
   });
 
-  it('lets a manager reschedule without changing customer data', async () => {
+  it('lets a manager edit a lead in an authorized store', async () => {
     const db = authenticatedDb('manager-uid', 'manager@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
       appointmentDate: '2026-10-20',
       appointmentTime: '10:30',
       updatedAtServer: Timestamp.now()
     }));
-    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
       appointmentDate: '2026-10-21',
       fullName: 'Alteracao indevida',
       updatedAtServer: Timestamp.now()

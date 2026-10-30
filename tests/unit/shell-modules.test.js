@@ -3,7 +3,7 @@ import { appShellView, currentPageTitle, loginView } from '../../src/app/shell/a
 import { homeView } from '../../src/app/shell/home-view.js';
 import { bottomNavigation } from '../../src/app/shell/navigation.js';
 
-const profile = { displayName: 'Ana Silva', role: 'manager', roleProfileName: 'Gestor de Unidades', storeId: 'loja-06', storeIds: ['loja-06'] };
+const profile = { displayName: 'Ana Silva', role: 'manager', roleProfileName: 'Gestor loja', storeId: 'loja-06', storeIds: ['loja-06'] };
 const state = { route: 'home', demoMode: false, leads: [{ id: 'lead-1' }], profile };
 const hasAccess = (permission) => ['leads.create', 'leads.view_own', 'followups.own', 'goals.view_own'].includes(permission);
 

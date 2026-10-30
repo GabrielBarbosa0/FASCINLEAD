@@ -73,14 +73,12 @@ async function persistSystemRolePermissions(profile, roleProfileId, permissions,
   accesses.docs.forEach((item) => batch.update(item.ref, {
     role: systemProfile.baseRole,
     permissions: validation.data.permissions,
-    ...(systemProfile.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {}),
     updatedAt: serverTimestamp(),
     updatedBy: profile.uid
   }));
   users.docs.forEach((item) => batch.update(item.ref, {
     role: systemProfile.baseRole,
     permissions: validation.data.permissions,
-    ...(systemProfile.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {})
   }));
   await batch.commit();
   return { ...validation, id: roleProfileId };
@@ -117,14 +115,12 @@ export async function saveRoleProfile(profile, values, existingId = '') {
     accesses.docs.forEach((item) => batch.update(item.ref, {
       role: validation.data.baseRole,
       permissions: validation.data.permissions,
-      ...(validation.data.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {}),
       updatedAt: serverTimestamp(),
       updatedBy: profile.uid
     }));
     users.docs.forEach((item) => batch.update(item.ref, {
       role: validation.data.baseRole,
       permissions: validation.data.permissions,
-      ...(validation.data.baseRole === 'captor' ? { storeIds: [item.data().storeId] } : {})
     }));
     if (!accesses.empty || !users.empty) await batch.commit();
   }
