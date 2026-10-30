@@ -142,10 +142,18 @@ test('lists upcoming appointments and prepares the manual WhatsApp reminder', as
     window.dispatchEvent(new Event('fascinlead:demo-leads'));
   }, { appointmentDate });
 
-  await page.getByRole('button', { name: /Confirmações/ }).click();
-  await expect(page.getByRole('heading', { name: 'Confirmações' })).toBeVisible();
+  await page.getByRole('button', { name: /Confirma/ }).click();
+  await expect(page.getByRole('heading', { name: /Confirma/ })).toBeVisible();
   await expect(page.getByText('Clara de Teste', { exact: true })).toBeVisible();
   await expect(page.getByText('(81) 99999-1234', { exact: true })).toBeVisible();
+  const confirmationDays = page.locator('[data-confirmation-days]');
+  await expect(confirmationDays).toHaveValue('7');
+  await confirmationDays.fill('14');
+  await confirmationDays.press('Tab');
+  await expect(confirmationDays).toHaveValue('14');
+  await page.screenshot({ path: testInfo.outputPath('custom-confirmation-period.png'), fullPage: false });
+  await confirmationDays.fill('7');
+  await confirmationDays.press('Tab');
   const whatsAppLink = page.getByRole('link', { name: 'Abrir WhatsApp' });
   const href = await whatsAppLink.getAttribute('href');
   const preparedMessage = new URL(href).searchParams.get('text');
@@ -154,7 +162,7 @@ test('lists upcoming appointments and prepares the manual WhatsApp reminder', as
   expect(preparedMessage).toContain('atendimento com o oftalmologista');
   expect(preparedMessage).toContain('às 14:30, na Loja 06 - Surubim.');
   expect(preparedMessage).toContain('Podemos confirmar sua presença?');
-  const summary = page.getByRole('region', { name: 'Resumo das confirmações' });
+  const summary = page.locator('.confirmation-metrics');
   await expect(summary.locator('[data-confirmation-filter="pending"] strong')).toHaveText('1');
   await expect(summary.locator('[data-confirmation-filter="done"] strong')).toHaveText('0');
   await page.getByRole('button', { name: 'Marcar como feito' }).click();
@@ -764,6 +772,11 @@ test('hides disabled ametropias in management details without erasing saved valu
 
 test('shows the management dashboard grouped by store and captor', async ({ page }, testInfo) => {
   const capturedAtClient = new Date().toISOString();
+  const consoleIssues = [];
+  page.on('console', (message) => {
+    if (message.type() === 'warning' || message.type() === 'error') consoleIssues.push(message.text());
+  });
+  page.on('pageerror', (error) => consoleIssues.push(error.message));
   let savwinRequest = null;
   await page.route('**/api/savwin/products-by-os', async (route) => {
     savwinRequest = route.request().postDataJSON();
@@ -840,7 +853,7 @@ test('shows the management dashboard grouped by store and captor', async ({ page
   }, { capturedAtClient });
 
   await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
-  await page.getByRole('button', { name: /Painel de gestão/ }).click();
+  await page.getByRole('button', { name: /Painel de gest/ }).click();
   const reportDate = capturedAtClient.slice(0, 10);
   await page.getByRole('button', { name: 'Dashboard' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
@@ -861,24 +874,42 @@ test('shows the management dashboard grouped by store and captor', async ({ page
   await expect(unitPerformance.getByRole('columnheader')).toHaveText(['Nome', 'Cadastros', 'Agendados', 'Compareceram', 'Faltaram', 'Taxa']);
   await expect(unitPerformance.getByText('Loja 02', { exact: true })).toBeVisible();
   await expect(unitPerformance.getByText('Loja 06', { exact: true })).toBeVisible();
+  await page.locator('#dashboard-store').selectOption('loja-06');
+  await page.getByRole('button', { name: 'Aplicar filtros' }).click();
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['2', '2', '0', '100%', '1', '2', '1', '1']);
+  await expect(unitPerformance.getByText('Loja 02', { exact: true })).toBeVisible();
+  await expect(unitPerformance.getByText('Loja 06', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Ranking de captadores' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toBeVisible();
-  const captorPerformance = page.locator('article.dashboard-panel', { has: page.getByRole('heading', { name: 'Resultados por captador' }) });
-  await expect(captorPerformance.getByRole('columnheader')).toHaveText(['Nome', 'Cadastros', 'Agendados', 'Compareceram', 'Faltaram', 'Taxa']);
-  await expect(captorPerformance.getByText('Captador Loja 06', { exact: true })).toBeVisible();
+  const rankingButton = page.getByRole('button', { name: 'Ver ranking completo' });
+  await expect(rankingButton.locator('svg.lucide-trophy')).toBeVisible();
+  await rankingButton.click();
+  const rankingDialog = page.getByRole('dialog', { name: 'Ranking completo' });
+  await expect(rankingDialog).toBeVisible();
+  const firstRankingRow = rankingDialog.locator('.dashboard-ranking-dialog-row').first();
+  await expect(firstRankingRow.locator('dt')).toHaveText(['Cadastros', 'Agendados', 'Compareceram', 'Faltaram', 'Taxa']);
+  await expect(firstRankingRow.locator('dd')).toHaveText(['2', '2', '1', '1', '50%']);
+  const populatedRankingHeight = await rankingDialog.evaluate((dialog) => dialog.getBoundingClientRect().height);
+  await rankingDialog.screenshot({ path: testInfo.outputPath('dashboard-ranking.png') });
+  await rankingDialog.getByLabel('Loja').selectOption('loja-04');
+  await expect(page.getByText('Nenhum captador encontrado')).toBeVisible();
+  const emptyRankingHeight = await rankingDialog.evaluate((dialog) => dialog.getBoundingClientRect().height);
+  expect(Math.abs(populatedRankingHeight - emptyRankingHeight)).toBeLessThanOrEqual(1);
+  await rankingDialog.getByRole('button', { name: 'Fechar ranking' }).click();
+  await expect(page.getByRole('heading', { name: 'Resultados por captador' })).toHaveCount(0);
   await expect(page.getByText('50% dos agendamentos')).toHaveCount(2);
   await page.getByLabel('Data inicial').fill(reportDate);
   await page.getByLabel('Data final').fill(reportDate);
-  await page.getByRole('button', { name: 'Aplicar período' }).click();
+  await page.getByRole('button', { name: 'Aplicar filtros' }).click();
   await expect(page.getByLabel('Data inicial')).toHaveValue(reportDate);
   await expect(page.getByLabel('Data final')).toHaveValue(reportDate);
-  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['3', '2', '1', '67%', '2', '2', '1', '2']);
+  await expect(dashboardMetrics.locator(':scope > div > strong')).toHaveText(['2', '2', '0', '100%', '1', '2', '1', '1']);
   await page.getByRole('button', { name: 'Consultar SavWin' }).click();
   await expect(page.getByText('SavWin conectado localmente')).toBeVisible();
   await expect(page.getByText('4 item(ns) encontrados em 2 OS no período.')).toBeVisible();
-  expect(savwinRequest.storeCodes).toEqual(['2', '4', '5', '6']);
+  expect(savwinRequest.storeCodes).toEqual(['6']);
   expect(savwinRequest.startDate).toBe(reportDate);
   expect(savwinRequest.endDate).toBe(reportDate);
+  expect(consoleIssues).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
 });
 

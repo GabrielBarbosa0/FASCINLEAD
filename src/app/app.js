@@ -56,6 +56,7 @@ import { appointmentCreateDialog as renderAppointmentCreateDialog, appointmentCr
 import { handleAppointmentClick, initializeAppointmentCreateEvents } from './features/appointments/appointment-events.js';
 import { appointmentsView as renderAppointmentsView } from './features/appointments/appointments-view.js';
 import { handleConfirmationClick } from './features/appointments/confirmation-events.js';
+import { normalizeConfirmationDays } from './features/appointments/confirmation-period.js';
 import { confirmationsView as renderConfirmationsView } from './features/appointments/confirmations-view.js';
 import { findManagementLead as selectManagementLead, loadManagementRecords, validateManagementPeriod } from './features/management/management-data.js';
 import { createDefaultManagementFilters as buildDefaultManagementFilters, filterManagementRecords } from './features/management/management-filters.js';
@@ -167,11 +168,6 @@ function pendingFollowUps() {
 
 function filteredManagementRecords() {
   return filterManagementRecords(state.management.records, state.management.filters);
-}
-
-function filteredReportRecords() {
-  const source = state.demoMode ? state.leads : state.management.records;
-  return filterDashboardRecords(source, state.management.filters);
 }
 
 function loginView() {
@@ -388,20 +384,32 @@ function kanbanView() {
   });
 }
 function dashboardView() {
-  const records = filteredReportRecords();
-  const upcomingRecords = state.demoMode ? state.leads : state.dashboardUpcoming.records;
-  const rankingRecords = filterDashboardRecords(
-    state.demoMode ? state.leads : state.management.records,
-    { ...state.management.filters, storeId: '', capturedByUid: '' }
+  const source = state.demoMode ? state.leads : state.management.records;
+  const periodFilters = { ...state.management.filters, storeId: '', capturedByUid: '' };
+  const comparisonRecords = filterDashboardRecords(source, periodFilters);
+  const records = filterDashboardRecords(comparisonRecords, {
+    startDate: '',
+    endDate: '',
+    storeId: state.dashboardFilters.storeId,
+    capturedByUid: ''
+  });
+  const upcomingRecords = filterDashboardRecords(
+    state.demoMode ? state.leads : state.dashboardUpcoming.records,
+    { startDate: '', endDate: '', storeId: state.dashboardFilters.storeId, capturedByUid: '' }
   );
+  const rankingRecords = comparisonRecords;
   const rankingStores = isAdmin()
     ? STORES
     : STORES.filter((store) => profileStoreIds(state.profile).includes(store.id));
   return renderDashboardView({
     allowed: hasAccess('dashboard.view'),
-    records,
-    metrics: dashboardMetrics(records, upcomingRecords, storeLabel),
-    management: state.management,
+    records: comparisonRecords,
+    metrics: dashboardMetrics(records, upcomingRecords, storeLabel, new Date(), comparisonRecords),
+    management: {
+      ...state.management,
+      filters: { ...state.management.filters, storeId: state.dashboardFilters.storeId }
+    },
+    allowedStores: rankingStores,
     ranking: {
       ...state.dashboardRanking,
       captors: dashboardCaptorStats(rankingRecords, state.dashboardRanking.storeId),
@@ -879,6 +887,7 @@ function bindPageEvents() {
     const values = Object.fromEntries(new FormData(dashboardPeriodForm));
     state.management.filters.startDate = values.startDate;
     state.management.filters.endDate = values.endDate;
+    state.dashboardFilters.storeId = String(values.storeId || '');
     state.management.loaded = false;
     state.dashboardUpcoming.loaded = false;
     state.management.page = 1;
@@ -893,6 +902,24 @@ function bindPageEvents() {
     state.appointments.storeId = appointmentsStore.value;
     state.appointments.loaded = false;
     startAppointmentsSubscription();
+  });
+
+  const confirmationDays = document.querySelector('[data-confirmation-days]');
+  const updateConfirmationDays = (value) => {
+    const days = normalizeConfirmationDays(value);
+    if (confirmationDays) confirmationDays.value = String(days);
+    if (days === state.confirmations.days) {
+      return;
+    }
+    state.confirmations.days = days;
+    state.confirmations.loaded = false;
+    state.confirmations.error = '';
+    if (state.demoMode) render();
+    else startConfirmationsSubscription();
+  };
+  confirmationDays?.addEventListener('change', () => updateConfirmationDays(confirmationDays.value));
+  document.querySelectorAll('[data-confirmation-days-adjust]').forEach((button) => {
+    button.addEventListener('click', () => updateConfirmationDays(state.confirmations.days + Number(button.dataset.confirmationDaysAdjust)));
   });
 
   const appointmentCreateForm = document.querySelector('#appointment-create-form');
@@ -1108,7 +1135,7 @@ async function loadDashboardUpcomingData() {
   render();
   const result = await loadDashboardUpcomingRecords({
     profile: state.profile,
-    filters: state.management.filters,
+    filters: { ...state.management.filters, storeId: state.dashboardFilters.storeId, capturedByUid: '' },
     demoMode: state.demoMode,
     demoRecords: state.leads,
     loadAppointments: loadUpcomingAppointments
@@ -1329,7 +1356,8 @@ async function handleAction(action) {
   }
 
   if (action === 'consult-savwin' && canManage() && isLocalSavwinEnabled) {
-    const { startDate, endDate, storeId } = state.management.filters;
+    const { startDate, endDate } = state.management.filters;
+    const storeId = state.route === 'dashboard' ? state.dashboardFilters.storeId : state.management.filters.storeId;
     state.savwin.loading = true;
     state.savwin.error = '';
     state.savwin.result = null;

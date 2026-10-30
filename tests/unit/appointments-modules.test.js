@@ -4,6 +4,7 @@ import { handleAppointmentClick } from '../../src/app/features/appointments/appo
 import { startAppointmentsLiveSubscription, startConfirmationsLiveSubscription } from '../../src/app/features/appointments/appointment-subscriptions.js';
 import { appointmentsView } from '../../src/app/features/appointments/appointments-view.js';
 import { handleConfirmationClick } from '../../src/app/features/appointments/confirmation-events.js';
+import { confirmationEndDate, normalizeConfirmationDays } from '../../src/app/features/appointments/confirmation-period.js';
 import { confirmationsView } from '../../src/app/features/appointments/confirmations-view.js';
 import { DEFAULT_STORE_SCHEDULE } from '../../src/utils/schedule.js';
 
@@ -77,6 +78,27 @@ describe('appointments feature modules', () => {
     });
     expect(completed).toContain('Desfazer');
     expect(completed).toContain('Marcado por Gestor');
+  });
+
+  it('uses a configurable confirmation period with seven days by default', () => {
+    const futureLead = { ...lead, id: 'lead-future', fullName: 'Cliente Futuro', appointmentDate: '2026-11-07' };
+    const defaultPeriod = confirmationsView({
+      allowed: true, source: [lead, futureLead], confirmations: { filter: 'all', updatingId: '', loading: false, error: '', truncated: false },
+      profileName: 'Gestor', queryLimit: 500, now: new Date('2026-10-29T12:00:00-03:00')
+    });
+    const extendedPeriod = confirmationsView({
+      allowed: true, source: [lead, futureLead], confirmations: { days: 10, filter: 'all', updatingId: '', loading: false, error: '', truncated: false },
+      profileName: 'Gestor', queryLimit: 500, now: new Date('2026-10-29T12:00:00-03:00')
+    });
+
+    expect(defaultPeriod).toContain('value="7"');
+    expect(defaultPeriod).not.toContain('Cliente Futuro');
+    expect(extendedPeriod).toContain('value="10"');
+    expect(extendedPeriod).toContain('Cliente Futuro');
+    expect(normalizeConfirmationDays(0)).toBe(1);
+    expect(normalizeConfirmationDays(200)).toBe(90);
+    expect(normalizeConfirmationDays('')).toBe(7);
+    expect(confirmationEndDate('2026-10-29', 7)).toBe('2026-11-04');
   });
 
   it('stops appointment and confirmation subscriptions', () => {

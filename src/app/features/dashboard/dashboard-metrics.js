@@ -36,14 +36,15 @@ export function dashboardCaptorStats(records, storeId = '') {
   ).sort((a, b) => b.total - a.total || b.attendanceRate - a.attendanceRate || a.label.localeCompare(b.label, 'pt-BR'));
 }
 
-export function dashboardMetrics(records, upcomingRecords, storeLabel, now = new Date()) {
+export function dashboardMetrics(records, upcomingRecords, storeLabel, now = new Date(), comparisonRecords = records) {
   const summary = dashboardSummary(records, upcomingRecords, now);
   const attended = records.filter((lead) => lead.appointmentAttendance === 'attended').length;
   const missed = records.filter((lead) => lead.appointmentAttendance === 'missed').length;
   const pending = Math.max(0, summary.scheduled - attended - missed);
   const attendanceRate = attended + missed ? Math.round((attended / (attended + missed)) * 100) : 0;
   const daily = [...records.reduce((days, lead) => { const date = String(lead.capturedAtClient || '').slice(0, 10); if (date) days.set(date, (days.get(date) || 0) + 1); return days; }, new Map()).entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-14);
-  const stores = dashboardGroupStats(records, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId)).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'pt-BR'));
+  const stores = dashboardGroupStats(comparisonRecords, (lead) => lead.storeId, (lead) => storeLabel(lead.storeId)).sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'pt-BR'));
   const captors = dashboardCaptorStats(records);
-  return { summary, attended, missed, pending, attendanceRate, daily, stores, captors, appointmentDistribution: appointmentDistribution(records) };
+  const activeStoreCount = new Set(records.map((lead) => lead.storeId).filter(Boolean)).size;
+  return { summary, attended, missed, pending, attendanceRate, daily, stores, captors, activeStoreCount, appointmentDistribution: appointmentDistribution(records) };
 }

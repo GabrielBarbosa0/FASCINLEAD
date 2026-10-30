@@ -35,6 +35,10 @@ describe('dashboard feature modules', () => {
     const metrics = dashboardMetrics(records, records, (id) => id, new Date('2026-10-29T12:00:00-03:00'));
     expect(metrics).toMatchObject({ attended: 1, missed: 1, attendanceRate: 50 });
     expect(metrics.captors).toHaveLength(2);
+    const filteredMetrics = dashboardMetrics([records[0]], [records[0]], (id) => id, new Date('2026-10-29T12:00:00-03:00'), records);
+    expect(filteredMetrics.summary.total).toBe(1);
+    expect(filteredMetrics.stores).toHaveLength(2);
+    expect(filteredMetrics.activeStoreCount).toBe(1);
     expect(dashboardCaptorStats(records, 'loja-06')).toEqual([
       expect.objectContaining({ label: 'Ana', total: 1 })
     ]);
@@ -54,7 +58,8 @@ describe('dashboard feature modules', () => {
       allowed: true,
       records,
       metrics,
-      management: { filters: { startDate: '2026-10-01', endDate: '2026-10-29' }, loading: false, error: '', truncated: false },
+      management: { filters: { startDate: '2026-10-01', endDate: '2026-10-29', storeId: 'loja-06' }, loading: false, error: '', truncated: false },
+      allowedStores: [{ id: 'loja-02', displayLabel: 'Loja 02 - Carpina' }, { id: 'loja-06', displayLabel: 'Loja 06 - Surubim' }],
       ranking: {
         open: true,
         storeId: 'loja-06',
@@ -68,12 +73,17 @@ describe('dashboard feature modules', () => {
       appointmentsLimit: 500
     });
     expect(markup).toContain('Taxa de agendamento');
+    expect(markup).toContain('id="dashboard-store"');
+    expect(markup).toContain('value="loja-06" selected');
     expect(markup).toContain('Desempenho por unidade');
-    expect(markup).toContain('Resultados por captador');
+    expect(markup).not.toContain('Resultados por captador');
     expect(markup).toContain('Agendamentos por dia da semana');
     expect(markup).toContain('data-dashboard-ranking-open');
+    expect(markup).toContain('data-lucide="trophy"');
+    expect(markup).not.toContain('data-lucide="list-ordered"');
     expect(markup).toContain('id="dashboard-ranking-dialog"');
     expect(markup).toContain('data-dashboard-ranking-store');
+    expect(markup).toContain('<dt>Cadastros</dt><dd>1</dd>');
     expect(markup).toContain('Loja 06 - Surubim');
   });
 });

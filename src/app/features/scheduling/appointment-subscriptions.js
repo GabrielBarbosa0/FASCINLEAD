@@ -3,7 +3,8 @@ import { loadAppointmentServices } from '../../../services/service-catalog-servi
 import { defaultAppointmentService, servicesForStore } from '../../../utils/service-catalog.js';
 import { DEFAULT_STORE_SCHEDULE } from '../../../utils/schedule.js';
 import { STORES } from '../../../utils/stores.js';
-import { addDaysToDateInput, toLocalDateInput } from '../../shared/formatters.js';
+import { toLocalDateInput } from '../../shared/formatters.js';
+import { confirmationEndDate } from '../appointments/confirmation-period.js';
 import { startAppointmentsLiveSubscription, startConfirmationsLiveSubscription } from '../appointments/appointment-subscriptions.js';
 
 export function stopAppointmentsSubscription(state) {
@@ -20,7 +21,7 @@ export function startConfirmationsSubscription({ state, render, hasAccess, subsc
   if (!hasAccess('appointments.view') || state.demoMode || state.route !== 'confirmations') return;
   stopConfirmationsSubscription(state);
   const startDate = toLocalDateInput(new Date());
-  const endDate = addDaysToDateInput(startDate, 6);
+  const endDate = confirmationEndDate(startDate, state.confirmations.days);
   state.confirmations.loading = true;
   state.confirmations.loaded = false;
   state.confirmations.error = '';

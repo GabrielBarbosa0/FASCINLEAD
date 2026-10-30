@@ -45,6 +45,9 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
       records: [],
       truncated: false
     },
+    dashboardFilters: {
+      storeId: ''
+    },
     dashboardRanking: {
       open: false,
       storeId: ''
@@ -69,6 +72,7 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
       records: [],
       truncated: false,
       filter: 'pending',
+      days: 7,
       updatingId: ''
     },
     appointmentCreate: {

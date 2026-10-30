@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ensureAppointmentData, stopAppointmentsSubscription, stopConfirmationsSubscription } from '../../src/app/features/scheduling/appointment-subscriptions.js';
+import { ensureAppointmentData, startConfirmationsSubscription, stopAppointmentsSubscription, stopConfirmationsSubscription } from '../../src/app/features/scheduling/appointment-subscriptions.js';
 import { stopNewLeadScheduleSubscriptions } from '../../src/app/features/scheduling/new-lead-schedule-controller.js';
 
 describe('scheduling controllers', () => {
@@ -28,5 +28,23 @@ describe('scheduling controllers', () => {
     expect(store).toHaveBeenCalledOnce();
     expect(day).toHaveBeenCalledOnce();
     expect(state).toMatchObject({ unsubscribeAppointments: null, unsubscribeConfirmations: null, unsubscribeStoreSchedule: null, unsubscribeDayAppointments: null });
+  });
+
+  it('subscribes to the selected number of confirmation days', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-29T12:00:00-03:00'));
+    const subscribe = vi.fn(() => vi.fn());
+    const state = {
+      route: 'confirmations',
+      demoMode: false,
+      profile: { uid: 'manager-1' },
+      confirmations: { days: 14, loading: false, loaded: false, error: '' },
+      unsubscribeConfirmations: null
+    };
+
+    startConfirmationsSubscription({ state, render: vi.fn(), hasAccess: () => true, subscribe });
+
+    expect(subscribe).toHaveBeenCalledWith(state.profile, '2026-10-29', '2026-11-11', expect.any(Function), expect.any(Function));
+    vi.useRealTimers();
   });
 });
