@@ -298,3 +298,136 @@ exports.provisionTeamMemberAccount = onCall({ region: 'southamerica-east1' }, as
 
   return { uid: user.uid, created };
 });
+
+function normalizedLeadSearch(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function leadSearchNamePrefixes(value) {
+  const text = normalizedLeadSearch(value);
+  const title = text.toLocaleLowerCase('pt-BR').replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase('pt-BR'));
+  return [...new Set([
+    text,
+    title,
+    text.toLocaleLowerCase('pt-BR'),
+    text.toLocaleUpperCase('pt-BR')
+  ].filter(Boolean))];
+}
+
+async function searchCallerProfile(request) {
+  const email = normalizeEmail(request.auth?.token?.email);
+  if (!request.auth || request.auth.token.email_verified !== true || !email) {
+    throw new HttpsError('unauthenticated', 'Entre novamente para pesquisar cadastros.');
+  }
+  const snapshot = await getFirestore().doc(`users/${request.auth.uid}`).get();
+  const profile = snapshot.data();
+  if (email !== PRIMARY_ADMIN_EMAIL && (!snapshot.exists || profile?.active !== true)) {
+    throw new HttpsError('permission-denied', 'Seu perfil nao possui acesso a pesquisa.');
+  }
+  const role = email === PRIMARY_ADMIN_EMAIL ? 'admin' : profile.role;
+  const permissions = role === 'admin'
+    ? ['leads.view_own', 'management.view']
+    : Array.isArray(profile.permissions)
+      ? profile.permissions
+      : role === 'manager'
+        ? ['leads.view_own', 'management.view']
+        : ['leads.view_own'];
+  if (!permissions.includes('leads.view_own')) {
+    throw new HttpsError('permission-denied', 'Seu perfil nao possui acesso a pesquisa.');
+  }
+  const storeIds = role === 'admin'
+    ? []
+    : [...new Set([profile.storeId, ...(Array.isArray(profile.storeIds) ? profile.storeIds : [])].filter(Boolean))];
+  return { uid: request.auth.uid, role, permissions, storeIds };
+}
+
+function searchResultForLead(snapshot, caller) {
+  const lead = snapshot.data();
+  const ownsLead = lead.capturedByUid === caller.uid;
+  const canManageLead = caller.role === 'admin'
+    || (caller.role === 'manager' && caller.permissions.includes('management.view') && caller.storeIds.includes(lead.storeId));
+  return {
+    id: snapshot.id,
+    fullName: String(lead.fullName || ''),
+    customerCpf: String(lead.customerCpf || ''),
+    storeId: String(lead.storeId || ''),
+    appointmentDate: String(lead.appointmentDate || ''),
+    appointmentTime: String(lead.appointmentTime || ''),
+    appointmentAttendance: String(lead.appointmentAttendance || ''),
+    appointmentServiceName: String(lead.appointmentServiceName || ''),
+    capturedByName: String(lead.capturedByName || ''),
+    canOpen: ownsLead || canManageLead
+  };
+}
+
+exports.searchLeadAppointments = onCall({ region: 'southamerica-east1' }, async (request) => {
+  const caller = await searchCallerProfile(request);
+  const search = normalizedLeadSearch(request.data?.query);
+  const digits = search.replace(/\D/g, '');
+  const hasLetters = /\p{L}/u.test(search);
+  if (!search || (hasLetters && search.length < 3) || (!hasLetters && digits.length !== 11)) {
+    throw new HttpsError('invalid-argument', 'Informe um nome com pelo menos 3 letras ou um CPF com 11 digitos.');
+  }
+
+  const leads = getFirestore().collection('leads');
+  let snapshots;
+  if (!hasLetters) {
+    snapshots = [await leads.where('customerCpf', '==', digits).limit(20).get()];
+  } else {
+    snapshots = await Promise.all(leadSearchNamePrefixes(search).map((prefix) => (
+      leads
+        .where('fullName', '>=', prefix)
+        .where('fullName', '<=', `${prefix}\uf8ff`)
+        .orderBy('fullName')
+        .limit(20)
+        .get()
+    )));
+  }
+
+  const matches = new Map();
+  snapshots.forEach((snapshot) => snapshot.docs.forEach((lead) => {
+    if (caller.role !== 'admin' && !caller.storeIds.includes(lead.data().storeId)) return;
+    matches.set(lead.id, lead);
+  }));
+  const results = [...matches.values()]
+    .sort((left, right) => String(left.data().fullName || '').localeCompare(String(right.data().fullName || ''), 'pt-BR'))
+    .slice(0, 20)
+    .map((lead) => searchResultForLead(lead, caller));
+  return { results };
+});
+
+function saoPauloDateKey(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function hasActiveAppointment(lead = {}, today = saoPauloDateKey()) {
+  const attendance = String(lead.appointmentAttendance || 'pending');
+  return Boolean(
+    lead.appointmentDate
+    && lead.appointmentTime
+    && String(lead.appointmentDate) >= today
+    && !['attended', 'missed'].includes(attendance)
+  );
+}
+
+exports.checkCpfActiveAppointment = onCall({ region: 'southamerica-east1' }, async (request) => {
+  await searchCallerProfile(request);
+  const customerCpf = String(request.data?.customerCpf || '').replace(/\D/g, '');
+  if (customerCpf.length !== 11) {
+    throw new HttpsError('invalid-argument', 'Informe um CPF com 11 dígitos.');
+  }
+
+  const snapshot = await getFirestore()
+    .collection('leads')
+    .where('customerCpf', '==', customerCpf)
+    .limit(20)
+    .get();
+  return { hasAppointment: snapshot.docs.some((lead) => hasActiveAppointment(lead.data())) };
+});

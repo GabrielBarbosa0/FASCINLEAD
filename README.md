@@ -117,7 +117,7 @@ Celular / navegador
 - Playwright;
 - Lucide Icons.
 
-Cloud Run e Storage nao fazem parte do MVP. Existe uma Callable Function administrativa para redefinicao de senha; sua publicacao exige aprovacao de faturamento, controle de acesso e alerta de custo.
+Cloud Run e Storage nao fazem parte do MVP. As Callable Functions atendem operacoes administrativas e consultas protegidas de agendamento; sua publicacao exige aprovacao de faturamento, controle de acesso e alerta de custo.
 
 ## SavWin local
 
@@ -157,7 +157,7 @@ CPF, RG, nascimento, sexo, ametropias e condicoes de saude ficam fora da respost
 
 A versao `v1` usa consulta ativa do CRM (polling) e nao oferece webhooks nem eventos de exclusao. O consumidor deve guardar `updatedAt` e o `cursor` para continuar a sincronizacao sem reler toda a base. Webhooks, credenciais separadas por parceiro e tombstones de exclusao ficam previstos para a etapa de hospedagem da API.
 
-O indice de todas as interfaces, incluindo a Callable Function `updateTeamMemberPassword`, dependencias externas e fronteiras que nao sao APIs publicas, esta em [`docs/API-CATALOG.md`](docs/API-CATALOG.md).
+O indice de todas as interfaces, incluindo as Callable Functions, dependencias externas e fronteiras que nao sao APIs publicas, esta em [`docs/API-CATALOG.md`](docs/API-CATALOG.md).
 
 ## Operacao offline controlada
 
@@ -220,6 +220,7 @@ A estrutura sera criada durante a fundacao do projeto e podera receber pequenos 
 | [Technical Design Document](docs/TDD.md) | Escopo, arquitetura, requisitos, modelo de dados, seguranca, testes e implantacao |
 | [Plano futuro de pre-atendimento clinico](docs/PLANO-PRE-ATENDIMENTO-CLINICO.md) | Separacao entre captacao, recepcao e atendimento medico; agenda clinica, alertas e privacidade |
 | [Plano futuro de evolucoes operacionais](docs/PLANO-EVOLUCOES-OPERACIONAIS.md) | Historico do lead, duplicidades, confirmacoes, lista de espera, alertas e busca global |
+| [Plano da fila de encaixes](docs/PLANO-FILA-DE-ENCAIXES.md) | Atendimento presencial no mesmo dia, fila operacional, auditoria, permissoes e indicadores |
 | [Guia para agentes](AGENTS.md) | Contexto e regras obrigatorias para pessoas e agentes de IA que alterarem o repositorio |
 
 Leia o `AGENTS.md` e o TDD antes de iniciar qualquer desenvolvimento.

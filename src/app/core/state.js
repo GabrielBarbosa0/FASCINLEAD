@@ -16,6 +16,13 @@ export function createAppState({ route, createDefaultManagementFilters, createDe
     dataError: '',
     toast: null,
     search: '',
+    leadSearch: {
+      query: '',
+      loading: false,
+      searched: false,
+      error: '',
+      results: []
+    },
     unsubscribeProfile: null,
     unsubscribeLeads: null,
     unsubscribeAppointments: null,

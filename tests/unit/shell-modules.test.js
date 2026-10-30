@@ -27,6 +27,8 @@ describe('application shell modules', () => {
   it('keeps navigation active state and management grouping', () => {
     const navigation = bottomNavigation({ state: { ...state, route: 'dashboard' }, hasAccess, canManage: () => true, pendingFollowUps: () => [] });
     expect(navigation).toContain('Gestão');
+    expect(navigation).toContain('data-route="search"');
+    expect(navigation.indexOf('Cadastros')).toBeLessThan(navigation.indexOf('Pesquisa'));
     expect(navigation).toContain('aria-current="page"');
     expect(currentPageTitle({ route: 'follow-ups' }, () => true)).toBe('Retornos da equipe');
   });

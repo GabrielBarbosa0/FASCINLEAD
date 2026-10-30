@@ -8,6 +8,99 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('warns twice before creating another appointment for the same CPF', async ({ page }, testInfo) => {
+  await page.evaluate(() => {
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([{
+      id: 'existing-cpf-appointment',
+      fullName: 'Cliente Ja Agendado',
+      phoneSearch: '81999991234',
+      customerCpf: '52998224725',
+      storeId: 'loja-06',
+      capturedByUid: 'demo-user',
+      capturedByName: 'Equipe Fascinante',
+      capturedAtClient: '2026-10-30T09:00:00-03:00',
+      appointmentDate: '2099-11-05',
+      appointmentTime: '08:20',
+      appointmentAttendance: 'pending',
+      appointmentServiceName: 'Exame de vista',
+      syncState: 'demo'
+    }]));
+  });
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+  await page.getByRole('button', { name: /Nova abordagem/ }).first().click();
+
+  const cpf = page.getByLabel('CPF', { exact: true });
+  await cpf.fill('52998224725');
+  await expect(page.locator('[data-cpf-appointment-status]')).toHaveText('Já existe um agendamento ativo vinculado a este CPF.');
+
+  await page.getByRole('button', { name: 'Salvar cadastro' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'CPF já possui agendamento' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('Deseja realmente continuar e criar outro agendamento?');
+  await page.screenshot({ path: testInfo.outputPath('duplicate-cpf-appointment-warning.png'), fullPage: true });
+  await confirmation.getByRole('button', { name: 'Voltar e revisar' }).click();
+  await expect(cpf).toHaveValue('529.982.247-25');
+});
+
+test('searches whether a client already has an appointment', async ({ page }, testInfo) => {
+  const consoleErrors = [];
+  page.on('console', (message) => {
+    if (['error', 'warning'].includes(message.type())) consoleErrors.push(message.text());
+  });
+  await page.evaluate(() => {
+    localStorage.setItem('fascinlead:demo-leads', JSON.stringify([
+      {
+        id: 'search-scheduled',
+        fullName: 'Maria Agendada',
+        phoneSearch: '81999991234',
+        customerCpf: '52998224725',
+        storeId: 'loja-06',
+        capturedByUid: 'demo-user',
+        capturedByName: 'Equipe Fascinante',
+        capturedAtClient: '2026-10-30T09:00:00-03:00',
+        appointmentDate: '2026-11-05',
+        appointmentTime: '08:20',
+        appointmentServiceName: 'Exame de vista',
+        syncState: 'demo'
+      },
+      {
+        id: 'search-unscheduled',
+        fullName: 'Mariana Sem Agenda',
+        phoneSearch: '81988887777',
+        customerCpf: '12345678909',
+        storeId: 'loja-06',
+        capturedByUid: 'outro-captor',
+        capturedByName: 'Outro colaborador',
+        capturedAtClient: '2026-10-30T08:00:00-03:00',
+        appointmentDate: '',
+        appointmentTime: '',
+        syncState: 'demo'
+      }
+    ]));
+  });
+  await page.getByRole('button', { name: 'Abrir modo de desenvolvimento' }).click();
+
+  const navigation = page.getByRole('navigation', { name: 'Navegação principal' });
+  await expect(navigation.getByRole('button', { name: 'Pesquisa' })).toBeVisible();
+  await navigation.getByRole('button', { name: 'Pesquisa' }).click();
+  await expect(page.getByRole('heading', { name: 'Pesquisa' })).toBeVisible();
+
+  await page.getByLabel('Nome ou CPF').fill('maria');
+  await page.getByRole('button', { name: 'Pesquisar' }).click();
+  await expect(page.getByText('Agendado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sem agendamento', { exact: true })).toBeVisible();
+  await expect(page.getByText(/05 de novembro às 08:20/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Abrir cadastro de Maria Agendada' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Abrir cadastro de Mariana Sem Agenda' })).toHaveCount(0);
+  await page.getByLabel('Nome ou CPF').fill('529.982.247-25');
+  await page.getByRole('button', { name: 'Pesquisar' }).click();
+  await expect(page.getByText('1 resultado encontrado')).toBeVisible();
+  await expect(page.getByText('CPF 529.982.247-25')).toBeVisible();
+  await expect(page.getByText('Mariana Sem Agenda')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('lead-appointment-search.png'), fullPage: true });
+  expect(consoleErrors).toEqual([]);
+});
+
 test('keeps the header fixed while wide pages and Kanban use their intended widths', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.evaluate(() => sessionStorage.setItem('fascinlead:demo-role', 'manager'));

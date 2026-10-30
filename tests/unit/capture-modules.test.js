@@ -6,6 +6,12 @@ import { transportFields } from '../../src/app/features/capture/capture-transpor
 import { captureView } from '../../src/app/features/capture/capture-view.js';
 import { DEFAULT_STORE_SCHEDULE } from '../../src/utils/schedule.js';
 import { leadDetailAppointmentTimeField } from '../../src/app/features/leads/lead-appointment.js';
+import {
+  bindCpfAppointmentWarning,
+  cpfAppointmentConfirmationDialog,
+  hasActiveAppointment,
+  hasDemoCpfAppointment
+} from '../../src/app/features/capture/cpf-appointment-warning.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -138,5 +144,45 @@ describe('capture feature modules', () => {
     expect(markup).toContain('id="lead-form"');
     expect(markup).toContain('Exame de vista - 20 min');
     expect(markup).toContain('data-time-field');
+  });
+
+  it('detects only active appointments for the same CPF', () => {
+    const cpf = '529.982.247-25';
+    const leads = [
+      { customerCpf: cpf, appointmentDate: '2026-10-29', appointmentTime: '08:00', appointmentAttendance: 'pending' },
+      { customerCpf: cpf, appointmentDate: '2026-10-31', appointmentTime: '09:00', appointmentAttendance: 'missed' },
+      { customerCpf: cpf, appointmentDate: '2026-11-01', appointmentTime: '10:00', appointmentAttendance: 'pending' }
+    ];
+
+    expect(hasActiveAppointment(leads[0], '2026-10-30')).toBe(false);
+    expect(hasActiveAppointment(leads[1], '2026-10-30')).toBe(false);
+    expect(hasActiveAppointment(leads[2], '2026-10-30')).toBe(true);
+    expect(hasDemoCpfAppointment(leads, cpf, '2026-10-30')).toBe(true);
+    expect(hasDemoCpfAppointment(leads, '111.444.777-35', '2026-10-30')).toBe(false);
+  });
+
+  it('shows the inline CPF warning and renders a confirmation dialog', async () => {
+    const listeners = {};
+    const input = {
+      value: '529.982.247-25',
+      addEventListener: (name, listener) => { listeners[name] = listener; }
+    };
+    const output = { dataset: {}, textContent: '', hidden: true };
+    const form = {
+      elements: { customerCpf: input },
+      querySelector: () => output
+    };
+    const controller = bindCpfAppointmentWarning(form, {
+      online: () => true,
+      lookup: async () => ({ hasAppointment: true })
+    });
+
+    await controller.checkNow();
+
+    expect(output.dataset.status).toBe('warning');
+    expect(output.hidden).toBe(false);
+    expect(output.textContent).toContain('agendamento ativo');
+    expect(cpfAppointmentConfirmationDialog()).toContain('Continuar e salvar');
+    expect(Object.keys(listeners)).toEqual(expect.arrayContaining(['input', 'blur']));
   });
 });

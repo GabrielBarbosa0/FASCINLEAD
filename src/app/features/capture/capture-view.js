@@ -4,6 +4,7 @@ import { STORES } from '../../../utils/stores.js';
 import { escapeHtml, toLocalDateInput } from '../../shared/formatters.js';
 import { ametropiaOptions, eyeTriageFields, pathologyOptions, sexOptions, triageConfigFields } from './capture-triage.js';
 import { transportFields } from './capture-transport.js';
+import { cpfAppointmentConfirmationDialog, cpfAppointmentStatusMarkup } from './cpf-appointment-warning.js';
 
 export function captureView({
   scheduleState,
@@ -54,7 +55,7 @@ export function captureView({
         <div class="field" data-field="customerRg"><label for="customerRg">RG</label><input id="customerRg" name="customerRg" maxlength="20" autocomplete="off" placeholder="0.000.000" /><small class="field-error"></small></div>
       </div>
       <div class="field-row identity-fields">
-        <div class="field" data-field="customerCpf"><label for="customerCpf">CPF</label><input id="customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" /><small class="field-error"></small></div>
+        <div class="field" data-field="customerCpf"><label for="customerCpf">CPF</label><input id="customerCpf" name="customerCpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" />${cpfAppointmentStatusMarkup()}<small class="field-error"></small></div>
         <div class="field" data-field="birthDate"><label for="birthDate">Data de nascimento <span aria-hidden="true">*</span></label><input id="birthDate" name="birthDate" type="date" autocomplete="bday" max="${toLocalDateInput(new Date())}" required /><small class="birth-age-hint" data-birth-age>A idade será calculada automaticamente.</small><small class="field-error"></small></div>
         <div class="field" data-field="sex"><label for="sex">Sexo</label><select id="sex" name="sex">${sexOptions()}</select><small class="field-error"></small></div>
       </div>
@@ -82,5 +83,5 @@ export function captureView({
       <div class="field" data-field="notes"><label for="notes">Observação rápida</label><textarea id="notes" name="notes" maxlength="500" rows="3" placeholder="Ex.: prefere contato pela manhã"></textarea><small class="field-hint"><span id="notes-count">0</span>/500</small><small class="field-error"></small></div>
       <button class="button button-primary button-block" type="submit"><i data-lucide="save"></i><span>Salvar cadastro</span></button>
       <p class="form-footnote"><i data-lucide="shield-check"></i> ${offlineCaptureEnabled ? 'Quando offline, somente os dados do lead serão salvos; o agendamento será feito depois.' : 'O cadastro exige conexão com a internet nesta loja.'}</p>
-    </form>`;
+    </form>${cpfAppointmentConfirmationDialog()}`;
 }

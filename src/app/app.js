@@ -43,12 +43,16 @@ import { captureAppointmentTimeField, careRouteAppointmentSchedule, isCareRouteD
 import { ametropiaOptions, bindEyeTriage, enrichLeadTriage } from './features/capture/capture-triage.js';
 import { bindTransportFields } from './features/capture/capture-transport.js';
 import { captureView } from './features/capture/capture-view.js';
+import { bindCpfAppointmentWarning, confirmDuplicateCpfAppointment, hasDemoCpfAppointment } from './features/capture/cpf-appointment-warning.js';
 import { initializeLeadDetailForm, leadDetailSubmissionValues } from './features/leads/lead-detail-events.js';
 import { leadDetailAppointmentTimeField as renderLeadDetailAppointmentTimeField, selectedLeadDetailService as resolveLeadDetailService } from './features/leads/lead-appointment.js';
 import { leadDetailView as renderLeadDetailView } from './features/leads/lead-detail-view.js';
 import { ensureLeadHistory, stopLeadHistorySubscription } from './features/funnel/lead-history-subscriptions.js';
 import { leadHistoryView } from './features/funnel/lead-history-view.js';
 import { leadsView as renderLeadsView } from './features/leads/leads-view.js';
+import { searchDemoLeads, validateLeadSearch } from './features/search/lead-search-data.js';
+import { checkCpfActiveAppointment, loadSearchLead, searchLeadAppointments } from './features/search/lead-search-service.js';
+import { leadSearchView as renderLeadSearchView } from './features/search/lead-search-view.js';
 import { handleFollowUpsClick } from './features/follow-ups/follow-ups-events.js';
 import { initialFollowUpsState, startFollowUpsSubscriptions } from './features/follow-ups/follow-ups-subscriptions.js';
 import { followUpsView as renderFollowUpsView, pendingFollowUps as selectPendingFollowUps } from './features/follow-ups/follow-ups-view.js';
@@ -135,6 +139,7 @@ function canAccessRoute(route) {
     home: () => true,
     new: () => hasAccess('leads.create'),
     leads: () => hasAccess('leads.view_own'),
+    search: () => hasAccess('leads.view_own'),
     lead: () => hasAccess('leads.view_own'),
     'follow-ups': () => hasAccess('followups.own') || hasAccess('followups.team'),
     management: () => hasAccess('management.view'),
@@ -179,7 +184,7 @@ function homeView() {
 }
 
 function appView() {
-  const pages = { home: homeView, new: newLeadView, leads: leadsView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, kanban: kanbanView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
+  const pages = { home: homeView, new: newLeadView, leads: leadsView, search: leadSearchView, lead: leadDetailView, 'follow-ups': followUpsView, management: managementView, 'management-lead': leadDetailView, kanban: kanbanView, dashboard: dashboardView, appointments: appointmentsView, confirmations: confirmationsView, access: accessView, goals: goalsView, settings: settingsView };
   const page = pages[state.route] || homeView;
   return appShellView({ state, page: `${page()}${leadDetailDialogView()}${leadHistoryDialogView()}`, canManage, hasAccess, pendingFollowUps });
 }
@@ -241,6 +246,10 @@ function leadsView() {
     dataError: state.dataError,
     canCreate: hasAccess('leads.create')
   });
+}
+
+function leadSearchView() {
+  return renderLeadSearchView({ search: state.leadSearch });
 }
 
 function followUpsView() {
@@ -526,6 +535,13 @@ function render() {
   });
 }
 
+function lookupCpfAppointment(customerCpf) {
+  if (state.demoMode) {
+    return Promise.resolve({ hasAppointment: hasDemoCpfAppointment(state.leads, customerCpf) });
+  }
+  return checkCpfActiveAppointment(customerCpf);
+}
+
 function synchronizePendingRegistrations(announce = false) {
   return synchronizeLifecyclePendingRegistrations(state, { announce, showToast });
 }
@@ -638,6 +654,7 @@ function bindPageEvents() {
         refreshAppointmentTimeControl();
       }
     });
+    const cpfAppointmentCheck = bindCpfAppointmentWarning(form, { lookup: lookupCpfAppointment });
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!navigator.onLine && !state.offlineCapture.enabled) {
@@ -657,6 +674,13 @@ function bindPageEvents() {
         rawValues.appointmentTime = '';
       }
       const values = enrichLeadTriage(rawValues, state.newLeadSchedule.settings);
+      if (navigator.onLine && await cpfAppointmentCheck.checkNow()) {
+        const confirmed = await confirmDuplicateCpfAppointment(document.querySelector('#cpf-appointment-confirmation'));
+        if (!confirmed) {
+          form.elements.customerCpf?.focus();
+          return;
+        }
+      }
       const controlledAppointment = values.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime;
       if (state.newLeadSchedule.settings.schedulingMode === 'controlled' && values.appointmentDate && values.appointmentTime) {
         const selectedSlot = buildAppointmentSlots({
@@ -855,6 +879,56 @@ function bindPageEvents() {
     });
   }
 
+  const appointmentSearchForm = document.querySelector('#lead-appointment-search');
+  if (appointmentSearchForm) {
+    const searchInput = appointmentSearchForm.elements.query;
+    searchInput?.addEventListener('input', () => {
+      state.leadSearch.query = searchInput.value;
+      const error = appointmentSearchForm.querySelector('#lead-search-error');
+      if (error) error.textContent = '';
+    });
+    appointmentSearchForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const queryText = String(searchInput?.value || '').trim();
+      const validationError = validateLeadSearch(queryText);
+      if (validationError) {
+        const error = appointmentSearchForm.querySelector('#lead-search-error');
+        if (error) error.textContent = validationError;
+        searchInput?.focus();
+        return;
+      }
+      state.leadSearch = {
+        ...state.leadSearch,
+        query: queryText,
+        loading: true,
+        searched: false,
+        error: '',
+        results: []
+      };
+      render();
+      try {
+        const results = state.demoMode
+          ? searchDemoLeads(state.leads, queryText, state.profile)
+          : await searchLeadAppointments(queryText);
+        state.leadSearch = { ...state.leadSearch, loading: false, searched: true, results };
+      } catch (error) {
+        const unavailable = ['functions/unavailable', 'functions/deadline-exceeded'].includes(error?.code);
+        state.leadSearch = {
+          ...state.leadSearch,
+          loading: false,
+          searched: true,
+          error: unavailable
+            ? 'A pesquisa está temporariamente indisponível. Tente novamente.'
+            : error?.code === 'functions/permission-denied'
+              ? 'Seu perfil não possui permissão para esta pesquisa.'
+              : error?.message || 'Não foi possível realizar a pesquisa.',
+          results: []
+        };
+      }
+      render();
+    });
+  }
+
   bindAuthenticationForm({ state, render });
 
   const managementForm = document.querySelector('#management-filters');
@@ -925,6 +999,7 @@ function bindPageEvents() {
   const appointmentCreateForm = document.querySelector('#appointment-create-form');
   if (appointmentCreateForm) {
     bindCpfInput(appointmentCreateForm);
+    const cpfAppointmentCheck = bindCpfAppointmentWarning(appointmentCreateForm, { lookup: lookupCpfAppointment });
     bindBirthDateInput(appointmentCreateForm);
     bindExclusiveOptions(appointmentCreateForm, 'ametropiaIds');
     bindExclusiveOptions(appointmentCreateForm, 'pathologyIds');
@@ -966,6 +1041,13 @@ function bindPageEvents() {
         if (!profileStoreIds(state.profile).includes(storeId)) {
           setFieldErrors(form, { storeId: 'Selecione uma loja permitida.' });
           return;
+        }
+        if (navigator.onLine && await cpfAppointmentCheck.checkNow()) {
+          const confirmed = await confirmDuplicateCpfAppointment(document.querySelector('#cpf-appointment-confirmation'));
+          if (!confirmed) {
+            form.elements.customerCpf?.focus();
+            return;
+          }
         }
         state.appointmentCreate.saving = true;
         const submitButton = form.querySelector('[type="submit"]');
@@ -1389,6 +1471,31 @@ async function handleAction(action) {
 
 export async function startApp() {
   document.addEventListener('click', async (event) => {
+    const searchLeadButton = event.target.closest('[data-search-open-lead]');
+    if (searchLeadButton && !searchLeadButton.disabled) {
+      const result = state.leadSearch.results.find((item) => item.id === searchLeadButton.dataset.searchOpenLead);
+      if (!result?.canOpen) return;
+      searchLeadButton.disabled = true;
+      try {
+        const lead = state.demoMode
+          ? state.leads.find((item) => item.id === result.id)
+          : await loadSearchLead(result.id);
+        if (!lead) throw new Error('not-found');
+        if (lead.capturedByUid === state.profile?.uid && hasAccess('leads.view_own')) {
+          if (!state.leads.some((item) => item.id === lead.id)) state.leads = [lead, ...state.leads];
+          navigate('lead', lead.id);
+        } else if (canManage()) {
+          state.management.activeLead = lead;
+          navigate('management-lead', lead.id);
+        }
+      } catch (error) {
+        searchLeadButton.disabled = false;
+        showToast(error?.code === 'permission-denied'
+          ? 'Seu perfil pode consultar o agendamento, mas não abrir este cadastro.'
+          : 'Não foi possível abrir o cadastro.', 'danger', 'circle-alert');
+      }
+      return;
+    }
     const rankingPanel = event.target.closest('.dashboard-panel');
     const openRankingButton = event.target.closest('[data-dashboard-ranking-open]')
       || (!event.target.closest('#dashboard-ranking-dialog') && rankingPanel?.querySelector(':scope > .dashboard-ranking-list')

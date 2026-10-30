@@ -2,8 +2,8 @@
 
 | Campo | Valor |
 | --- | --- |
-| Versao | 1.0 |
-| Data | 22/10/2026 |
+| Versao | 1.1 |
+| Data | 30/10/2026 |
 | Escopo | Interfaces de rede mantidas ou consumidas pelo FascinLead |
 
 Este catalogo identifica quais interfaces sao contratos publicos, locais, administrativos ou apenas dependencias operacionais. Os contratos OpenAPI sao a fonte dos formatos HTTP; o TDD permanece como fonte das decisoes arquiteturais.
@@ -15,6 +15,8 @@ Este catalogo identifica quais interfaces sao contratos publicos, locais, admini
 | API CRM `/api/v1` | FascinLead fornece | Vite local; hospedagem futura | Bearer Token | `docs/fascinlead-api.openapi.yaml` |
 | Proxy `/api/savwin` | FascinLead fornece ao proprio frontend | Somente Vite local | Mesma origem; credenciais apenas no Node | `docs/savwin-local-proxy.openapi.yaml` |
 | Callable `updateTeamMemberPassword` | FascinLead fornece a administradores | Firebase Functions | Firebase Auth e perfil administrador | Secao 4 deste documento |
+| Callable `searchLeadAppointments` | FascinLead fornece a usuarios ativos | Firebase Functions | Firebase Auth, perfil ativo e permissao de consulta | Secao 4 deste documento |
+| Callable `checkCpfActiveAppointment` | FascinLead fornece a usuarios ativos | Firebase Functions | Firebase Auth, perfil ativo e permissao de consulta | Secao 4 deste documento |
 | Firestore e Authentication | FascinLead consome | Firebase | SDK Firebase e Security Rules | Nao sao API publica do produto |
 | Captar | Scripts operacionais consomem | Execucao administrativa local | Credenciais em variaveis de ambiente | Nao e API publica do produto |
 | WhatsApp `wa.me` | Navegador abre link externo | Cliente | Fluxo do usuario | Nao e API de integracao servidor-a-servidor |
@@ -94,7 +96,7 @@ Se o endpoint por CPF responder `404`, o proxy consulta ate cinco periodos pelo 
 
 Os cabecalhos `identificador` e `Authorization` sao adicionados somente pelo processo Node. O navegador chama apenas as rotas locais e nunca recebe esses valores.
 
-## 4. Callable Function administrativa
+## 4. Callable Functions
 
 ### 4.1 `updateTeamMemberPassword`
 
@@ -131,6 +133,40 @@ Regras:
 - altera a senha, revoga refresh tokens e grava `password_reset_by_admin` em `accessAuditEvents`.
 
 Codigos callable possiveis: `unauthenticated`, `permission-denied`, `invalid-argument` e `not-found`. Falhas inesperadas sao tratadas pelo protocolo da Firebase Functions e nao devem expor credenciais ou dados pessoais.
+
+### 4.2 `searchLeadAppointments`
+
+Pesquisa agendamentos por nome ou CPF para a tela de consulta. Exige sessao autenticada, e-mail verificado, perfil ativo e permissao `leads.view_own`. Administradores pesquisam todas as lojas; os demais usuarios recebem somente resultados das unidades permitidas. A resposta e limitada a 20 itens e informa se o cadastro pode ser aberto pelo solicitante.
+
+### 4.3 `checkCpfActiveAppointment`
+
+Entrada:
+
+```json
+{
+  "customerCpf": "52998224725"
+}
+```
+
+Resposta:
+
+```json
+{
+  "hasAppointment": true
+}
+```
+
+Regras:
+
+- exige sessao Firebase autenticada, e-mail verificado, perfil ativo e permissao `leads.view_own`;
+- aceita somente CPF normalizado com 11 digitos;
+- procura correspondencia exata em `customerCpf`;
+- considera ativo somente um agendamento com data atual ou futura, horario preenchido e comparecimento ainda nao encerrado como `attended` ou `missed`;
+- consulta todas as lojas para impedir duplicidade entre unidades;
+- devolve apenas um booleano e nao revela nome, telefone, loja, data ou horario do cadastro correspondente;
+- limita a leitura a 20 documentos correspondentes.
+
+Codigos callable possiveis: `unauthenticated`, `permission-denied` e `invalid-argument`.
 
 ## 5. Interfaces que nao sao endpoints publicos
 

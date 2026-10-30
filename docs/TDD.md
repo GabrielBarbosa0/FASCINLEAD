@@ -4,9 +4,9 @@
 | --- | --- |
 | Documento | Technical Design Document (TDD) |
 | Projeto | FascinLead |
-| Versao | 2.8 |
+| Versao | 2.9 |
 | Status | Em implementacao |
-| Data | 26/10/2026 |
+| Data | 30/10/2026 |
 | Responsavel | Oticas Fascinante |
 
 ### Manutencao deste documento
@@ -115,6 +115,8 @@ Novos cadastros exigem data de nascimento tanto na interface quanto nas regras d
 Ao trocar a loja de destino durante um novo cadastro, o formulario preserva os dados pessoais, endereco, interesse, triagem, transporte e observacoes. Data e horario sao limpos porque dependem da agenda da nova unidade; o servico permanece selecionado somente quando tambem estiver disponivel nela.
 
 O valor do exame nao e digitado nem persistido como uma segunda fonte de verdade. A interface e as exportacoes o calculam a partir de `examPaymentType` e do encaminhamento efetivo: optometrista pago custa R$ 150, oftalmologista pago custa R$ 200 e cortesia custa R$ 0. Alterar o encaminhamento recalcula o valor imediatamente.
+
+Quando um CPF valido e informado em um novo cadastro online, o sistema consulta se existe um agendamento ativo vinculado ao documento. Um aviso em texto aparece junto ao CPF assim que a consulta encontra uma data atual ou futura ainda nao encerrada. No salvamento, a consulta e repetida e uma confirmacao explicita pergunta se o usuario deseja criar outro cadastro/agendamento. A ocorrencia nao bloqueia a operacao: continuar permanece uma decisao explicita do usuario. A verificacao nao e executada no modo offline e nao devolve dados pessoais do cadastro encontrado.
 
 ### RF-03 - Operacao offline
 
@@ -330,12 +332,12 @@ O cadastro e o bloqueio de acessos sao feitos na tela `Acessos da equipe`. Lojas
 | Login | Firebase Authentication com Google e E-mail/Senha | Login conhecido, contas operacionais e persistencia de sessao |
 | Dados | Cloud Firestore | Persistencia offline no navegador e sincronizacao automatica |
 | Hospedagem | Firebase Hosting | HTTPS, CDN e deploy estatico |
-| Funcao administrativa | Firebase Functions callable | Redefinicao de senha de membros por administrador, sem expor credenciais privilegiadas no cliente |
+| Funcoes protegidas | Firebase Functions callable | Operacoes administrativas e consultas exatas que nao podem depender de leitura ampla do cliente |
 | Testes unitarios | Vitest | Integracao simples com o Vite |
 | Testes de interface | Playwright | Validacao dos fluxos online, offline e responsivos |
 | Testes locais Firebase | Firebase Emulator Suite | Testes sem consumir cota e validacao das regras |
 
-Cloud Run, Storage e extensoes pagas nao fazem parte do MVP. Firebase Functions e usada somente para a operacao administrativa de senha; sua publicacao exige confirmar previamente o plano e o custo do projeto Firebase.
+Cloud Run, Storage e extensoes pagas nao fazem parte do MVP. Firebase Functions e usada para operacoes administrativas e consultas protegidas, incluindo pesquisa de agendamentos e verificacao exata de CPF. Sua publicacao exige confirmar previamente o plano e o custo do projeto Firebase.
 
 ### 5.2 API de integracao com CRM
 

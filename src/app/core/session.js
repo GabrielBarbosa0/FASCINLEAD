@@ -78,6 +78,7 @@ export function resetSessionState(state, {
   state.profile = null;
   state.demoMode = false;
   state.leads = [];
+  state.leadSearch = { query: '', loading: false, searched: false, error: '', results: [] };
   state.management = {
     loading: false,
     loaded: false,

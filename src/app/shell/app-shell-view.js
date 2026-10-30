@@ -11,7 +11,7 @@ export function loginView({ state, firebaseConfigured, devMode }) {
 }
 
 export function currentPageTitle(state, canManage) {
-  const titles = { home: 'Início', new: 'Cadastro', leads: 'Meus cadastros', lead: 'Detalhes do cadastro', management: 'Painel de leads', 'management-lead': 'Detalhes do lead', dashboard: 'Dashboard', appointments: 'Agenda de exames', confirmations: 'Confirmações', access: 'Acessos da equipe', goals: 'Metas', settings: 'Configurações' };
+  const titles = { home: 'Início', new: 'Cadastro', leads: 'Meus cadastros', search: 'Pesquisa', lead: 'Detalhes do cadastro', management: 'Painel de leads', 'management-lead': 'Detalhes do lead', dashboard: 'Dashboard', appointments: 'Agenda de exames', confirmations: 'Confirmações', access: 'Acessos da equipe', goals: 'Metas', settings: 'Configurações' };
   if (state.route === 'kanban') return 'Funil de leads';
   if (state.route === 'follow-ups') return canManage() ? 'Retornos da equipe' : 'Retornos pendentes';
   return titles[state.route] || 'Início';
