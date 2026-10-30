@@ -495,6 +495,30 @@ describe('lead correction rules', () => {
     }));
   });
 
+  it('accepts new mutable lead fields without requiring a rules allowlist update', async () => {
+    const db = authenticatedDb('captor-uid', 'captor@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      futureWorkflowField: 'ready',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('keeps lead identity fields protected from non-administrative profiles', async () => {
+    const db = authenticatedDb('manager-uid', 'manager@example.com');
+    await assertFails(updateDoc(doc(db, 'leads', 'lead-test'), {
+      capturedByUid: 'manager-uid',
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
+  it('gives administrators a direct bypass for legacy and future fields', async () => {
+    const db = authenticatedDb('admin-uid', 'admin@example.com');
+    await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {
+      futureWorkflowField: { status: 'migrated' },
+      updatedAtServer: Timestamp.now()
+    }));
+  });
+
   it('lets an administrator reschedule while updating the lead funnel', async () => {
     const db = authenticatedDb('admin-uid', 'admin@example.com');
     await assertSucceeds(updateDoc(doc(db, 'leads', 'lead-test'), {

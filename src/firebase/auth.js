@@ -18,10 +18,17 @@ import {
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, authPersistenceReady, db, functions, isFirebaseConfigured } from './client.js';
-import { systemRoleProfileForId, systemRoleProfileForRole } from '../utils/role-profile.js';
+import {
+  PERMISSION_SCHEMA_VERSION,
+  systemRoleProfileForId,
+  systemRoleProfileForRole
+} from '../utils/role-profile.js';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
+
+const accessSyncEnabled = import.meta.env.VITE_ENABLE_ACCESS_SYNC === 'true'
+  || import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -160,6 +167,16 @@ export async function loadAuthorizedProfile(firebaseUser) {
   }
 
   const email = firebaseUser.email.toLowerCase();
+  let synchronizedProfile = null;
+  if (functions && accessSyncEnabled) {
+    try {
+      const synchronizeAccess = httpsCallable(functions, 'syncCurrentAccess');
+      const result = await synchronizeAccess();
+      synchronizedProfile = result.data?.profile || null;
+    } catch {
+      // Access sync is a migration aid; the existing Firestore profile remains the login fallback.
+    }
+  }
   const permissionRef = doc(db, 'allowedEmails', email);
   const permissionSnapshot = await getDoc(permissionRef);
 
@@ -182,6 +199,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
       role: permission.role,
       roleProfileId: permission.roleProfileId || '',
       permissions: assignedPermissions,
+      permissionSchemaVersion: permission.permissionSchemaVersion || PERMISSION_SCHEMA_VERSION,
       storeId: permission.storeId,
       storeIds: permission.storeIds || [permission.storeId],
       phone: permission.phone || '',
@@ -192,7 +210,7 @@ export async function loadAuthorizedProfile(firebaseUser) {
     });
   }
 
-  const profile = profileSnapshot.exists()
+  const profile = synchronizedProfile || (profileSnapshot.exists()
     ? profileSnapshot.data()
     : {
         email,
@@ -201,12 +219,13 @@ export async function loadAuthorizedProfile(firebaseUser) {
         role: permission.role,
         roleProfileId: permission.roleProfileId || '',
         permissions: assignedPermissions,
+        permissionSchemaVersion: permission.permissionSchemaVersion || PERMISSION_SCHEMA_VERSION,
         storeId: permission.storeId,
         storeIds: permission.storeIds || [permission.storeId],
         phone: permission.phone || '',
         savwinCode: permission.savwinCode || '',
         active: true
-      };
+      });
 
   if (profile.active !== true) {
     throw new Error('Este acesso está inativo. Procure o administrador.');
@@ -225,7 +244,12 @@ export async function loadAuthorizedProfile(firebaseUser) {
     roleProfile = { id: roleSnapshot.id, ...roleSnapshot.data() };
   }
 
-  return { uid: firebaseUser.uid, ...profile, roleProfileName: roleProfile.name, permissions: roleProfile.permissions };
+  return {
+    uid: firebaseUser.uid,
+    ...profile,
+    roleProfileName: roleProfile.name,
+    permissions: Array.isArray(profile.permissions) ? profile.permissions : roleProfile.permissions
+  };
 }
 
 export function observeAuthorizedProfile(firebaseUser, callback, errorCallback = () => {}) {

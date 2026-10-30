@@ -71,7 +71,7 @@ export default defineConfig(({ mode }) => {
         runtimeCaching: []
       },
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: 'module'
       }
     })

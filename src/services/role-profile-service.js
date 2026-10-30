@@ -1,6 +1,12 @@
 import { collection, deleteDoc, doc, getDocs, limit, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
-import { SYSTEM_ROLE_PROFILES, normalizeRolePermissions, systemRoleProfileForId, validateRoleProfile } from '../utils/role-profile.js';
+import {
+  PERMISSION_SCHEMA_VERSION,
+  SYSTEM_ROLE_PROFILES,
+  normalizeRolePermissions,
+  systemRoleProfileForId,
+  validateRoleProfile
+} from '../utils/role-profile.js';
 
 function assertAdmin(profile) {
   if (!isFirebaseConfigured || profile?.role !== 'admin') {
@@ -66,6 +72,7 @@ async function persistSystemRolePermissions(profile, roleProfileId, permissions,
       permissions: validation.data.permissions,
       system: true,
       schemaVersion: 1,
+      permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
       updatedAt: serverTimestamp(),
       updatedByUid: profile.uid
     });
@@ -73,12 +80,14 @@ async function persistSystemRolePermissions(profile, roleProfileId, permissions,
   accesses.docs.forEach((item) => batch.update(item.ref, {
     role: systemProfile.baseRole,
     permissions: validation.data.permissions,
+    permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
     updatedAt: serverTimestamp(),
     updatedBy: profile.uid
   }));
   users.docs.forEach((item) => batch.update(item.ref, {
     role: systemProfile.baseRole,
     permissions: validation.data.permissions,
+    permissionSchemaVersion: PERMISSION_SCHEMA_VERSION
   }));
   await batch.commit();
   return { ...validation, id: roleProfileId };
@@ -102,6 +111,7 @@ export async function saveRoleProfile(profile, values, existingId = '') {
     active: true,
     system: false,
     schemaVersion: 1,
+    permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
     updatedAt: serverTimestamp(),
     updatedByUid: profile.uid,
     ...(!existingId ? { createdAt: serverTimestamp(), createdByUid: profile.uid } : {})
@@ -115,12 +125,14 @@ export async function saveRoleProfile(profile, values, existingId = '') {
     accesses.docs.forEach((item) => batch.update(item.ref, {
       role: validation.data.baseRole,
       permissions: validation.data.permissions,
+      permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
       updatedAt: serverTimestamp(),
       updatedBy: profile.uid
     }));
     users.docs.forEach((item) => batch.update(item.ref, {
       role: validation.data.baseRole,
       permissions: validation.data.permissions,
+      permissionSchemaVersion: PERMISSION_SCHEMA_VERSION
     }));
     if (!accesses.empty || !users.empty) await batch.commit();
   }

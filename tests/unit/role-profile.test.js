@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_PERMISSION_IDS,
+  PERMISSION_SCHEMA_VERSION,
   SYSTEM_ROLE_PROFILES,
   hasPermission,
   normalizeRolePermissions,
@@ -9,6 +10,11 @@ import {
 } from '../../src/utils/role-profile.js';
 
 describe('role profiles', () => {
+  it('uses a versioned permission schema shared with Firebase Functions', () => {
+    expect(PERMISSION_SCHEMA_VERSION).toBe(2);
+    expect(SYSTEM_ROLE_PROFILES.every((profile) => profile.permissionSchemaVersion === 2)).toBe(true);
+  });
+
   it('keeps the administrator profile with every permission', () => {
     const admin = SYSTEM_ROLE_PROFILES.find((profile) => profile.baseRole === 'admin');
     expect(admin.permissions).toEqual(ALL_PERMISSION_IDS);

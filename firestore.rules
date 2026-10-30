@@ -124,26 +124,7 @@ service cloud.firestore {
     }
 
     function validLead(data) {
-      return data.keys().hasOnly([
-          'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
-          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'careRouteReasons',
-          'examPaymentType', 'examPaymentMethods', 'examPrice',
-          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
-          'appointmentDate', 'appointmentTime', 'appointmentAttendance',
-          'funnelStage', 'funnelReasonCode', 'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
-          'appointmentSchedulingMode', 'appointmentDurationMinutes',
-          'appointmentServiceId', 'appointmentServiceName',
-          'notes',
-          'consentGiven', 'consentAtClient', 'source',
-          'capturedAtClient', 'createdAtServer', 'updatedAtServer',
-          'capturedByUid', 'capturedByName', 'storeId', 'installationId',
-          'appVersion', 'schemaVersion'
-        ])
-        && data.fullName is string
+      return data.fullName is string
         && data.fullName.size() >= 2
         && data.fullName.size() <= 120
         && data.phone is string
@@ -311,73 +292,6 @@ service cloud.firestore {
         && slotId == 'slot-' + appointmentResourceId(data.storeId) + '-' + data.appointmentDate + '-' + data.blockTime;
     }
 
-    function validCaptorCorrectionData(data) {
-      return data.fullName is string
-        && data.fullName.size() >= 2
-        && data.fullName.size() <= 120
-        && data.phone is string
-        && data.phone.size() >= 12
-        && data.phone.size() <= 14
-        && data.phoneSearch is string
-        && data.phoneSearch.matches('^\\d{10,11}$')
-        && (!('customerCpf' in data) || (data.customerCpf is string
-          && (data.customerCpf == '' || data.customerCpf.matches('^\\d{11}$'))))
-        && (!('customerRg' in data) || (data.customerRg is string && data.customerRg.size() <= 20))
-        && (!('birthDate' in data) || (data.birthDate is string
-          && (data.birthDate == '' || data.birthDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))))
-        && (!('sex' in data) || (data.sex is string && data.sex in ['', 'female', 'male']))
-        && (!('eyeSurgeryStatus' in data) || data.eyeSurgeryStatus in ['', 'yes', 'no', 'unknown'])
-        && (!('eyeSurgeryType' in data) || data.eyeSurgeryType in ['', 'cataract', 'refractive', 'corneal-transplant', 'other'])
-        && (!('eyeSurgeryDetails' in data) || (data.eyeSurgeryDetails is string && data.eyeSurgeryDetails.size() <= 120))
-        && (!('careRoute' in data) || data.careRoute in ['optometrist', 'ophthalmologist'])
-        && (!('careRouteOverride' in data) || data.careRouteOverride in ['automatic', 'optometrist', 'ophthalmologist'])
-        && (!('careRouteReasons' in data) || (data.careRouteReasons is list
-          && data.careRouteReasons.hasOnly(['pathology', 'surgery', 'manual'])))
-        && (!('examPrice' in data) || (data.examPrice is number && data.examPrice >= 0 && data.examPrice <= 100000))
-        && (!('needsTransport' in data) || data.needsTransport is bool)
-        && (!('hasCompanion' in data) || data.hasCompanion is bool)
-        && (!('companionCount' in data) || (data.companionCount is int
-          && data.companionCount >= 0 && data.companionCount <= 5))
-        && (!('transportSeats' in data) || (data.transportSeats is int
-          && data.transportSeats >= 0 && data.transportSeats <= 6))
-        && (!('needsTransport' in data) || !('hasCompanion' in data) || data.needsTransport || !data.hasCompanion)
-        && (!('needsTransport' in data) || !('hasCompanion' in data) || !('transportSeats' in data)
-          || data.transportSeats == (data.needsTransport
-            ? (('companionCount' in data) ? data.companionCount + 1 : (data.hasCompanion ? 2 : 1))
-            : 0))
-        && (!('companionCount' in data) || !('hasCompanion' in data)
-          || data.hasCompanion == (data.companionCount > 0))
-        && (!('street' in data) || (data.street is string && data.street.size() <= 120))
-        && (!('streetNumber' in data) || (data.streetNumber is string && data.streetNumber.size() <= 12))
-        && (!('addressReference' in data) || (data.addressReference is string && data.addressReference.size() <= 160))
-        && data.notes is string
-        && data.notes.size() <= 500
-        && (!('ametropiaIds' in data) || (data.ametropiaIds is list
-          && data.ametropiaIds.size() <= 4
-          && data.ametropiaIds.hasOnly(['myopia', 'hyperopia', 'astigmatism', 'presbyopia', 'none', 'unknown'])
-          && (!data.ametropiaIds.hasAny(['none', 'unknown']) || data.ametropiaIds.size() == 1)))
-        && (!('pathologyIds' in data) || (data.pathologyIds is list
-          && data.pathologyIds.size() <= 10
-          && data.pathologyIds.hasOnly(['cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus', 'retinopathy', 'dry-eye', 'macular-degeneration', 'retinal-detachment', 'other', 'none', 'unknown'])
-          && (!data.pathologyIds.hasAny(['none', 'unknown']) || data.pathologyIds.size() == 1)))
-        && (!('appointmentDate' in data) || data.appointmentDate == ''
-          || data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
-        && (!('appointmentTime' in data) || data.appointmentTime == ''
-          || data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$'))
-        && (!('appointmentAttendance' in data)
-          || data.appointmentAttendance in ['pending', 'attended', 'missed'])
-        && (!('appointmentSchedulingMode' in data)
-          || data.appointmentSchedulingMode in ['controlled', 'free'])
-        && (!('appointmentDurationMinutes' in data)
-          || (data.appointmentDurationMinutes is int
-            && data.appointmentDurationMinutes >= 5
-            && data.appointmentDurationMinutes <= 180))
-        && (!('appointmentServiceId' in data)
-          || (data.appointmentServiceId is string && data.appointmentServiceId.size() <= 120))
-        && (!('appointmentServiceName' in data)
-          || (data.appointmentServiceName is string && data.appointmentServiceName.size() <= 80));
-    }
-
     function validLeadSale(leadId, data) {
       return data.keys().hasOnly([
           'leadId', 'storeId', 'capturedByUid', 'customerCpf',
@@ -406,37 +320,6 @@ service cloud.firestore {
         && data.updatedByUid == request.auth.uid
         && data.updatedAt is timestamp
         && data.schemaVersion == 1;
-    }
-
-    function isCaptorLeadCorrection() {
-      return activeUser()
-        && resource.data.capturedByUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'fullName', 'preferredName', 'phone', 'phoneSearch',
-          'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
-          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
-          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
-          'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-          'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendance', 'funnelStage', 'funnelReasonCode',
-          'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
-          'notes', 'updatedAtServer'
-        ])
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
-          || (
-            request.resource.data.appointmentAttendance == 'pending'
-            && (
-              !('appointmentAttendance' in resource.data)
-              || resource.data.appointmentAttendance == 'missed'
-            )
-            && (
-              request.resource.data.appointmentDate != resource.data.appointmentDate
-              || request.resource.data.appointmentTime != resource.data.appointmentTime
-            )
-          ));
     }
 
     function isOwnerAppointmentUpdate() {
@@ -485,18 +368,116 @@ service cloud.firestore {
         && data.schemaVersion == 1;
     }
 
-    function isManagerLeadUpdate() {
-      return (isAdmin() || (isManager() && managerHasStore(resource.data.storeId)))
+    function leadIdentityIsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'capturedByUid', 'capturedByName', 'storeId', 'capturedAtClient',
+        'createdAtServer', 'installationId', 'source', 'schemaVersion',
+        'consentGiven', 'consentAtClient'
+      ]);
+    }
+
+    function validLeadUpdateShape() {
+      return request.resource.data.fullName is string
+        && request.resource.data.fullName.size() >= 2
+        && request.resource.data.fullName.size() <= 120
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() >= 12
+        && request.resource.data.phone.size() <= 14
+        && request.resource.data.phoneSearch is string
+        && request.resource.data.phoneSearch.matches('^\\d{10,11}$')
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 500
         && (!('appointmentDate' in request.resource.data)
           || request.resource.data.appointmentDate == ''
           || request.resource.data.appointmentDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))
         && (!('appointmentTime' in request.resource.data)
           || request.resource.data.appointmentTime == ''
           || request.resource.data.appointmentTime.matches('^([01]\\d|2[0-3]):[0-5]\\d$'))
+        && (!('appointmentDate' in request.resource.data)
+          || !('appointmentTime' in request.resource.data)
+          || ((request.resource.data.appointmentDate == '')
+            == (request.resource.data.appointmentTime == '')))
         && (!('appointmentAttendance' in request.resource.data)
           || request.resource.data.appointmentAttendance in ['pending', 'attended', 'missed'])
+        && (!('customerRg' in request.resource.data)
+          || (request.resource.data.customerRg is string
+            && request.resource.data.customerRg.size() <= 20))
+        && (!('addressReference' in request.resource.data)
+          || (request.resource.data.addressReference is string
+            && request.resource.data.addressReference.size() <= 160))
+        && (!('ametropiaIds' in request.resource.data)
+          || (request.resource.data.ametropiaIds is list
+            && request.resource.data.ametropiaIds.size() <= 4
+            && request.resource.data.ametropiaIds.hasOnly([
+              'myopia', 'hyperopia', 'astigmatism', 'presbyopia', 'none', 'unknown'
+            ])
+            && (!request.resource.data.ametropiaIds.hasAny(['none', 'unknown'])
+              || request.resource.data.ametropiaIds.size() == 1)))
+        && (!('pathologyIds' in request.resource.data)
+          || (request.resource.data.pathologyIds is list
+            && request.resource.data.pathologyIds.size() <= 10
+            && request.resource.data.pathologyIds.hasOnly([
+              'cataract', 'glaucoma', 'diabetes', 'hypertension', 'keratoconus',
+              'retinopathy', 'dry-eye', 'macular-degeneration', 'retinal-detachment',
+              'other', 'none', 'unknown'
+            ])
+            && (!request.resource.data.pathologyIds.hasAny(['none', 'unknown'])
+              || request.resource.data.pathologyIds.size() == 1)))
+        && (!('companionCount' in request.resource.data)
+          || (request.resource.data.companionCount is int
+            && request.resource.data.companionCount >= 0
+            && request.resource.data.companionCount <= 5))
+        && (!('transportSeats' in request.resource.data)
+          || (request.resource.data.transportSeats is int
+            && request.resource.data.transportSeats >= 0
+            && request.resource.data.transportSeats <= 6))
+        && (!('needsTransport' in request.resource.data)
+          || !('hasCompanion' in request.resource.data)
+          || request.resource.data.needsTransport
+          || !request.resource.data.hasCompanion)
+        && (!('companionCount' in request.resource.data)
+          || !('hasCompanion' in request.resource.data)
+          || request.resource.data.hasCompanion
+            == (request.resource.data.companionCount > 0))
+        && (!('needsTransport' in request.resource.data)
+          || !('hasCompanion' in request.resource.data)
+          || !('transportSeats' in request.resource.data)
+          || request.resource.data.transportSeats == (request.resource.data.needsTransport
+            ? (('companionCount' in request.resource.data)
+              ? request.resource.data.companionCount + 1
+              : (request.resource.data.hasCompanion ? 2 : 1))
+            : 0));
+    }
+
+    function ownerAttendanceChangeIsValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'appointmentAttendanceUpdatedAt', 'appointmentAttendanceUpdatedByUid'
+        ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['appointmentAttendance'])
+          || (
+            request.resource.data.appointmentAttendance == 'pending'
+            && (!('appointmentAttendance' in resource.data)
+              || resource.data.appointmentAttendance == 'missed')
+            && (
+              request.resource.data.appointmentDate != resource.data.appointmentDate
+              || request.resource.data.appointmentTime != resource.data.appointmentTime
+            )
+          ));
+    }
+
+    function isOwnerLeadUpdate() {
+      return resource.data.capturedByUid == request.auth.uid
+        && userHasStore(resource.data.storeId)
+        && hasPermission('leads.edit_own')
+        && validLeadUpdateShape()
+        && ownerAttendanceChangeIsValid();
+    }
+
+    function isManagerLeadUpdate() {
+      return isManager()
+        && managerHasStore(resource.data.storeId)
         && (
-          hasPermission('leads.edit_all')
+          (hasPermission('leads.edit_all') && validLeadUpdateShape())
           || (
             hasPermission('appointments.attendance')
             &&
@@ -547,23 +528,6 @@ service cloud.firestore {
         && request.resource.data.followUpContactedAppointmentKey is string
         && request.resource.data.followUpContactedAppointmentKey
           == resource.data.appointmentDate + '|' + resource.data.appointmentTime;
-    }
-
-    function isAdminLeadCorrection() {
-      return isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'fullName', 'preferredName', 'phone', 'phoneSearch', 'customerCpf', 'customerRg', 'birthDate', 'birthMonthDay', 'sex',
-          'street', 'streetNumber', 'neighborhood', 'city', 'state', 'addressReference', 'interestId', 'interestLabel',
-          'ametropiaIds', 'ametropiaLabels', 'pathologyIds', 'pathologyLabels', 'diabetesLevel', 'diabetesNeedsMedicalAlert',
-          'eyeSurgeryStatus', 'eyeSurgeryType', 'eyeSurgeryDetails',
-          'careRoute', 'careRouteOverride', 'examPaymentType', 'examPaymentMethods', 'examPrice',
-          'needsTransport', 'hasCompanion', 'companionCount', 'transportSeats',
-          'appointmentDate', 'appointmentTime', 'appointmentSchedulingMode',
-          'appointmentDurationMinutes', 'appointmentServiceId', 'appointmentServiceName',
-          'appointmentAttendance', 'funnelStage', 'funnelReasonCode',
-          'funnelUpdatedAtClient', 'funnelUpdatedAtServer', 'appointmentCycle',
-          'notes', 'updatedAtServer'
-        ]);
     }
 
     match /allowedEmails/{email} {
@@ -645,11 +609,13 @@ service cloud.firestore {
     }
 
     match /leads/{leadId} {
-      allow create: if activeUser()
+      allow create: if isAdmin() || (
+        activeUser()
         && hasPermission('leads.create')
         && validLead(request.resource.data)
         && request.resource.data.capturedByUid == request.auth.uid
-        && (isAdmin() || userHasStore(request.resource.data.storeId));
+        && userHasStore(request.resource.data.storeId)
+      );
 
       allow get, list: if activeUser() && (
         (resource.data.capturedByUid == request.auth.uid && hasPermission('leads.view_own'))
@@ -658,32 +624,25 @@ service cloud.firestore {
         || isAdmin()
       );
 
-      allow update: if request.resource.data.capturedByUid == resource.data.capturedByUid
-        && request.resource.data.storeId == resource.data.storeId
-        && request.resource.data.createdAtServer == resource.data.createdAtServer
+      allow update: if isAdmin() || (
+        activeUser()
+        && leadIdentityIsUnchanged()
         && (
-          (
-            resource.data.capturedByUid == request.auth.uid
-            && (
-              isCaptorFollowUpContactUpdate()
-              || isOwnerAppointmentUpdate()
-              || (
-                isCaptorLeadCorrection()
-                && (!('permissions' in userProfile()) || 'leads.edit_own' in userProfile().permissions)
-                && validCaptorCorrectionData(request.resource.data)
-              )
-            )
-          )
-          || isAdminLeadCorrection()
+          isOwnerLeadUpdate()
+          || isOwnerAppointmentUpdate()
+          || isCaptorFollowUpContactUpdate()
           || isManagerLeadUpdate()
-        );
+        )
+      );
 
-      allow delete: if isPrimaryAdmin()
-        || (activeUser()
-          && hasPermission('leads.delete')
-          && (isAdmin()
-            || resource.data.capturedByUid == request.auth.uid
-            || managerHasStore(resource.data.storeId)));
+      allow delete: if isAdmin() || (
+        activeUser()
+        && hasPermission('leads.delete')
+        && (
+          (resource.data.capturedByUid == request.auth.uid && userHasStore(resource.data.storeId))
+          || managerHasStore(resource.data.storeId)
+        )
+      );
 
       match /history/{historyId} {
         allow get, list: if canReadLeadHistory(leadId);

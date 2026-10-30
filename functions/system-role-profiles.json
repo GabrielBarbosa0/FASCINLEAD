@@ -1,0 +1,98 @@
+{
+  "permissionSchemaVersion": 2,
+  "profiles": [
+    {
+      "id": "system-captor",
+      "name": "Colaborador",
+      "scope": "own",
+      "baseRole": "captor",
+      "permissions": [
+        "leads.create",
+        "leads.view_own",
+        "leads.edit_own",
+        "followups.own",
+        "goals.view_own"
+      ]
+    },
+    {
+      "id": "system-mei",
+      "name": "MEI",
+      "scope": "own",
+      "baseRole": "captor",
+      "permissions": [
+        "leads.create",
+        "leads.view_own",
+        "leads.edit_own",
+        "followups.own",
+        "goals.view_own"
+      ]
+    },
+    {
+      "id": "system-manager",
+      "name": "Gestor loja",
+      "scope": "stores",
+      "baseRole": "manager",
+      "permissions": [
+        "leads.create",
+        "leads.view_own",
+        "leads.edit_own",
+        "followups.own",
+        "goals.view_own",
+        "leads.edit_all",
+        "leads.delete",
+        "management.view",
+        "leads.clinical_update",
+        "appointments.view",
+        "appointments.attendance",
+        "followups.team",
+        "goals.manage",
+        "dashboard.view",
+        "leads.export"
+      ]
+    },
+    {
+      "id": "system-receptionist",
+      "name": "Atendente Balcao",
+      "scope": "stores",
+      "baseRole": "manager",
+      "permissions": [
+        "leads.create",
+        "leads.view_own",
+        "leads.edit_own",
+        "followups.own",
+        "management.view",
+        "leads.edit_all",
+        "leads.clinical_update",
+        "appointments.view",
+        "appointments.attendance",
+        "followups.team"
+      ]
+    },
+    {
+      "id": "system-admin",
+      "name": "Administrador",
+      "scope": "admin",
+      "baseRole": "admin",
+      "permissions": [
+        "leads.create",
+        "leads.view_own",
+        "leads.edit_own",
+        "followups.own",
+        "goals.view_own",
+        "management.view",
+        "leads.clinical_update",
+        "appointments.view",
+        "appointments.attendance",
+        "followups.team",
+        "goals.manage",
+        "dashboard.view",
+        "leads.export",
+        "leads.edit_all",
+        "leads.delete",
+        "schedule.manage",
+        "access.manage",
+        "roles.manage"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/client.js';
 import { normalizeAccessEmail, validateAccess } from '../utils/access.js';
-import { permissionsForProfile } from '../utils/role-profile.js';
+import { PERMISSION_SCHEMA_VERSION, permissionsForProfile } from '../utils/role-profile.js';
 
 function assertAdmin(profile) {
   if (!isFirebaseConfigured || profile?.role !== 'admin') {
@@ -86,6 +86,7 @@ export async function saveAccess(profile, values, roleProfiles = [], options = {
     role,
     roleProfileId,
     permissions,
+    permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
     storeId,
     storeIds,
     active: true,
@@ -100,7 +101,18 @@ export async function saveAccess(profile, values, roleProfiles = [], options = {
 
   batch.set(permissionRef, permissionData, { merge: true });
   usersSnapshot.docs.forEach((item) => {
-    batch.update(item.ref, { displayName, phone, savwinCode, role, roleProfileId, permissions, storeId, storeIds, active: true });
+    batch.update(item.ref, {
+      displayName,
+      phone,
+      savwinCode,
+      role,
+      roleProfileId,
+      permissions,
+      permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
+      storeId,
+      storeIds,
+      active: true
+    });
   });
   await batch.commit();
   return validation;

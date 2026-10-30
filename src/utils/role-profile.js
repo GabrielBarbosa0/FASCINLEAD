@@ -1,3 +1,7 @@
+import systemRoleConfig from '../../functions/system-role-profiles.json';
+
+export const PERMISSION_SCHEMA_VERSION = systemRoleConfig.permissionSchemaVersion;
+
 export const ROLE_SCOPES = [
   { id: 'own', label: 'Dados próprios', baseRole: 'captor' },
   { id: 'stores', label: 'Unidades permitidas', baseRole: 'manager' }
@@ -41,48 +45,14 @@ export const PERMISSION_GROUPS = [
 
 export const ALL_PERMISSION_IDS = PERMISSION_GROUPS.flatMap((group) => group.permissions.map((permission) => permission.id));
 
-const CAPTOR_PERMISSIONS = [
-  'leads.create',
-  'leads.view_own',
-  'leads.edit_own',
-  'followups.own',
-  'goals.view_own'
-];
-
-const MANAGER_PERMISSIONS = [
-  ...CAPTOR_PERMISSIONS,
-  'leads.edit_all',
-  'leads.delete',
-  'management.view',
-  'leads.clinical_update',
-  'appointments.view',
-  'appointments.attendance',
-  'followups.team',
-  'goals.manage',
-  'dashboard.view',
-  'leads.export'
-];
-
-const RECEPTIONIST_PERMISSIONS = [
-  'leads.create',
-  'leads.view_own',
-  'leads.edit_own',
-  'followups.own',
-  'management.view',
-  'leads.edit_all',
-  'leads.clinical_update',
-  'appointments.view',
-  'appointments.attendance',
-  'followups.team'
-];
-
-export const SYSTEM_ROLE_PROFILES = [
-  { id: 'system-captor', name: 'Colaborador', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
-  { id: 'system-mei', name: 'MEI', scope: 'own', baseRole: 'captor', permissions: CAPTOR_PERMISSIONS, system: true, active: true },
-  { id: 'system-manager', name: 'Gestor loja', scope: 'stores', baseRole: 'manager', permissions: MANAGER_PERMISSIONS, system: true, active: true },
-  { id: 'system-receptionist', name: 'Atendente Balcão', scope: 'stores', baseRole: 'manager', permissions: RECEPTIONIST_PERMISSIONS, system: true, active: true },
-  { id: 'system-admin', name: 'Administrador', scope: 'admin', baseRole: 'admin', permissions: ALL_PERMISSION_IDS, system: true, active: true }
-];
+export const SYSTEM_ROLE_PROFILES = systemRoleConfig.profiles.map((profile) => ({
+  ...profile,
+  name: profile.id === 'system-receptionist' ? 'Atendente Balcão' : profile.name,
+  permissions: profile.baseRole === 'admin' ? [...ALL_PERMISSION_IDS] : [...profile.permissions],
+  permissionSchemaVersion: PERMISSION_SCHEMA_VERSION,
+  system: true,
+  active: true
+}));
 
 export function systemRoleProfileForRole(role) {
   return SYSTEM_ROLE_PROFILES.find((profile) => profile.baseRole === role) || SYSTEM_ROLE_PROFILES[0];
